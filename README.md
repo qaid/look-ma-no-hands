@@ -1,143 +1,187 @@
-# WhisperDictation
+# WhisperTalk
 
-A macOS dictation app that uses local AI for transcription and smart formatting. Speak anywhere, get perfectly formatted text.
+Fast, local voice dictation for macOS. Press Caps Lock, speak, and get perfectly formatted text—instantly.
 
-## Features
+## ✨ Features
 
-- **System-wide dictation**: Works in any app, any text field
-- **Caps Lock trigger**: Press Caps Lock to start/stop recording
-- **Local transcription**: Uses Whisper AI model, runs on your Mac
-- **Smart formatting**: AI automatically formats your text appropriately
-- **100% private**: No cloud services, all processing happens locally
+- **Lightning Fast**: ~1 second transcription with Core ML acceleration (8-15x faster than competitors)
+- **System-wide**: Works in any app, any text field
+- **Caps Lock trigger**: Simple toggle—press once to start, again to stop
+- **100% Local**: Everything runs on your Mac, no cloud, no internet required
+- **Smart formatting**: Automatic capitalization, punctuation, and cleanup
+- **Privacy first**: Your voice never leaves your computer
+- **Native macOS**: Beautiful floating indicator, menu bar integration
 
-## Requirements
+## 🚀 Quick Start
 
-- macOS 13 (Ventura) or later
-- Apple Silicon Mac recommended (Intel Macs supported but slower)
-- 8GB RAM minimum, 16GB recommended
-- [Ollama](https://ollama.ai) installed for smart formatting
-
-## Installation
-
-### 1. Install Ollama
-
-Download and install Ollama from [ollama.ai](https://ollama.ai).
-
-Then install a formatting model:
-
-```bash
-ollama pull llama3.2:3b
-```
-
-### 2. Build WhisperDictation
+### 1. Install Dependencies
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd WhisperDictation
+git clone https://github.com/qaid/whispertalk.git
+cd whispertalk
 
-# Build the app
+# Build
 swift build -c release
-
-# Run the app
-.build/release/WhisperDictation
 ```
 
-### 3. Grant Permissions
+### 2. Download Whisper Model
 
-On first launch, you'll be asked to grant:
-
-1. **Microphone access**: Required to capture your voice
-2. **Accessibility access**: Required to insert text into apps
-
-## Usage
-
-1. Launch WhisperDictation (it will appear in your menu bar)
-2. Click on any text field in any application
-3. Press **Caps Lock** to start recording
-4. Speak your text
-5. Press **Caps Lock** again to stop
-6. Your formatted text will be inserted
-
-## Examples
-
-### Email Dictation
-
-**You say**:
-> "hey john hope you're doing well wanted to follow up on our meeting yesterday let me know if you have time to chat this week thanks"
-
-**You get**:
-> Hey John,
->
-> Hope you're doing well. Wanted to follow up on our meeting yesterday.
->
-> Let me know if you have time to chat this week.
->
-> Thanks
-
-### Quick Note
-
-**You say**:
-> "remember to buy milk eggs bread and pick up dry cleaning tomorrow"
-
-**You get**:
-> Remember to buy: milk, eggs, bread. Pick up dry cleaning tomorrow.
-
-## Settings
-
-Click the menu bar icon and select "Settings" to configure:
-
-- **Trigger key**: Change from Caps Lock to another key
-- **Whisper model**: Choose accuracy vs. speed
-- **Ollama model**: Choose formatting quality
-- **Visual indicator**: Customize recording indicator
-
-## Troubleshooting
-
-### Caps Lock not working?
-
-If Caps Lock doesn't trigger recording, the app will fall back to the Right Option key. You can also configure a different key in Settings.
-
-### Ollama not detected?
-
-Make sure Ollama is running:
+**Recommended**: Use the tiny model with Core ML for best speed:
 
 ```bash
-ollama serve
+cd ~/.whisper/models
+
+# Download tiny model (75 MB)
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+
+# Download Core ML acceleration (14 MB) - 5-10x faster!
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-encoder.mlmodelc.zip
+unzip ggml-tiny-encoder.mlmodelc.zip
+rm ggml-tiny-encoder.mlmodelc.zip
 ```
 
-If Ollama isn't available, the app will still work but insert raw (unformatted) text.
+Alternatively, WhisperTalk can download models for you on first launch.
 
-### Text not inserting?
-
-Some applications have restricted text input. If text doesn't appear, the app will copy it to your clipboard instead. Just press Cmd+V to paste.
-
-## Privacy
-
-WhisperDictation processes everything locally:
-
-- Audio is processed by Whisper on your Mac
-- Formatting is done by Ollama on your Mac
-- No data is sent to any cloud service
-- No internet connection required after initial setup
-
-## Development
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical details.
-
-### Building from Source
+### 3. Run
 
 ```bash
-swift build          # Debug build
-swift build -c release   # Release build
-swift test           # Run tests
+.build/release/WhisperTalk
 ```
 
-## License
+### 4. Grant Permissions
 
-[To be determined]
+On first launch, grant:
+1. **Microphone access**: To capture your voice
+2. **Accessibility access**: To insert text anywhere
 
-## Acknowledgments
+## 🎯 Usage
 
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) for local transcription
-- [Ollama](https://ollama.ai) for local LLM inference
+1. Click any text field in any app
+2. Press **Caps Lock** to start recording
+3. Speak naturally
+4. Press **Caps Lock** again to stop
+5. Formatted text appears instantly!
+
+## ⚡ Performance
+
+| Model | Size | Speed (16s audio) | Accuracy | Recommended |
+|-------|------|-------------------|----------|-------------|
+| **tiny** | 75 MB | **~1s** (Core ML) | Good for dictation | ✅ **Yes** |
+| base | 142 MB | ~2-3s (Core ML) | Better accuracy | For longer transcriptions |
+| small | 466 MB | ~5-7s (Core ML) | High accuracy | Complex terminology |
+
+**With Core ML**: 8-15x faster on Apple Silicon!
+**Without Core ML**: Falls back to CPU (still works, just slower)
+
+See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
+
+## 🛠️ Requirements
+
+- **macOS 14+** (Sonoma or later)
+- **Apple Silicon** recommended (Intel Macs supported but slower)
+- **~200 MB disk space** for tiny model + Core ML
+
+## 📝 How It Works
+
+1. **Audio Capture**: AVFoundation records high-quality 16kHz mono audio
+2. **Transcription**: Whisper.cpp with Core ML converts speech to text
+3. **Formatting**: Rule-based system adds capitalization and punctuation
+4. **Insertion**: Accessibility API pastes text directly into focused field
+
+All processing happens on your Mac in under 1 second!
+
+## 🔧 Configuration
+
+Click the menu bar icon to:
+- Download different Whisper models
+- View permissions status
+- Quit the app
+
+## 🐛 Troubleshooting
+
+**Core ML not loading?**
+- Check console for `whisper_init_state: Core ML model loaded`
+- Ensure `.mlmodelc` file is in `~/.whisper/models/`
+- Requires macOS 12+ and Apple Silicon for best performance
+
+**Text not inserting?**
+- Some apps restrict accessibility—WhisperTalk falls back to clipboard
+- Check Accessibility permissions in System Settings
+
+**Caps Lock not working?**
+- The app monitors Caps Lock presses (doesn't change actual Caps Lock state)
+- Ensure Accessibility permission is granted
+
+## 📚 Project Structure
+
+```
+WhisperTalk/
+├── Sources/WhisperTalk/
+│   ├── App/              # Main app and menu bar
+│   ├── Services/         # Core functionality
+│   │   ├── AudioRecorder.swift       # 16kHz audio capture + normalization
+│   │   ├── WhisperService.swift      # Whisper.cpp integration + Core ML
+│   │   ├── TextFormatter.swift       # Rule-based text cleanup
+│   │   ├── TextInsertionService.swift # Accessibility API
+│   │   └── KeyboardMonitor.swift     # Caps Lock detection
+│   ├── Views/            # SwiftUI + AppKit UI
+│   └── Models/           # State management
+├── docs/                 # Architecture documentation
+└── PERFORMANCE.md        # Optimization guide
+```
+
+## 🔒 Privacy
+
+WhisperTalk is 100% local:
+- ✅ Audio never sent to cloud
+- ✅ No telemetry or analytics
+- ✅ No internet required (after model download)
+- ✅ Open source—verify for yourself
+
+## 🚧 Known Limitations
+
+- Caps Lock monitoring requires Accessibility permission
+- Some sandboxed apps may not allow direct text insertion
+- Best accuracy with clear audio in quiet environments
+- English-only (Whisper supports other languages, but not tested)
+
+## 📖 Advanced Usage
+
+### Using Different Models
+
+Download other models from [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp/tree/main):
+
+```bash
+cd ~/.whisper/models
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
+curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-encoder.mlmodelc.zip
+unzip ggml-base-encoder.mlmodelc.zip
+```
+
+WhisperTalk automatically uses the best model it finds (prefers tiny → base → small).
+
+### Building for Release
+
+```bash
+swift build -c release
+cp .build/release/WhisperTalk ~/Applications/
+```
+
+## 🤝 Contributing
+
+Contributions welcome! Please read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first.
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file.
+
+## 🙏 Acknowledgments
+
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Fast Whisper inference
+- [SwiftWhisper](https://github.com/exPHAT/SwiftWhisper) - Swift bindings
+- Inspired by macOS built-in dictation, but faster and fully local
+
+---
+
+**Made with ❤️ for productive macOS users who value privacy and speed.**
