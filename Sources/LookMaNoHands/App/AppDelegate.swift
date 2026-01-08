@@ -37,6 +37,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         NSLog("✅ AppDelegate: Set activation policy")
 
+        // Register URL event handler for URL scheme support
+        NSAppleEventManager.shared().setEventHandler(
+            self,
+            andSelector: #selector(handleURLEvent(_:withReplyEvent:)),
+            forEventClass: AEEventClass(kInternetEventClass),
+            andEventID: AEEventID(kAEGetURL)
+        )
+        NSLog("✅ AppDelegate: URL scheme handler registered")
+
         // Set up the menu bar
         setupMenuBar()
         NSLog("✅ AppDelegate: Menu bar setup complete")
@@ -57,6 +66,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("✅ AppDelegate: Keyboard monitoring setup complete")
 
         NSLog("🎉 Look Ma No Hands launched successfully")
+    }
+
+    // MARK: - URL Scheme Handling
+
+    @objc func handleURLEvent(_ event: NSAppleEventDescriptor, withReplyEvent replyEvent: NSAppleEventDescriptor) {
+        guard let urlString = event.paramDescriptor(forKeyword: AEKeyword(keyDirectObject))?.stringValue,
+              let url = URL(string: urlString) else {
+            NSLog("❌ Invalid URL event received")
+            return
+        }
+
+        NSLog("🔗 Received URL: \(url)")
+
+        // Handle lookmanohands:// URLs
+        if url.scheme == "lookmanohands" {
+            switch url.host {
+            case "toggle":
+                NSLog("📞 URL command: toggle recording")
+                handleTriggerKey()
+            case "start":
+                NSLog("📞 URL command: start recording")
+                if !transcriptionState.isRecording && transcriptionState.recordingState == .idle {
+                    startRecording()
+                }
+            case "stop":
+                NSLog("📞 URL command: stop recording")
+                if transcriptionState.isRecording {
+                    stopRecordingAndTranscribe()
+                }
+            default:
+                NSLog("⚠️ Unknown URL command: \(url.host ?? "none")")
+            }
+        }
     }
     
     // MARK: - Menu Bar Setup
