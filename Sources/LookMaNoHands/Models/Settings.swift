@@ -15,9 +15,9 @@ enum WhisperModel: String, CaseIterable, Identifiable {
     case base = "base"
     case small = "small"
     case medium = "medium"
-    
+
     var id: String { rawValue }
-    
+
     var displayName: String {
         switch self {
         case .tiny: return "Tiny (75MB, fastest)"
@@ -26,10 +26,18 @@ enum WhisperModel: String, CaseIterable, Identifiable {
         case .medium: return "Medium (1.5GB, best)"
         }
     }
-    
+
     var modelFileName: String {
         "ggml-\(rawValue).bin"
     }
+}
+
+/// Recording indicator position
+enum IndicatorPosition: String, CaseIterable, Identifiable {
+    case top = "Top"
+    case bottom = "Bottom"
+
+    var id: String { rawValue }
 }
 
 /// User preferences and settings
@@ -46,8 +54,10 @@ class Settings: ObservableObject {
         static let triggerKey = "triggerKey"
         static let whisperModel = "whisperModel"
         static let ollamaModel = "ollamaModel"
-        static let enableFormatting = "enableFormatting"
+        // Note: enableFormatting removed - formatting is always enabled for dictation
+        // Ollama integration reserved for future meeting transcription feature
         static let showIndicator = "showIndicator"
+        static let indicatorPosition = "indicatorPosition"
     }
     
     // MARK: - Published Properties
@@ -66,27 +76,27 @@ class Settings: ObservableObject {
         }
     }
     
-    /// The Ollama model to use for formatting
+    /// The Ollama model to use for formatting (reserved for meeting transcription)
     @Published var ollamaModel: String {
         didSet {
             UserDefaults.standard.set(ollamaModel, forKey: Keys.ollamaModel)
         }
     }
-    
-    /// Whether to enable AI formatting (if false, use raw transcription)
-    @Published var enableFormatting: Bool {
-        didSet {
-            UserDefaults.standard.set(enableFormatting, forKey: Keys.enableFormatting)
-        }
-    }
-    
+
     /// Whether to show the floating recording indicator
     @Published var showIndicator: Bool {
         didSet {
             UserDefaults.standard.set(showIndicator, forKey: Keys.showIndicator)
         }
     }
-    
+
+    /// Position of the recording indicator (top or bottom of screen)
+    @Published var indicatorPosition: IndicatorPosition {
+        didSet {
+            UserDefaults.standard.set(indicatorPosition.rawValue, forKey: Keys.indicatorPosition)
+        }
+    }
+
     // MARK: - Initialization
     
     private init() {
@@ -107,18 +117,18 @@ class Settings: ObservableObject {
         }
         
         self.ollamaModel = UserDefaults.standard.string(forKey: Keys.ollamaModel) ?? "llama3.2:3b"
-        
-        // Default to true if not set
-        if UserDefaults.standard.object(forKey: Keys.enableFormatting) != nil {
-            self.enableFormatting = UserDefaults.standard.bool(forKey: Keys.enableFormatting)
-        } else {
-            self.enableFormatting = true
-        }
-        
+
         if UserDefaults.standard.object(forKey: Keys.showIndicator) != nil {
             self.showIndicator = UserDefaults.standard.bool(forKey: Keys.showIndicator)
         } else {
             self.showIndicator = true
+        }
+
+        if let savedPosition = UserDefaults.standard.string(forKey: Keys.indicatorPosition),
+           let position = IndicatorPosition(rawValue: savedPosition) {
+            self.indicatorPosition = position
+        } else {
+            self.indicatorPosition = .top
         }
     }
     
@@ -129,7 +139,7 @@ class Settings: ObservableObject {
         triggerKey = .capsLock
         whisperModel = .base
         ollamaModel = "llama3.2:3b"
-        enableFormatting = true
         showIndicator = true
+        indicatorPosition = .top
     }
 }

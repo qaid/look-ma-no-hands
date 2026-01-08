@@ -60,16 +60,30 @@ struct SettingsView: View {
             
             Section {
                 Toggle("Show recording indicator", isOn: $settings.showIndicator)
-                
+
+                if settings.showIndicator {
+                    Picker("Indicator Position", selection: $settings.indicatorPosition) {
+                        ForEach(IndicatorPosition.allCases) { position in
+                            Text(position.rawValue).tag(position)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 Text("Display a floating indicator while recording")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             
             Section {
-                Toggle("Enable smart formatting", isOn: $settings.enableFormatting)
-                
-                Text("Use AI to format transcribed text (requires Ollama)")
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Automatic formatting enabled")
+                        .font(.body)
+                }
+
+                Text("Applies capitalization and punctuation to transcribed text")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -103,11 +117,12 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
             
-            Section("Ollama (Formatting)") {
+            Section("Ollama (Meeting Transcription)") {
                 TextField("Model name", text: $settings.ollamaModel)
                     .textFieldStyle(.roundedBorder)
-                
-                Text("The Ollama model used for formatting (e.g., llama3.2:3b)")
+                    .disabled(true)
+
+                Text("For future meeting transcription feature (e.g., llama3.2:3b)")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 

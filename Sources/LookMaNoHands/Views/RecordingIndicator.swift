@@ -8,7 +8,7 @@ struct RecordingIndicator: View {
     @State private var isPulsing = false
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             // Pulsing red recording dot with smooth animation
             Circle()
                 .fill(
@@ -16,10 +16,10 @@ struct RecordingIndicator: View {
                         gradient: Gradient(colors: [.red, Color.red.opacity(0.8)]),
                         center: .center,
                         startRadius: 0,
-                        endRadius: 6
+                        endRadius: 8
                     )
                 )
-                .frame(width: 10, height: 10)
+                .frame(width: 14, height: 14)
                 .scaleEffect(isPulsing ? 1.3 : 1.0)
                 .opacity(isPulsing ? 0.7 : 1.0)
                 .animation(
@@ -28,18 +28,18 @@ struct RecordingIndicator: View {
                 )
 
             Text("Recording")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundColor(.primary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 14)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 4)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
         )
         .onAppear {
@@ -57,6 +57,8 @@ struct RecordingIndicator: View {
 class RecordingIndicatorWindowController {
 
     private var window: NSWindow?
+    private let windowWidth: CGFloat = 160
+    private let windowHeight: CGFloat = 46
 
     init() {
         // Create window once during initialization
@@ -69,7 +71,7 @@ class RecordingIndicatorWindowController {
 
         // Create window
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 130, height: 36),
+            contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
             styleMask: [.borderless],
             backing: .buffered,
             defer: false
@@ -83,13 +85,8 @@ class RecordingIndicatorWindowController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
 
-        // Position near top-center
-        if let screen = NSScreen.main {
-            let screenFrame = screen.visibleFrame
-            let x = screenFrame.midX - 65 // Half of window width
-            let y = screenFrame.maxY - 52  // From top
-            window.setFrameOrigin(NSPoint(x: x, y: y))
-        }
+        // Position will be set when showing based on user preference
+        updatePosition()
 
         // Start hidden
         window.alphaValue = 0
@@ -98,9 +95,33 @@ class RecordingIndicatorWindowController {
         self.window = window
     }
 
+    /// Update window position based on user preference
+    private func updatePosition() {
+        guard let window = window, let screen = NSScreen.main else { return }
+
+        let screenFrame = screen.visibleFrame
+        let x = screenFrame.midX - (windowWidth / 2) // Center horizontally
+        let y: CGFloat
+
+        // Get position preference from settings
+        let position = Settings.shared.indicatorPosition
+
+        switch position {
+        case .top:
+            y = screenFrame.maxY - 60  // Near top with some padding
+        case .bottom:
+            y = screenFrame.minY + 60  // Near bottom with some padding
+        }
+
+        window.setFrameOrigin(NSPoint(x: x, y: y))
+    }
+
     /// Show the recording indicator
     func show() {
         guard let window = window else { return }
+
+        // Update position in case settings changed
+        updatePosition()
 
         // Make window visible first
         window.orderFront(nil)
