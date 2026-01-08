@@ -6,11 +6,19 @@ Fast, local voice dictation for macOS. Press Caps Lock, speak, and get perfectly
 
 - **Lightning Fast**: ~1 second transcription with Core ML acceleration (8-15x faster than competitors)
 - **System-wide**: Works in any app, any text field
-- **Caps Lock trigger**: Simple toggle—press once to start, again to stop
+- **Multiple Triggers**:
+  - Caps Lock toggle (press once to start, again to stop)
+  - Menu bar control (Start/Stop Recording)
 - **100% Local**: Everything runs on your Mac, no cloud, no internet required
 - **Smart formatting**: Automatic capitalization, punctuation, and cleanup
 - **Privacy first**: Your voice never leaves your computer
-- **Native macOS**: Beautiful floating indicator, menu bar integration
+- **Native macOS**:
+  - Beautiful floating recording indicator with pulsing animation
+  - Menu bar app with status icon that changes during recording
+  - Settings window for permission management
+  - Custom app icon
+- **Core ML Optimized**: Utilizes Apple Neural Engine for maximum performance
+- **Visual Feedback**: Recording indicator shows real-time recording status
 
 ## 🚀 Quick Start
 
@@ -57,11 +65,26 @@ On first launch, grant:
 
 ## 🎯 Usage
 
+### Recording via Caps Lock
 1. Click any text field in any app
-2. Press **Caps Lock** to start recording
+2. Press **Caps Lock** to start recording (floating indicator appears)
 3. Speak naturally
 4. Press **Caps Lock** again to stop
 5. Formatted text appears instantly!
+
+### Recording via Menu Bar
+1. Click the **Look Ma No Hands** menu bar icon
+2. Select **Start Recording**
+3. Speak naturally
+4. Click the menu bar icon again and select **Stop Recording**
+
+### Settings Window
+Access via menu bar → **Settings** to:
+- **Permissions Tab**: Check microphone and accessibility permissions status
+- **Grant Permissions**: Quick buttons to request required permissions
+- **About Tab**: View app version and information
+
+The menu bar icon changes when recording is active, and the menu item toggles between "Start Recording" and "Stop Recording".
 
 ## ⚡ Performance
 

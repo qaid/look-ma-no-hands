@@ -1,4 +1,6 @@
 import SwiftUI
+import AVFoundation
+import ApplicationServices
 
 /// Settings window for configuring Look Ma No Hands
 struct SettingsView: View {
@@ -240,17 +242,29 @@ struct SettingsView: View {
     
     private func checkPermissions() {
         // Check microphone permission
-        // TODO: Implement actual AVCaptureDevice.authorizationStatus check
-        micPermission = .unknown
-        
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        switch micStatus {
+        case .authorized:
+            micPermission = .granted
+        case .denied, .restricted:
+            micPermission = .denied
+        case .notDetermined:
+            micPermission = .unknown
+        @unknown default:
+            micPermission = .unknown
+        }
+
         // Check accessibility permission
         let trusted = AXIsProcessTrusted()
         accessibilityPermission = trusted ? .granted : .denied
     }
     
     private func requestMicrophonePermission() {
-        // TODO: Implement AVCaptureDevice.requestAccess
-        print("Requesting microphone permission...")
+        AVCaptureDevice.requestAccess(for: .audio) { granted in
+            DispatchQueue.main.async {
+                self.micPermission = granted ? .granted : .denied
+            }
+        }
     }
     
     private func openAccessibilityPreferences() {

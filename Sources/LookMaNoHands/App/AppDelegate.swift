@@ -8,6 +8,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Menu bar status item
     private var statusItem: NSStatusItem?
+    private var recordingMenuItem: NSMenuItem?
+    private var settingsWindow: NSWindow?
 
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
@@ -29,25 +31,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("🚀 AppDelegate: applicationDidFinishLaunching called")
+
         // Hide dock icon (menu bar app only)
         NSApp.setActivationPolicy(.accessory)
+        NSLog("✅ AppDelegate: Set activation policy")
 
         // Set up the menu bar
         setupMenuBar()
+        NSLog("✅ AppDelegate: Menu bar setup complete")
 
         // Check permissions on launch
         checkPermissions()
+        NSLog("✅ AppDelegate: Permissions checked")
 
         // Load Whisper model
         loadWhisperModel()
+        NSLog("✅ AppDelegate: Whisper model load initiated")
 
         // Optional: Check if Ollama is available (for advanced AI formatting)
         // checkOllamaStatus()
 
         // Start keyboard monitoring
         setupKeyboardMonitoring()
+        NSLog("✅ AppDelegate: Keyboard monitoring setup complete")
 
-        print("Look Ma No Hands launched successfully")
+        NSLog("🎉 Look Ma No Hands launched successfully")
     }
     
     // MARK: - Menu Bar Setup
@@ -72,13 +81,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(statusItem)
         
         menu.addItem(NSMenuItem.separator())
-        
+
         // Recording control
-        menu.addItem(NSMenuItem(
+        let recordingItem = NSMenuItem(
             title: "Start Recording (Caps Lock)",
             action: #selector(toggleRecording),
             keyEquivalent: ""
-        ))
+        )
+        self.recordingMenuItem = recordingItem
+        menu.addItem(recordingItem)
         
         menu.addItem(NSMenuItem.separator())
         
@@ -138,9 +149,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func openSettings() {
-        // Open the Settings window
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        NSLog("📋 Opening Settings window...")
+
+        // If window already exists, just bring it to front
+        if let window = settingsWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // Create settings window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 400),
+            styleMask: [.titled, .closable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.title = "Look Ma No Hands Settings"
+        window.center()
+        window.isReleasedWhenClosed = false
+
+        // Create SwiftUI settings view and wrap it in NSHostingView
+        let settingsView = SettingsView()
+        let hostingView = NSHostingView(rootView: settingsView)
+        window.contentView = hostingView
+
+        self.settingsWindow = window
+
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        NSLog("✅ Settings window created and displayed")
     }
     
     // MARK: - Permission Checks
@@ -353,8 +393,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Keyboard Monitoring Setup
 
     private func setupKeyboardMonitoring() {
-        keyboardMonitor.startMonitoring { [weak self] in
+        let success = keyboardMonitor.startMonitoring { [weak self] in
             self?.handleTriggerKey()
+        }
+
+        if success {
+            NSLog("✅ Keyboard monitoring started successfully")
+        } else {
+            NSLog("❌ Keyboard monitoring failed to start - accessibility permission may not be granted")
+            // Try again after a delay in case permissions were just granted
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                NSLog("🔄 Retrying keyboard monitoring setup...")
+                if self?.keyboardMonitor.startMonitoring(onTrigger: { [weak self] in
+                    self?.handleTriggerKey()
+                }) == true {
+                    NSLog("✅ Keyboard monitoring started on retry")
+                }
+            }
         }
     }
 
@@ -485,6 +540,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Could also change the color here using button.contentTintColor
         } else {
             button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Look Ma No Hands")
+        }
+
+        // Update menu item text
+        updateRecordingMenuItem(isRecording: isRecording)
+    }
+
+    /// Update the recording menu item text based on recording state
+    private func updateRecordingMenuItem(isRecording: Bool) {
+        if isRecording {
+            recordingMenuItem?.title = "Stop Recording (Caps Lock)"
+        } else {
+            recordingMenuItem?.title = "Start Recording (Caps Lock)"
         }
     }
 }

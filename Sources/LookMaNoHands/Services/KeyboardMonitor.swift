@@ -28,10 +28,13 @@ class KeyboardMonitor {
     @discardableResult
     func startMonitoring(onTrigger callback: @escaping TriggerCallback) -> Bool {
         guard !isMonitoring else { return true }
-        
-        // Check accessibility permission
-        guard AXIsProcessTrusted() else {
-            print("KeyboardMonitor: Accessibility permission not granted")
+
+        // Check accessibility permission and prompt if needed
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let trusted = AXIsProcessTrustedWithOptions(options)
+
+        guard trusted else {
+            print("KeyboardMonitor: Accessibility permission not granted - prompt shown")
             return false
         }
         
@@ -74,8 +77,8 @@ class KeyboardMonitor {
         CGEvent.tapEnable(tap: tap, enable: true)
         
         isMonitoring = true
-        print("KeyboardMonitor: Started monitoring")
-        
+        NSLog("⌨️ KeyboardMonitor: Started monitoring successfully!")
+
         return true
     }
     
@@ -116,10 +119,11 @@ class KeyboardMonitor {
         
         // Caps Lock keycode is 57
         if keyCode == 57 {
-            print("KeyboardMonitor: Caps Lock detected")
-            
+            NSLog("🔔 KeyboardMonitor: Caps Lock detected (keycode: %d)", keyCode)
+
             // Call the trigger callback on the main thread
             DispatchQueue.main.async { [weak self] in
+                NSLog("🔔 KeyboardMonitor: Triggering callback...")
                 self?.onTrigger?()
             }
         }
