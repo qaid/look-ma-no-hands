@@ -1,10 +1,10 @@
-# WhisperDictation - Claude Code Context
+# Look Ma No Hands - Claude Code Context
 
 This file provides context for Claude Code sessions working on this project.
 
 ## Project Overview
 
-**WhisperDictation** is a macOS application that provides system-wide voice dictation with AI-powered smart formatting. Users press Caps Lock to toggle recording, speak, and the transcribed + formatted text is inserted into any active input field.
+**Look Ma No Hands** is a macOS application that provides system-wide voice dictation with local AI transcription. Users press Caps Lock to toggle recording, speak, and the transcribed + formatted text is inserted into any active input field.
 
 ## Core Requirements
 
@@ -14,7 +14,7 @@ This file provides context for Claude Code sessions working on this project.
 | Trigger | Caps Lock key toggles recording (with fallback to alternative key if needed) |
 | Scope | System-wide - works in any application, any input field |
 | Transcription | 100% local using whisper.cpp |
-| Formatting | 100% local using Ollama (local LLM) |
+| Formatting | Rule-based capitalization and punctuation |
 | Interface | Menu bar icon + floating recording indicator + settings window |
 | Privacy | No cloud services - everything runs on user's Mac |
 

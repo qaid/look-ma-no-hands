@@ -182,13 +182,14 @@ curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-e
 unzip ggml-base-encoder.mlmodelc.zip
 ```
 
-WhisperTalk automatically uses the best model it finds (prefers tiny → base → small).
+Look Ma No Hands automatically uses the best model it finds (prefers tiny → base → small).
 
 ### Building for Release
 
 ```bash
 swift build -c release
-cp .build/release/WhisperTalk ~/Applications/
+# Or use the deployment script:
+./deploy.sh
 ```
 
 ## 🤝 Contributing
