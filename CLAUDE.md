@@ -167,6 +167,14 @@ LookMaNoHands/
 4. **Fail gracefully**: If Ollama isn't running, offer raw transcription
 5. **Privacy first**: Never send data off the device
 
+## Git Commit Guidelines
+
+**IMPORTANT**: When creating git commits for this project:
+- **NEVER** include "🤖 Generated with [Claude Code]" footer
+- **NEVER** include "Co-Authored-By: Claude Sonnet" attribution
+- Write clear, concise commit messages that follow the existing style
+- Focus on describing what changed and why, without AI attribution
+
 ## Commands
 
 ```bash
