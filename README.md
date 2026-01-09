@@ -1,4 +1,4 @@
-# Look Ma No Hands
+# Look Ma, No Hands 🙌🏾
 
 Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock for instant dictation, or record video calls with AI-powered meeting notes.
 
