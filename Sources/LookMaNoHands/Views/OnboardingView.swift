@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import AppKit
 
 // MARK: - Main Onboarding View
 
@@ -13,50 +14,62 @@ struct OnboardingView: View {
     let onComplete: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Progress indicator
-            ProgressIndicatorView(currentStep: onboardingState.currentStep)
-                .padding(.top, 20)
-                .padding(.bottom, 10)
+        ZStack(alignment: .top) {
+            // Main content
+            VStack(spacing: 0) {
+                // Spacer for progress indicator
+                Spacer()
+                    .frame(height: 80)
 
-            // Content area
-            TabView(selection: $onboardingState.currentStep) {
-                WelcomeStepView(onboardingState: onboardingState)
-                    .tag(OnboardingState.Step.welcome)
+                // Content area - using ZStack instead of TabView to avoid page indicators
+                ZStack {
+                    if onboardingState.currentStep == .welcome {
+                        WelcomeStepView(onboardingState: onboardingState)
+                            .transition(.opacity)
+                    } else if onboardingState.currentStep == .ollama {
+                        OllamaStepView(
+                            onboardingState: onboardingState,
+                            ollamaService: ollamaService
+                        )
+                        .transition(.opacity)
+                    } else if onboardingState.currentStep == .whisperModel {
+                        WhisperModelStepView(
+                            onboardingState: onboardingState,
+                            whisperService: whisperService
+                        )
+                        .transition(.opacity)
+                    } else if onboardingState.currentStep == .permissions {
+                        PermissionsStepView(
+                            onboardingState: onboardingState
+                        )
+                        .transition(.opacity)
+                    } else if onboardingState.currentStep == .complete {
+                        CompletionStepView(
+                            onboardingState: onboardingState
+                        )
+                        .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: onboardingState.currentStep)
 
-                OllamaStepView(
-                    onboardingState: onboardingState,
-                    ollamaService: ollamaService
+                Spacer()
+                    .frame(height: 20)
+
+                // Navigation buttons
+                OnboardingNavigationView(
+                    state: onboardingState,
+                    onComplete: completeOnboarding
                 )
-                    .tag(OnboardingState.Step.ollama)
-
-                WhisperModelStepView(
-                    onboardingState: onboardingState,
-                    whisperService: whisperService
-                )
-                    .tag(OnboardingState.Step.whisperModel)
-
-                PermissionsStepView(
-                    onboardingState: onboardingState
-                )
-                    .tag(OnboardingState.Step.permissions)
-
-                CompletionStepView(
-                    onboardingState: onboardingState
-                )
-                    .tag(OnboardingState.Step.complete)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 30)
             }
-            .animation(.easeInOut, value: onboardingState.currentStep)
 
-            // Navigation buttons
-            OnboardingNavigationView(
-                state: onboardingState,
-                onComplete: completeOnboarding
-            )
-            .padding(.horizontal, 30)
-            .padding(.bottom, 20)
+            // Progress indicator (floating on top)
+            ProgressIndicatorView(currentStep: onboardingState.currentStep)
+                .frame(maxWidth: .infinity)
+                .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(width: 700, height: 550)
+        .frame(width: 700, height: 600)
     }
 
     private func completeOnboarding() {
@@ -71,14 +84,64 @@ struct OnboardingView: View {
 struct ProgressIndicatorView: View {
     let currentStep: OnboardingState.Step
 
+    private let stepTitles = ["Welcome", "Ollama", "Model", "Permissions", "Complete"]
+
     var body: some View {
-        HStack(spacing: 12) {
-            ForEach(OnboardingState.Step.allCases, id: \.self) { step in
-                Circle()
-                    .fill(step.rawValue <= currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3))
-                    .frame(width: 10, height: 10)
+        HStack(spacing: 0) {
+            ForEach(Array(OnboardingState.Step.allCases.enumerated()), id: \.element) { index, step in
+                VStack(spacing: 8) {
+                    // Step circle
+                    ZStack {
+                        Circle()
+                            .strokeBorder(
+                                step.rawValue <= currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3),
+                                lineWidth: 2
+                            )
+                            .background(
+                                Circle()
+                                    .fill(step.rawValue <= currentStep.rawValue ? Color.accentColor : Color.clear)
+                            )
+                            .frame(width: 32, height: 32)
+
+                        if step.rawValue < currentStep.rawValue {
+                            // Checkmark for completed steps
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.white)
+                        } else if step.rawValue == currentStep.rawValue {
+                            // Current step number
+                            Text("\(step.rawValue + 1)")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.white)
+                        } else {
+                            // Future step number
+                            Text("\(step.rawValue + 1)")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.gray.opacity(0.5))
+                        }
+                    }
+
+                    // Step label
+                    Text(stepTitles[index])
+                        .font(.system(size: 11, weight: step.rawValue == currentStep.rawValue ? .semibold : .regular))
+                        .foregroundColor(step.rawValue <= currentStep.rawValue ? .primary : .secondary.opacity(0.6))
+                }
+                .frame(maxWidth: .infinity)
+
+                // Connecting line (except after last step)
+                if index < OnboardingState.Step.allCases.count - 1 {
+                    Rectangle()
+                        .fill(step.rawValue < currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3))
+                        .frame(height: 2)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 32) // Align with circles
+                }
             }
         }
+        .padding(.horizontal, 40)
+        .padding(.top, 20)
+        .padding(.bottom, 20)
+        .animation(.easeInOut(duration: 0.3), value: currentStep)
     }
 }
 
@@ -88,48 +151,38 @@ struct WelcomeStepView: View {
     @Bindable var onboardingState: OnboardingState
 
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
             Spacer()
 
             // App icon
             Image(systemName: "mic.circle.fill")
                 .resizable()
-                .frame(width: 100, height: 100)
+                .frame(width: 90, height: 90)
                 .foregroundColor(.accentColor)
 
             // Title
             Text("Welcome to Look Ma No Hands")
-                .font(.system(size: 32, weight: .bold))
+                .font(.system(size: 28, weight: .bold))
+                .multilineTextAlignment(.center)
 
             // Description
-            VStack(spacing: 12) {
+            VStack(spacing: 15) {
                 Text("Fast, local voice dictation for macOS")
                     .font(.title3)
                     .foregroundColor(.secondary)
 
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     FeatureRow(icon: "bolt.fill", text: "Lightning-fast voice dictation")
                     FeatureRow(icon: "lock.fill", text: "100% local - your voice never leaves your Mac")
                     FeatureRow(icon: "waveform", text: "AI-powered meeting transcription")
                 }
-                .padding(.top, 15)
+                .padding(.top, 10)
             }
 
             Spacer()
-
-            // Get Started button
-            Button(action: {
-                onboardingState.nextStep()
-            }) {
-                Text("Get Started")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
         }
-        .padding(40)
+        .padding(.horizontal, 50)
+        .padding(.vertical, 20)
     }
 }
 
@@ -160,30 +213,31 @@ struct OllamaStepView: View {
     @State private var isChecking: Bool = true
 
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
             Spacer()
 
             // Icon
             Image(systemName: "brain.head.profile")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
+                .frame(width: 70, height: 70)
                 .foregroundColor(.purple)
 
             // Title
             Text("Install Ollama (Optional)")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 26, weight: .bold))
 
             // Description
             Text("Ollama enables AI-powered meeting notes from transcripts.\nVoice dictation works without it.")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 40)
+                .font(.body)
+                .padding(.horizontal, 50)
 
             // Status
             if isChecking {
                 ProgressView("Checking for Ollama...")
-                    .padding()
+                    .padding(.top, 10)
             } else if ollamaInstalled {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
@@ -191,11 +245,11 @@ struct OllamaStepView: View {
                     Text("Ollama is installed and running")
                         .font(.headline)
                 }
-                .padding()
+                .padding(.top, 10)
             } else {
-                VStack(spacing: 15) {
+                VStack(spacing: 18) {
                     // Instructions
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Text("Installation steps:")
                             .font(.headline)
 
@@ -205,36 +259,31 @@ struct OllamaStepView: View {
                     }
                     .frame(maxWidth: 450)
 
-                    // Copy commands button
-                    Button(action: {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString("brew install ollama && ollama serve", forType: .string)
-                    }) {
-                        Label("Copy Commands", systemImage: "doc.on.doc")
-                    }
+                    HStack(spacing: 12) {
+                        // Copy commands button
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString("brew install ollama && ollama serve", forType: .string)
+                        }) {
+                            Label("Copy Commands", systemImage: "doc.on.doc")
+                        }
 
-                    // Check again button
-                    Button(action: {
-                        checkOllama()
-                    }) {
-                        Label("Check Again", systemImage: "arrow.clockwise")
+                        // Check again button
+                        Button(action: {
+                            checkOllama()
+                        }) {
+                            Label("Check Again", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.bordered)
                 }
+                .padding(.top, 10)
             }
 
             Spacer()
-
-            // Skip button
-            if !ollamaInstalled {
-                Button("Skip for Now") {
-                    onboardingState.ollamaSkipped = true
-                    onboardingState.nextStep()
-                }
-                .foregroundColor(.secondary)
-            }
         }
-        .padding(40)
+        .padding(.horizontal, 50)
+        .padding(.vertical, 20)
         .onAppear {
             checkOllama()
         }
@@ -306,7 +355,7 @@ struct WhisperModelStepView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                    Text("Model already installed: \(onboardingState.selectedModel.rawValue)")
+                    Text("Current model: \(onboardingState.selectedModel.displayName)")
                         .font(.headline)
                 }
                 .padding()
@@ -358,24 +407,38 @@ struct WhisperModelStepView: View {
     private func checkExistingModel() {
         isCheckingModel = true
         Task {
-            // Check if any model exists
+            // FIRST: Get the currently configured model from Settings
+            let configuredModel = Settings.shared.whisperModel
+
+            // Check if the configured model exists on disk
+            let configuredModelExists = WhisperService.modelExists(named: configuredModel.rawValue)
+
+            // Also check other models for fallback
             let tinyExists = WhisperService.modelExists(named: "tiny")
             let baseExists = WhisperService.modelExists(named: "base")
             let smallExists = WhisperService.modelExists(named: "small")
 
+            let anyModelExists = tinyExists || baseExists || smallExists
+
             await MainActor.run {
-                modelExists = tinyExists || baseExists || smallExists
-                onboardingState.modelDownloaded = modelExists
+                modelExists = anyModelExists
+                onboardingState.modelDownloaded = anyModelExists
                 isCheckingModel = false
 
-                // Set selected model based on what exists
-                if tinyExists {
-                    onboardingState.selectedModel = .tiny
-                } else if baseExists {
-                    onboardingState.selectedModel = .base
-                } else if smallExists {
-                    onboardingState.selectedModel = .small
+                // PRIORITY 1: Use configured model if it exists on disk
+                if configuredModelExists {
+                    onboardingState.selectedModel = configuredModel
+                } else if anyModelExists {
+                    // PRIORITY 2: Fallback to first available model
+                    if tinyExists {
+                        onboardingState.selectedModel = .tiny
+                    } else if baseExists {
+                        onboardingState.selectedModel = .base
+                    } else if smallExists {
+                        onboardingState.selectedModel = .small
+                    }
                 }
+                // PRIORITY 3: No models exist, keep default .tiny for download
             }
         }
     }
@@ -419,27 +482,28 @@ struct PermissionsStepView: View {
     @State private var permissionCheckTimer: Timer?
 
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
             Spacer()
 
             // Icon
             Image(systemName: "lock.shield.fill")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 80, height: 80)
+                .frame(width: 70, height: 70)
                 .foregroundColor(.orange)
 
             // Title
             Text("Grant Permissions")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 26, weight: .bold))
 
             // Description
             Text("Look Ma No Hands needs permissions to work properly")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
+                .font(.body)
 
             // Permission cards
-            VStack(spacing: 15) {
+            VStack(spacing: 16) {
                 // Microphone permission
                 PermissionCard(
                     icon: "mic.fill",
@@ -465,11 +529,13 @@ struct PermissionsStepView: View {
                     extraInfo: onboardingState.hasAccessibilityPermission ? nil : "You'll need to manually enable accessibility in System Settings"
                 )
             }
-            .frame(maxWidth: 500)
+            .frame(maxWidth: 550)
+            .padding(.top, 10)
 
             Spacer()
         }
-        .padding(40)
+        .padding(.horizontal, 50)
+        .padding(.vertical, 20)
         .onAppear {
             startPermissionChecking()
         }
@@ -590,21 +656,22 @@ struct CompletionStepView: View {
     }
 
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 20) {
             Spacer()
 
             // Icon
             Image(systemName: needsRestart ? "arrow.clockwise.circle.fill" : "checkmark.circle.fill")
                 .resizable()
-                .frame(width: 80, height: 80)
+                .frame(width: 70, height: 70)
                 .foregroundColor(needsRestart ? .orange : .green)
 
             // Title
             Text(needsRestart ? "Setup Complete - Restart Required" : "You're All Set!")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 26, weight: .bold))
+                .multilineTextAlignment(.center)
 
             // Summary
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 Text("Configuration Summary:")
                     .font(.headline)
                     .padding(.bottom, 5)
@@ -633,27 +700,31 @@ struct CompletionStepView: View {
                     status: onboardingState.hasAccessibilityPermission ? .success : .warning
                 )
             }
-            .frame(maxWidth: 450)
+            .frame(maxWidth: 500)
+            .padding(.top, 5)
 
             if needsRestart {
                 Text("The app will restart to apply accessibility permissions")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 50)
+                    .padding(.top, 8)
             }
 
             if !onboardingState.hasMicrophonePermission || !onboardingState.hasAccessibilityPermission {
                 Text("⚠️ Some permissions were not granted.\nYou can configure them later in Settings.")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.orange)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
+                    .padding(.horizontal, 50)
+                    .padding(.top, 8)
             }
 
             Spacer()
         }
-        .padding(40)
+        .padding(.horizontal, 50)
+        .padding(.vertical, 20)
     }
 }
 
@@ -688,6 +759,14 @@ struct OnboardingNavigationView: View {
     @Bindable var state: OnboardingState
     let onComplete: () -> Void
 
+    private var buttonLabel: String {
+        if state.currentStep == .complete {
+            return state.hasAccessibilityPermission ? "Restart" : "Finish"
+        } else {
+            return "Continue"
+        }
+    }
+
     var body: some View {
         HStack {
             // Back button
@@ -700,7 +779,7 @@ struct OnboardingNavigationView: View {
 
             Spacer()
 
-            // Continue/Finish button
+            // Continue/Finish/Restart button
             Button(action: {
                 if state.currentStep == .complete {
                     onComplete()
@@ -708,7 +787,7 @@ struct OnboardingNavigationView: View {
                     state.nextStep()
                 }
             }) {
-                Text(state.currentStep == .complete ? "Finish" : "Continue")
+                Text(buttonLabel)
                     .frame(minWidth: 100)
             }
             .buttonStyle(.borderedProminent)
