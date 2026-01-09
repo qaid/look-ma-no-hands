@@ -10,6 +10,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var recordingMenuItem: NSMenuItem?
     private var settingsWindow: NSWindow?
+    private var meetingWindow: NSWindow?
 
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
@@ -132,9 +133,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         self.recordingMenuItem = recordingItem
         menu.addItem(recordingItem)
-        
+
         menu.addItem(NSMenuItem.separator())
-        
+
+        // Meeting transcription
+        menu.addItem(NSMenuItem(
+            title: "Start Meeting Transcription...",
+            action: #selector(openMeetingTranscription),
+            keyEquivalent: "m"
+        ))
+
+        menu.addItem(NSMenuItem.separator())
+
         // Permissions section
         let permissionsItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
         let permissionsSubmenu = NSMenu()
@@ -150,14 +160,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ))
         permissionsItem.submenu = permissionsSubmenu
         menu.addItem(permissionsItem)
-        
-        // Ollama status
-        menu.addItem(NSMenuItem(
-            title: "Ollama: Checking...",
-            action: nil,
-            keyEquivalent: ""
-        ))
-        
+
         menu.addItem(NSMenuItem.separator())
         
         // Settings
@@ -223,6 +226,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         NSLog("✅ Settings window created and displayed")
+    }
+
+    @objc private func openMeetingTranscription() {
+        NSLog("🎙️ Opening Meeting Transcription window...")
+
+        // Check if macOS 13+ is available (required for ScreenCaptureKit)
+        guard #available(macOS 13.0, *) else {
+            showAlert(
+                title: "macOS 13+ Required",
+                message: "Meeting transcription requires macOS 13 or later for system audio capture."
+            )
+            return
+        }
+
+        // If window already exists, just bring it to front
+        if let window = meetingWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // Create meeting window
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+
+        window.title = "Meeting Transcription"
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 600, height: 400)
+
+        // Create SwiftUI meeting view and wrap it in NSHostingView
+        let meetingView = MeetingView(whisperService: whisperService)
+        let hostingView = NSHostingView(rootView: meetingView)
+        window.contentView = hostingView
+
+        self.meetingWindow = window
+
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        NSLog("✅ Meeting Transcription window created and displayed")
     }
     
     // MARK: - Permission Checks
@@ -476,7 +524,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func startRecording() {
         // Check permissions first
         guard transcriptionState.hasAccessibilityPermission else {
-            showAlert(title: "Permission Required", message: "Accessibility permission is required to insert text.")
+            handleMissingAccessibilityPermission()
             return
         }
 
@@ -500,6 +548,81 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.recordingIndicator.hide()
             }
         }
+    }
+
+    /// Handle missing accessibility permission with smart detection
+    private func handleMissingAccessibilityPermission() {
+        // Double-check if permission is actually granted in System Preferences
+        // but the app hasn't been restarted yet
+        let systemPrefsGranted = AXIsProcessTrusted()
+
+        if systemPrefsGranted {
+            // Permission is granted in System Preferences but app needs restart
+            showRestartRequiredAlert()
+        } else {
+            // Permission not granted - prompt user to grant it
+            showAccessibilityPermissionAlert()
+        }
+    }
+
+    /// Show alert when accessibility permission is granted but restart is needed
+    private func showRestartRequiredAlert() {
+        let alert = NSAlert()
+        alert.messageText = "App Restart Required"
+        alert.informativeText = "Accessibility permission has been granted, but Look Ma No Hands needs to be restarted (not your computer) for the changes to take effect.\n\nWould you like to restart the app now?"
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Restart App Now")
+        alert.addButton(withTitle: "Later")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            restartApp()
+        }
+    }
+
+    /// Show alert to prompt for accessibility permission
+    private func showAccessibilityPermissionAlert() {
+        let alert = NSAlert()
+        alert.messageText = "Accessibility Permission Required"
+        alert.informativeText = "Look Ma No Hands needs accessibility permission to:\n\n• Monitor the Caps Lock key\n• Insert transcribed text into other apps\n\nClick 'Open System Settings' to grant permission, then restart the app."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Open System Settings")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            openAccessibilityPreferences()
+        }
+    }
+
+    /// Restart the application
+    private func restartApp() {
+        // Get the path to the application bundle
+        let bundlePath = Bundle.main.bundlePath
+
+        // Use NSWorkspace to relaunch the app
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+
+        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: bundlePath),
+                                          configuration: config) { _, error in
+            if let error = error {
+                print("Failed to relaunch app: \(error)")
+            } else {
+                // Only terminate if relaunch succeeded
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
+        }
+    }
+
+    /// Open System Preferences to Accessibility settings
+    private func openAccessibilityPreferences() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 
     /// Stop recording and begin transcription pipeline

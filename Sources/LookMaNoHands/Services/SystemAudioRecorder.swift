@@ -80,26 +80,43 @@ class SystemAudioRecorder: NSObject {
 
         let filter = SCContentFilter(display: display, excludingWindows: [])
 
-        // Configure stream for audio capture
+        // Configure stream for audio-only capture
         let configuration = SCStreamConfiguration()
 
         // Audio settings
         configuration.capturesAudio = true
+        configuration.excludesCurrentProcessAudio = false
         configuration.sampleRate = Int(targetSampleRate)
         configuration.channelCount = 1 // Mono audio
 
-        // We don't need video
-        configuration.width = 1
-        configuration.height = 1
-        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 1)
+        // Minimal video settings (required even for audio-only)
+        configuration.width = 100
+        configuration.height = 100
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 1) // 1 fps minimum
+        configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+        configuration.showsCursor = false
+        configuration.queueDepth = 5
 
         // Create and start stream
         stream = SCStream(filter: filter, configuration: configuration, delegate: self)
 
-        // Add stream output for audio
-        try stream?.addStreamOutput(self, type: .audio, sampleHandlerQueue: DispatchQueue(label: "com.lookmanohands.audio"))
+        guard let stream = stream else {
+            throw RecorderError.captureFailure("Failed to create SCStream")
+        }
 
-        try await stream?.startCapture()
+        // Add stream output for audio
+        do {
+            try stream.addStreamOutput(self, type: .audio, sampleHandlerQueue: DispatchQueue(label: "com.lookmanohands.audio"))
+        } catch {
+            throw RecorderError.captureFailure("Failed to add audio output: \(error.localizedDescription)")
+        }
+
+        // Start capture
+        do {
+            try await stream.startCapture()
+        } catch {
+            throw RecorderError.captureFailure("Failed to start capture: \(error.localizedDescription)")
+        }
 
         isRecording = true
         audioBuffer.removeAll()
@@ -160,11 +177,15 @@ extension SystemAudioRecorder: SCStreamOutput {
         audioBuffer.append(contentsOf: audioSamples)
 
         // Optionally call chunk callback for streaming transcription
-        // For now, we'll just accumulate in the buffer
         if let onAudioChunk = onAudioChunk, audioBuffer.count >= Int(targetSampleRate * 30) {
             // Send 30-second chunks
             let chunk = Array(audioBuffer.prefix(Int(targetSampleRate * 30)))
             onAudioChunk(chunk)
+
+            // Keep overlap for next chunk (5 seconds)
+            let overlapSamples = Int(targetSampleRate * 5)
+            let samplesToRemove = Int(targetSampleRate * 30) - overlapSamples
+            audioBuffer.removeFirst(samplesToRemove)
         }
     }
 
