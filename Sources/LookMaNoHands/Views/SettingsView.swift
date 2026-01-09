@@ -5,11 +5,15 @@ import ApplicationServices
 /// Settings window for configuring Look Ma No Hands
 struct SettingsView: View {
     @ObservedObject private var settings = Settings.shared
-    
+
     // Permission states (would be updated by checking actual permissions)
     @State private var micPermission: PermissionState = .unknown
     @State private var accessibilityPermission: PermissionState = .unknown
     @State private var ollamaStatus: ConnectionState = .unknown
+    @State private var isDownloadingModel = false
+    @State private var modelDownloadProgress: Double = 0.0
+    @State private var modelDownloadError: String?
+    @State private var modelAvailability: [WhisperModel: Bool] = [:]
     
     var body: some View {
         TabView {
@@ -17,17 +21,17 @@ struct SettingsView: View {
                 .tabItem {
                     Label("General", systemImage: "gear")
                 }
-            
+
             modelsTab
                 .tabItem {
                     Label("Models", systemImage: "cpu")
                 }
-            
+
             permissionsTab
                 .tabItem {
                     Label("Permissions", systemImage: "lock.shield")
                 }
-            
+
             aboutTab
                 .tabItem {
                     Label("About", systemImage: "info.circle")
@@ -38,6 +42,7 @@ struct SettingsView: View {
         .onAppear {
             checkPermissions()
             checkOllamaStatus()
+            checkWhisperModelStatus()
         }
     }
     
@@ -101,49 +106,164 @@ struct SettingsView: View {
     }
     
     // MARK: - Models Tab
-    
+
     private var modelsTab: some View {
-        Form {
-            Section("Whisper (Transcription)") {
-                Picker("Model", selection: $settings.whisperModel) {
-                    ForEach(WhisperModel.allCases) { model in
-                        Text(model.displayName).tag(model)
+        VStack(spacing: 0) {
+            // Dictation Section
+            VStack(alignment: .leading, spacing: 12) {
+                // Section header
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dictation")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Voice-to-text using Whisper (Caps Lock trigger)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.bottom, 8)
+
+                // Model picker
+                HStack {
+                    Text("Model")
+                        .frame(width: 80, alignment: .trailing)
+
+                    Picker("", selection: $settings.whisperModel) {
+                        ForEach(WhisperModel.allCases) { model in
+                            HStack {
+                                Text(model.displayName)
+                                Spacer()
+                                if let isAvailable = modelAvailability[model] {
+                                    if isAvailable {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                            .font(.caption)
+                                    } else {
+                                        Image(systemName: "arrow.down.circle")
+                                            .foregroundColor(.orange)
+                                            .font(.caption)
+                                    }
+                                }
+                            }
+                            .tag(model)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .frame(width: 220)
+                    .onChange(of: settings.whisperModel) { oldValue, newValue in
+                        handleModelChange(to: newValue)
+                    }
+
+                    // Show model status
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(modelStatusColor)
+                            .frame(width: 8, height: 8)
+                        Text(modelStatusText)
+                            .font(.caption)
+                    }
+                    .frame(width: 100, alignment: .leading)
+                }
+
+                // Show download progress if downloading
+                if isDownloadingModel {
+                    HStack {
+                        Spacer()
+                            .frame(width: 80)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                ProgressView(value: modelDownloadProgress)
+                                    .frame(width: 200)
+                                Text("\(Int(modelDownloadProgress * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Text("Downloading \(settings.whisperModel.displayName)...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                 }
-                .pickerStyle(.menu)
-                
-                Text("Larger models are more accurate but slower")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Section("Ollama (Meeting Transcription)") {
-                TextField("Model name", text: $settings.ollamaModel)
-                    .textFieldStyle(.roundedBorder)
-                    .disabled(true)
 
-                Text("For future meeting transcription feature (e.g., llama3.2:3b)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
+                // Show error if download failed
+                if let error = modelDownloadError {
+                    HStack {
+                        Spacer()
+                            .frame(width: 80)
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                        }
+                    }
+                }
+
+                // Help text
                 HStack {
-                    connectionStatusView(ollamaStatus, label: "Ollama")
-                    
                     Spacer()
-                    
+                        .frame(width: 80)
+                    Text("Larger models are more accurate but slower")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(20)
+
+            Divider()
+
+            // Meeting Transcription Section
+            VStack(alignment: .leading, spacing: 12) {
+                // Section header
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Meeting Transcription")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("System audio recording with AI-powered notes (via Ollama)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.bottom, 8)
+
+                // Model name
+                HStack {
+                    Text("Model")
+                        .frame(width: 80, alignment: .trailing)
+
+                    TextField("", text: $settings.ollamaModel)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                        .disabled(true)
+
+                    connectionStatusView(ollamaStatus, label: "")
+                        .frame(width: 100, alignment: .leading)
+                }
+
+                // Connection check button
+                HStack {
+                    Spacer()
+                        .frame(width: 80)
+
                     Button("Check Connection") {
                         checkOllamaStatus()
                     }
+                    .controlSize(.small)
                 }
             }
-            
+            .padding(20)
+
             Spacer()
         }
-        .padding()
     }
-    
+
     // MARK: - Permissions Tab
-    
+
     private var permissionsTab: some View {
         Form {
             Section("Required Permissions") {
@@ -288,13 +408,101 @@ struct SettingsView: View {
     }
     
     private func checkOllamaStatus() {
-        // TODO: Implement actual HTTP check to localhost:11434
         ollamaStatus = .checking
-        
-        // Simulate async check
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            // This would be replaced with actual HTTP check
-            self.ollamaStatus = .unknown
+
+        Task {
+            let ollamaService = OllamaService()
+            let isAvailable = await ollamaService.isAvailable()
+
+            await MainActor.run {
+                self.ollamaStatus = isAvailable ? .connected : .disconnected
+            }
+        }
+    }
+
+    // MARK: - Model Management
+
+    /// Check availability of all Whisper models
+    private func checkWhisperModelStatus() {
+        for model in WhisperModel.allCases {
+            let exists = WhisperService.modelExists(named: model.rawValue)
+            modelAvailability[model] = exists
+        }
+    }
+
+    /// Handle when user switches models in the picker
+    private func handleModelChange(to newModel: WhisperModel) {
+        // Clear any previous error
+        modelDownloadError = nil
+
+        // Check if model exists
+        let modelExists = WhisperService.modelExists(named: newModel.rawValue)
+
+        if !modelExists {
+            // Model doesn't exist, start download
+            Task {
+                await downloadModel(newModel)
+            }
+        } else {
+            print("SettingsView: Model \(newModel.rawValue) already downloaded")
+            // TODO: Notify AppDelegate to reload the model if needed
+        }
+    }
+
+    /// Download a Whisper model
+    private func downloadModel(_ model: WhisperModel) async {
+        isDownloadingModel = true
+        modelDownloadProgress = 0.0
+        modelDownloadError = nil
+
+        print("SettingsView: Starting download of \(model.rawValue) model...")
+
+        do {
+            try await WhisperService.downloadModel(named: model.rawValue) { progress in
+                DispatchQueue.main.async {
+                    self.modelDownloadProgress = progress
+                }
+            }
+
+            // Download successful
+            DispatchQueue.main.async {
+                self.isDownloadingModel = false
+                self.modelDownloadProgress = 1.0
+                self.modelAvailability[model] = true
+                print("SettingsView: Model \(model.rawValue) downloaded successfully")
+
+                // TODO: Notify AppDelegate to reload the model
+            }
+
+        } catch {
+            // Download failed
+            DispatchQueue.main.async {
+                self.isDownloadingModel = false
+                self.modelDownloadError = "Download failed: \(error.localizedDescription)"
+                print("SettingsView: Model download failed - \(error)")
+            }
+        }
+    }
+
+    /// Computed property for model status color
+    private var modelStatusColor: Color {
+        if isDownloadingModel {
+            return .yellow
+        } else if let isAvailable = modelAvailability[settings.whisperModel] {
+            return isAvailable ? .green : .orange
+        } else {
+            return .gray
+        }
+    }
+
+    /// Computed property for model status text
+    private var modelStatusText: String {
+        if isDownloadingModel {
+            return "Downloading..."
+        } else if let isAvailable = modelAvailability[settings.whisperModel] {
+            return isAvailable ? "Downloaded" : "Not downloaded"
+        } else {
+            return "Checking..."
         }
     }
 }

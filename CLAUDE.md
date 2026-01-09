@@ -172,8 +172,15 @@ LookMaNoHands/
 **IMPORTANT**: When creating git commits for this project:
 - **NEVER** include "🤖 Generated with [Claude Code]" footer
 - **NEVER** include "Co-Authored-By: Claude Sonnet" attribution
+- **NEVER** commit and push to GitHub without explicit user request
+- Always wait for user confirmation before running `git push`
 - Write clear, concise commit messages that follow the existing style
 - Focus on describing what changed and why, without AI attribution
+
+**Git Workflow**:
+- Commits can be made freely to track progress locally
+- Pushing to remote requires explicit user approval
+- User will say "commit and push" or "update the repo" when ready
 
 ## Commands
 

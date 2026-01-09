@@ -1,13 +1,19 @@
 import Foundation
 import SwiftUI
 
+/// Audio source for recording
+enum AudioSource: String, Equatable {
+    case microphone = "Microphone"
+    case systemAudio = "System Audio"
+}
+
 /// Represents the current state of the recording/transcription process
 enum RecordingState: Equatable {
     case idle
     case recording
     case processing
     case error(String)
-    
+
     var description: String {
         switch self {
         case .idle:
@@ -46,7 +52,13 @@ class TranscriptionState {
     
     /// Whether accessibility permission is granted
     var hasAccessibilityPermission: Bool = false
-    
+
+    /// Whether screen recording permission is granted (for system audio capture)
+    var hasScreenRecordingPermission: Bool = false
+
+    /// Current audio source being used
+    var audioSource: AudioSource = .microphone
+
     // MARK: - Computed Properties
     
     /// Whether we're currently in a recording session

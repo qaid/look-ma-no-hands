@@ -43,17 +43,84 @@ enum IndicatorPosition: String, CaseIterable, Identifiable {
 /// User preferences and settings
 /// Persisted to UserDefaults
 class Settings: ObservableObject {
-    
+
     // MARK: - Singleton
-    
+
     static let shared = Settings()
-    
+
+    // MARK: - Default Values
+
+    static let defaultMeetingPrompt = """
+You are a professional meeting assistant. Your task is to transform a raw meeting transcription into a clear, actionable document that helps participants stay productive after the meeting.
+
+## Instructions
+
+Analyze the transcription below and produce a structured summary following this exact format. Be concise but thorough. Extract only what was actually discussed—do not invent or assume information.
+
+---
+
+## Output Format
+
+### Meeting Overview
+- **Date/Time**: [Extract if mentioned, otherwise write "Not specified"]
+- **Participants**: [List all speakers identified in the transcription]
+- **Meeting Purpose**: [One sentence describing the main topic or goal]
+
+### Key Decisions Made
+List each decision that was clearly agreed upon during the meeting. If no decisions were made, write "No decisions were finalized."
+
+Format each as:
+- **Decision**: [What was decided]
+- **Context**: [Brief background on why this decision was made]
+
+### Action Items
+List every task, assignment, or commitment mentioned. This is the most critical section.
+
+Format each as:
+| Task | Owner | Deadline | Notes |
+|------|-------|----------|-------|
+| [Specific task description] | [Person responsible, or "Unassigned"] | [Due date, or "Not specified"] | [Any relevant details] |
+
+### Discussion Summary
+Summarize the main topics discussed in 3-5 bullet points. Focus on substance, not small talk or tangents. Each bullet should capture a complete thought.
+
+### Open Questions & Unresolved Items
+List any questions raised but not answered, disagreements not resolved, or topics that need further discussion.
+
+Format each as:
+- **Question/Issue**: [Description]
+- **Why it matters**: [Brief context]
+
+### Follow-Up Required
+List any items that require action before the next meeting or that were explicitly marked for follow-up.
+
+### Next Steps
+If a follow-up meeting or next steps were discussed, describe them here. If not mentioned, write "No next steps were explicitly discussed."
+
+---
+
+## Processing Rules
+
+1. **Speaker Attribution**: When someone commits to a task or makes a decision, always attribute it to them by name if identifiable.
+
+2. **Handle Transcription Noise**: Ignore filler words (um, uh, like), false starts, and crosstalk. Focus on the meaningful content.
+
+3. **Be Precise with Action Items**: Only list something as an action item if someone clearly committed to doing it or was assigned to do it. Do not infer tasks that weren't explicitly discussed.
+
+4. **Preserve Important Details**: If specific numbers, dates, names, or technical terms were mentioned, include them exactly as stated.
+
+5. **Flag Uncertainty**: If the transcription is unclear about who said something or what was meant, note this with [unclear] rather than guessing.
+
+6. **Keep It Scannable**: Use short sentences. Busy professionals should be able to extract value in under 2 minutes of reading.
+"""
+
     // MARK: - Keys
     
     private enum Keys {
         static let triggerKey = "triggerKey"
         static let whisperModel = "whisperModel"
         static let ollamaModel = "ollamaModel"
+        static let meetingPrompt = "meetingPrompt"
         // Note: enableFormatting removed - formatting is always enabled for dictation
         // Ollama integration reserved for future meeting transcription feature
         static let showIndicator = "showIndicator"
@@ -80,6 +147,13 @@ class Settings: ObservableObject {
     @Published var ollamaModel: String {
         didSet {
             UserDefaults.standard.set(ollamaModel, forKey: Keys.ollamaModel)
+        }
+    }
+
+    /// Custom prompt for meeting notes processing
+    @Published var meetingPrompt: String {
+        didSet {
+            UserDefaults.standard.set(meetingPrompt, forKey: Keys.meetingPrompt)
         }
     }
 
@@ -116,7 +190,9 @@ class Settings: ObservableObject {
             self.whisperModel = .base
         }
         
-        self.ollamaModel = UserDefaults.standard.string(forKey: Keys.ollamaModel) ?? "llama3.2:3b"
+        self.ollamaModel = UserDefaults.standard.string(forKey: Keys.ollamaModel) ?? "qwen3:8b"
+
+        self.meetingPrompt = UserDefaults.standard.string(forKey: Keys.meetingPrompt) ?? Settings.defaultMeetingPrompt
 
         if UserDefaults.standard.object(forKey: Keys.showIndicator) != nil {
             self.showIndicator = UserDefaults.standard.bool(forKey: Keys.showIndicator)
@@ -138,7 +214,8 @@ class Settings: ObservableObject {
     func resetToDefaults() {
         triggerKey = .capsLock
         whisperModel = .base
-        ollamaModel = "llama3.2:3b"
+        ollamaModel = "qwen3:8b"
+        meetingPrompt = Settings.defaultMeetingPrompt
         showIndicator = true
         indicatorPosition = .top
     }

@@ -30,6 +30,8 @@
 	<string>Look Ma No Hands needs access to your microphone to transcribe your voice into text.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Look Ma No Hands needs to control other applications to insert transcribed text.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>Look Ma No Hands needs screen recording permission to capture system audio during meetings for transcription.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
