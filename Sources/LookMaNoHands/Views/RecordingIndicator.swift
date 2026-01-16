@@ -2,10 +2,12 @@ import SwiftUI
 import AppKit
 
 /// Floating window that appears during recording to show the user that audio is being captured
-/// Uses native macOS design patterns for a polished, system-integrated look
+/// Uses native macOS design patterns with an animated Siri-style multi-color border
 struct RecordingIndicator: View {
 
     @State private var isPulsing = false
+    @State private var borderRotation: Double = 0
+    @State private var borderOpacity: Double = 1.0
 
     var body: some View {
         HStack(spacing: 12) {
@@ -39,11 +41,43 @@ struct RecordingIndicator: View {
                 .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 4)
         )
         .overlay(
+            // Siri-style animated multi-color border
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                .strokeBorder(
+                    AngularGradient(
+                        gradient: Gradient(colors: [
+                            Color(red: 0.3, green: 0.6, blue: 1.0),   // Blue
+                            Color(red: 0.8, green: 0.3, blue: 1.0),   // Purple
+                            Color(red: 1.0, green: 0.3, blue: 0.6),   // Pink
+                            Color(red: 1.0, green: 0.5, blue: 0.3),   // Orange
+                            Color(red: 0.3, green: 1.0, blue: 0.6),   // Green
+                            Color(red: 0.3, green: 0.6, blue: 1.0)    // Blue (loop)
+                        ]),
+                        center: .center,
+                        angle: .degrees(borderRotation)
+                    ),
+                    lineWidth: 3
+                )
+                .opacity(borderOpacity)
         )
         .onAppear {
             isPulsing = true
+
+            // Start continuous rotation animation for the border
+            withAnimation(
+                .linear(duration: 3.0)
+                .repeatForever(autoreverses: false)
+            ) {
+                borderRotation = 360
+            }
+
+            // Pulsing opacity for the border
+            withAnimation(
+                .easeInOut(duration: 1.5)
+                .repeatForever(autoreverses: true)
+            ) {
+                borderOpacity = 0.6
+            }
         }
         .onDisappear {
             isPulsing = false
