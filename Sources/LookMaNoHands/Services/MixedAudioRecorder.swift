@@ -24,6 +24,12 @@ class MixedAudioRecorder {
     /// Callback for mixed audio chunks (for real-time transcription)
     var onAudioChunk: (([Float]) -> Void)?
 
+    /// Callback for microphone-only audio chunks (for separate transcription)
+    var onMicrophoneChunk: (([Float]) -> Void)?
+
+    /// Callback for system-only audio chunks (for separate transcription)
+    var onSystemAudioChunk: (([Float]) -> Void)?
+
     /// Track how many mic samples we've already processed
     private var micSamplesProcessed: Int = 0
 
@@ -118,6 +124,15 @@ class MixedAudioRecorder {
                 // Send the mixed chunk to the callback
                 if let onAudioChunk = self.onAudioChunk {
                     onAudioChunk(mixedChunk)
+                }
+
+                // Send separate unmixed chunks if callbacks are set
+                if let onMicrophoneChunk = self.onMicrophoneChunk, !micChunk.isEmpty {
+                    onMicrophoneChunk(micChunk)
+                }
+
+                if let onSystemAudioChunk = self.onSystemAudioChunk, !systemChunk.isEmpty {
+                    onSystemAudioChunk(systemChunk)
                 }
             }
         }

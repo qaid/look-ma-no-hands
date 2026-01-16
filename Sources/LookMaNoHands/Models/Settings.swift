@@ -201,6 +201,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Ollama integration reserved for future meeting transcription feature
         static let showIndicator = "showIndicator"
         static let indicatorPosition = "indicatorPosition"
+        static let enableDiarization = "enableDiarization"
     }
     
     // MARK: - Audio Device Manager
@@ -259,6 +260,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to enable speaker diarization in meeting transcripts
+    @Published var enableDiarization: Bool {
+        didSet {
+            UserDefaults.standard.set(enableDiarization, forKey: Keys.enableDiarization)
+        }
+    }
+
     // MARK: - Initialization
     
     private init() {
@@ -300,6 +308,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
         } else {
             self.hasCompletedOnboarding = false
+        }
+
+        // Default to enabling speaker diarization
+        if UserDefaults.standard.object(forKey: Keys.enableDiarization) != nil {
+            self.enableDiarization = UserDefaults.standard.bool(forKey: Keys.enableDiarization)
+        } else {
+            self.enableDiarization = true
         }
     }
     

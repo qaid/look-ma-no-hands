@@ -7,6 +7,8 @@ struct TranscriptSegment {
     let startTime: TimeInterval
     let endTime: TimeInterval
     let timestamp: Date
+    let audioSource: AudioSource
+    var speakerLabel: String?
 }
 
 /// Service for continuous transcription of long-form audio
@@ -48,6 +50,9 @@ class ContinuousTranscriber {
 
     /// Total samples processed in current session
     private var totalSamplesProcessed: Int = 0
+
+    /// Last known audio source for this session
+    private var lastAudioSource: AudioSource = .microphone
 
     /// Queue for processing audio chunks
     private let processingQueue = DispatchQueue(label: "com.lookmanohands.transcription", qos: .userInitiated)
@@ -92,7 +97,7 @@ class ContinuousTranscriber {
 
         // Process any remaining audio in buffer
         if !audioBuffer.isEmpty {
-            await processChunk(audioBuffer, isFinal: true)
+            await processChunk(audioBuffer, isFinal: true, audioSource: lastAudioSource)
         }
 
         isTranscribing = false
@@ -112,8 +117,11 @@ class ContinuousTranscriber {
 
     /// Add audio samples to the buffer for processing
     /// Processes chunks automatically when threshold is reached
-    func addAudio(_ samples: [Float]) async {
+    func addAudio(_ samples: [Float], audioSource: AudioSource = .microphone) async {
         guard isTranscribing else { return }
+
+        // Track the audio source for this session
+        lastAudioSource = audioSource
 
         audioBuffer.append(contentsOf: samples)
 
@@ -121,11 +129,11 @@ class ContinuousTranscriber {
 
         // Check if we have enough samples for a chunk
         if audioBuffer.count >= chunkSamples {
-            await processNextChunk()
+            await processNextChunk(audioSource: audioSource)
         } else {
             // Check for silence to process early
             if detectSilence(in: samples) {
-                await processSilenceChunk()
+                await processSilenceChunk(audioSource: audioSource)
             }
         }
     }
@@ -133,7 +141,7 @@ class ContinuousTranscriber {
     // MARK: - Chunk Processing
 
     /// Process the next chunk from the buffer
-    private func processNextChunk() async {
+    private func processNextChunk(audioSource: AudioSource) async {
         let chunkSamples = Int(chunkDuration * sampleRate)
         let overlapSamples = Int(overlapDuration * sampleRate)
 
@@ -141,7 +149,7 @@ class ContinuousTranscriber {
         let chunk = Array(audioBuffer.prefix(chunkSamples))
 
         // Process the chunk
-        await processChunk(chunk, isFinal: false)
+        await processChunk(chunk, isFinal: false, audioSource: audioSource)
 
         // Remove processed samples, keeping overlap for next chunk
         let samplesToRemove = chunkSamples - overlapSamples
@@ -149,7 +157,7 @@ class ContinuousTranscriber {
     }
 
     /// Process a chunk early if silence is detected
-    private func processSilenceChunk() async {
+    private func processSilenceChunk(audioSource: AudioSource) async {
         guard !audioBuffer.isEmpty else { return }
 
         let silenceSamples = Int(silenceDuration * sampleRate)
@@ -157,7 +165,7 @@ class ContinuousTranscriber {
         // Only process if we have enough audio before the silence
         if audioBuffer.count > silenceSamples {
             let chunk = Array(audioBuffer)
-            await processChunk(chunk, isFinal: false)
+            await processChunk(chunk, isFinal: false, audioSource: audioSource)
 
             // Clear buffer after processing
             audioBuffer.removeAll()
@@ -165,11 +173,11 @@ class ContinuousTranscriber {
     }
 
     /// Process a single audio chunk through Whisper
-    private func processChunk(_ samples: [Float], isFinal: Bool) async {
+    private func processChunk(_ samples: [Float], isFinal: Bool, audioSource: AudioSource) async {
         guard !samples.isEmpty else { return }
 
         let duration = Double(samples.count) / sampleRate
-        print("ContinuousTranscriber: Processing \(String(format: "%.1f", duration))s chunk (final: \(isFinal))")
+        print("ContinuousTranscriber: Processing \(String(format: "%.1f", duration))s chunk (final: \(isFinal), source: \(audioSource.rawValue))")
 
         onStatusUpdate?("Transcribing...")
 
@@ -190,13 +198,15 @@ class ContinuousTranscriber {
                 text: text,
                 startTime: startTime,
                 endTime: endTime,
-                timestamp: Date()
+                timestamp: Date(),
+                audioSource: audioSource,
+                speakerLabel: nil
             )
 
             segments.append(segment)
             totalSamplesProcessed += samples.count
 
-            print("ContinuousTranscriber: Transcribed segment [\(String(format: "%.1f", startTime))s - \(String(format: "%.1f", endTime))s]: \"\(text)\"")
+            print("ContinuousTranscriber: Transcribed segment [\(String(format: "%.1f", startTime))s - \(String(format: "%.1f", endTime))s] (\(audioSource.rawValue)): \"\(text)\"")
 
             onSegmentTranscribed?(segment)
             onStatusUpdate?("Recording")

@@ -28,15 +28,21 @@ struct MeetingView: View {
 
     // Services
     private let mixedAudioRecorder: MixedAudioRecorder
-    private let continuousTranscriber: ContinuousTranscriber
+    private let microphoneTranscriber: ContinuousTranscriber
+    private let systemAudioTranscriber: ContinuousTranscriber
     private let whisperService: WhisperService
     private let meetingAnalyzer: MeetingAnalyzer
+    private let diarizationService: SpeakerDiarizationService
 
     init(whisperService: WhisperService) {
         self.whisperService = whisperService
         self.mixedAudioRecorder = MixedAudioRecorder()
-        self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
+        self.microphoneTranscriber = ContinuousTranscriber(whisperService: whisperService)
+        self.systemAudioTranscriber = ContinuousTranscriber(whisperService: whisperService)
         self.meetingAnalyzer = MeetingAnalyzer()
+
+        let ollamaService = OllamaService(modelName: Settings.shared.ollamaModel)
+        self.diarizationService = SpeakerDiarizationService(ollamaService: ollamaService)
 
         // Setup callbacks for continuous transcription
         setupTranscriberCallbacks()
@@ -181,7 +187,7 @@ struct MeetingView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding()
                     } else {
-                        // Show segments with timestamps
+                        // Show segments with timestamps and speaker labels
                         ForEach(Array(meetingState.segments.enumerated()), id: \.offset) { index, segment in
                             HStack(alignment: .top, spacing: 12) {
                                 // Timestamp
@@ -189,6 +195,15 @@ struct MeetingView: View {
                                     .font(.system(.caption, design: .monospaced))
                                     .foregroundColor(.secondary)
                                     .frame(width: 60, alignment: .leading)
+
+                                // Speaker label (if available)
+                                if let speaker = segment.speakerLabel {
+                                    Text(speaker)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(colorForSpeaker(speaker))
+                                        .frame(width: 80, alignment: .leading)
+                                }
 
                                 // Text
                                 Text(segment.text)
@@ -316,8 +331,9 @@ struct MeetingView: View {
 
             meetingState.statusMessage = "Starting..."
 
-            // Start continuous transcriber session
-            continuousTranscriber.startSession()
+            // Start both transcriber sessions
+            microphoneTranscriber.startSession()
+            systemAudioTranscriber.startSession()
 
             // Start mixed audio recording (system + microphone)
             try await mixedAudioRecorder.startRecording()
@@ -362,16 +378,20 @@ struct MeetingView: View {
         // Stop mixed audio recording (audio chunks were already processed in real-time)
         _ = await mixedAudioRecorder.stopRecording()
 
-        // End transcription session (processes any remaining audio)
-        let finalSegments = await continuousTranscriber.endSession()
+        // End both transcription sessions (processes any remaining audio)
+        let micSegments = await microphoneTranscriber.endSession()
+        let systemSegments = await systemAudioTranscriber.endSession()
 
-        // Update with all segments (includes real-time + any final processing)
-        meetingState.segments = finalSegments
+        // Merge segments chronologically by timestamp
+        let allSegments = (micSegments + systemSegments).sorted { $0.timestamp < $1.timestamp }
+
+        // Update with all segments
+        meetingState.segments = allSegments
 
         meetingState.isRecording = false
-        meetingState.statusMessage = "Recording stopped - \(finalSegments.count) segments"
+        meetingState.statusMessage = "Recording stopped - \(allSegments.count) segments"
 
-        print("MeetingView: Recording stopped, \(finalSegments.count) segments transcribed")
+        print("MeetingView: Recording stopped, \(allSegments.count) segments transcribed (\(micSegments.count) mic, \(systemSegments.count) system)")
     }
 
     // MARK: - Timer
@@ -416,15 +436,15 @@ struct MeetingView: View {
         guard !meetingState.segments.isEmpty else { return }
 
         meetingState.isAnalyzing = true
-        meetingState.statusMessage = "Generating structured notes..."
-
-        // Build full transcript
-        let fullTranscript = meetingState.segments
-            .map { $0.text }
-            .joined(separator: " ")
+        meetingState.statusMessage = "Identifying speakers and generating notes..."
 
         do {
-            let notes = try await meetingAnalyzer.analyzeMeeting(transcript: fullTranscript, customPrompt: prompt)
+            // Analyze meeting with speaker diarization enabled
+            let notes = try await meetingAnalyzer.analyzeMeeting(
+                segments: meetingState.segments,
+                customPrompt: prompt,
+                performDiarization: true
+            )
             meetingState.structuredNotes = notes
             meetingState.statusMessage = "Notes generated successfully"
         } catch {
@@ -499,27 +519,51 @@ struct MeetingView: View {
     // MARK: - Callbacks
 
     private func setupTranscriberCallbacks() {
-        continuousTranscriber.onSegmentTranscribed = { [self] segment in
+        // Microphone transcriber callback
+        microphoneTranscriber.onSegmentTranscribed = { [self] segment in
             Task { @MainActor in
                 meetingState.segments.append(segment)
             }
         }
 
-        continuousTranscriber.onStatusUpdate = { [self] status in
+        microphoneTranscriber.onStatusUpdate = { [self] status in
             Task { @MainActor in
                 if meetingState.isRecording {
-                    meetingState.statusMessage = status
+                    meetingState.statusMessage = "Mic: \(status)"
+                }
+            }
+        }
+
+        // System audio transcriber callback
+        systemAudioTranscriber.onSegmentTranscribed = { [self] segment in
+            Task { @MainActor in
+                meetingState.segments.append(segment)
+            }
+        }
+
+        systemAudioTranscriber.onStatusUpdate = { [self] status in
+            Task { @MainActor in
+                if meetingState.isRecording {
+                    meetingState.statusMessage = "System: \(status)"
                 }
             }
         }
     }
 
     private func setupAudioRecorderCallback() {
-        mixedAudioRecorder.onAudioChunk = { [weak continuousTranscriber] audioChunk in
-            guard let transcriber = continuousTranscriber else { return }
+        // Send microphone audio to microphone transcriber
+        mixedAudioRecorder.onMicrophoneChunk = { [weak microphoneTranscriber] audioChunk in
+            guard let transcriber = microphoneTranscriber else { return }
             Task {
-                // Send mixed audio chunks to the transcriber for real-time processing
-                await transcriber.addAudio(audioChunk)
+                await transcriber.addAudio(audioChunk, audioSource: .microphone)
+            }
+        }
+
+        // Send system audio to system audio transcriber
+        mixedAudioRecorder.onSystemAudioChunk = { [weak systemAudioTranscriber] audioChunk in
+            guard let transcriber = systemAudioTranscriber else { return }
+            Task {
+                await transcriber.addAudio(audioChunk, audioSource: .systemAudio)
             }
         }
     }
@@ -690,5 +734,26 @@ When these terms appear, preserve their exact formatting and context. If they're
         let minutes = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    /// Generate a consistent color for each speaker based on their label
+    private func colorForSpeaker(_ speaker: String) -> Color {
+        // Use a simple hash to generate consistent colors for each speaker
+        let hash = speaker.hashValue
+        let hue = Double(abs(hash) % 360) / 360.0
+
+        switch speaker {
+        case "You":
+            return .blue
+        case "Speaker 1":
+            return .green
+        case "Speaker 2":
+            return .orange
+        case "Speaker 3":
+            return .purple
+        default:
+            // Generate color from hash for additional speakers
+            return Color(hue: hue, saturation: 0.6, brightness: 0.8)
+        }
     }
 }
