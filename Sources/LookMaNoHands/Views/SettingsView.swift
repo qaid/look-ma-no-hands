@@ -2,6 +2,27 @@ import SwiftUI
 import AVFoundation
 import ApplicationServices
 
+/// Settings tabs
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case general = "General"
+    case recording = "Recording"
+    case models = "Models"
+    case permissions = "Permissions"
+    case about = "About"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .general: return "gear"
+        case .recording: return "mic.circle"
+        case .models: return "cpu"
+        case .permissions: return "lock.shield"
+        case .about: return "info.circle"
+        }
+    }
+}
+
 /// Settings window for configuring Look Ma No Hands
 struct SettingsView: View {
     @ObservedObject private var settings = Settings.shared
@@ -14,31 +35,41 @@ struct SettingsView: View {
     @State private var modelDownloadProgress: Double = 0.0
     @State private var modelDownloadError: String?
     @State private var modelAvailability: [WhisperModel: Bool] = [:]
-    
+
+    // Selected tab
+    @State private var selectedTab: SettingsTab = .general
+
     var body: some View {
-        TabView {
-            generalTab
-                .tabItem {
-                    Label("General", systemImage: "gear")
+        VStack(spacing: 0) {
+            // Tab bar
+            Picker("", selection: $selectedTab) {
+                ForEach(SettingsTab.allCases) { tab in
+                    Label(tab.rawValue, systemImage: tab.icon).tag(tab)
                 }
+            }
+            .pickerStyle(.segmented)
+            .padding()
 
-            modelsTab
-                .tabItem {
-                    Label("Models", systemImage: "cpu")
-                }
+            Divider()
 
-            permissionsTab
-                .tabItem {
-                    Label("Permissions", systemImage: "lock.shield")
+            // Content area
+            Group {
+                switch selectedTab {
+                case .general:
+                    generalTab
+                case .recording:
+                    recordingTab
+                case .models:
+                    modelsTab
+                case .permissions:
+                    permissionsTab
+                case .about:
+                    aboutTab
                 }
-
-            aboutTab
-                .tabItem {
-                    Label("About", systemImage: "info.circle")
-                }
+            }
+            .padding()
         }
-        .padding(20)
-        .frame(width: 500, height: 350)
+        .frame(width: 550, height: 400)
         .onAppear {
             checkPermissions()
             checkOllamaStatus()
@@ -47,22 +78,9 @@ struct SettingsView: View {
     }
     
     // MARK: - General Tab
-    
+
     private var generalTab: some View {
         Form {
-            Section {
-                Picker("Trigger Key", selection: $settings.triggerKey) {
-                    ForEach(TriggerKey.allCases) { key in
-                        Text(key.rawValue).tag(key)
-                    }
-                }
-                .pickerStyle(.menu)
-                
-                Text("Press this key to start and stop recording")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
             Section {
                 Toggle("Show recording indicator", isOn: $settings.showIndicator)
 
@@ -78,8 +96,10 @@ struct SettingsView: View {
                 Text("Display a floating indicator while recording")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            } header: {
+                Text("Display")
             }
-            
+
             Section {
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
@@ -91,10 +111,12 @@ struct SettingsView: View {
                 Text("Applies capitalization and punctuation to transcribed text")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            } header: {
+                Text("Text Formatting")
             }
 
-            Section("Setup") {
-                Button("Run Setup Wizard Again") {
+            Section {
+                Button {
                     // Reset onboarding flag and show restart alert
                     settings.hasCompletedOnboarding = false
 
@@ -104,11 +126,15 @@ struct SettingsView: View {
                     alert.alertStyle = .informational
                     alert.addButton(withTitle: "OK")
                     alert.runModal()
+                } label: {
+                    Text("Run Setup Wizard Again")
                 }
 
                 Text("Re-run the initial setup wizard to reconfigure Ollama, models, and permissions")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            } header: {
+                Text("Setup")
             }
 
             Spacer()
@@ -120,7 +146,58 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding()
+    }
+
+    // MARK: - Recording Tab
+
+    private var recordingTab: some View {
+        Form {
+            Section {
+                Picker("Trigger Key", selection: $settings.triggerKey) {
+                    ForEach(TriggerKey.allCases) { key in
+                        Text(key.rawValue).tag(key)
+                    }
+                }
+
+                Text("Press this key to start and stop recording")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            } header: {
+                Text("Trigger Key")
+            }
+
+            Section {
+                Picker("Microphone", selection: Binding(
+                    get: { settings.audioDeviceManager.selectedDevice },
+                    set: { settings.audioDeviceManager.selectDevice($0) }
+                )) {
+                    ForEach(settings.audioDeviceManager.availableDevices) { device in
+                        Text(device.name).tag(device)
+                    }
+                }
+
+                HStack {
+                    Text("Select which microphone to use for dictation and meeting transcription")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        settings.audioDeviceManager.refreshDevices()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Refresh device list")
+                }
+            } header: {
+                Text("Audio Input")
+            }
+
+            Spacer()
+        }
     }
     
     // MARK: - Models Tab
@@ -284,31 +361,47 @@ struct SettingsView: View {
 
     private var permissionsTab: some View {
         Form {
-            Section("Required Permissions") {
+            Section("Required for Dictation") {
                 permissionRow(
                     title: "Microphone",
-                    description: "Required to capture your voice",
+                    description: "Required to capture your voice for dictation",
                     state: micPermission,
                     action: requestMicrophonePermission
                 )
-                
+
                 permissionRow(
                     title: "Accessibility",
-                    description: "Required to insert text into other apps",
+                    description: "Required to insert transcribed text into applications",
                     state: accessibilityPermission,
                     action: openAccessibilityPreferences
                 )
             }
-            
-            Section {
-                Button("Refresh Permission Status") {
-                    checkPermissions()
+
+            Section("Additional Info") {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.blue)
+                        Text("Meeting transcription requires Screen Recording permission")
+                            .font(.caption)
+                    }
+
+                    Text("This permission is requested automatically when you start a meeting recording.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            
+
+            Section {
+                Button {
+                    checkPermissions()
+                } label: {
+                    Label("Refresh Permission Status", systemImage: "arrow.clockwise")
+                }
+            }
+
             Spacer()
         }
-        .padding()
     }
     
     // MARK: - About Tab
@@ -318,27 +411,26 @@ struct SettingsView: View {
             Image(systemName: "mic.fill")
                 .font(.system(size: 64))
                 .foregroundColor(.accentColor)
-            
+
             Text("Look Ma No Hands")
                 .font(.title)
                 .fontWeight(.bold)
-            
+
             Text("Version 0.1.0")
                 .foregroundColor(.secondary)
-            
+
             Text("Local voice dictation with AI-powered formatting")
                 .multilineTextAlignment(.center)
-            
+
             Divider()
-            
+
             VStack(alignment: .leading, spacing: 8) {
                 Link("Whisper.cpp on GitHub", destination: URL(string: "https://github.com/ggerganov/whisper.cpp")!)
                 Link("Ollama", destination: URL(string: "https://ollama.ai")!)
             }
-            
+
             Spacer()
         }
-        .padding()
     }
     
     // MARK: - Helper Views
@@ -421,6 +513,11 @@ struct SettingsView: View {
     }
     
     private func openAccessibilityPreferences() {
+        // First, trigger the system prompt to add this app to Accessibility
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+
+        // Also open System Settings to the Accessibility pane
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }

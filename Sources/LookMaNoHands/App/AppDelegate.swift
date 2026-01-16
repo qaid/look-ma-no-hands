@@ -301,6 +301,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 600, height: 400)
+        window.delegate = self
 
         // Create SwiftUI meeting view and wrap it in NSHostingView
         let meetingView = MeetingView(whisperService: whisperService)
@@ -308,6 +309,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView = hostingView
 
         self.meetingWindow = window
+
+        // Change activation policy to regular app so window appears in Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -759,6 +763,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             recordingMenuItem?.title = "Stop Recording (Caps Lock)"
         } else {
             recordingMenuItem?.title = "Start Recording (Caps Lock)"
+        }
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension AppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        guard let window = notification.object as? NSWindow else { return }
+
+        // If the meeting window is closing, revert to accessory mode
+        if window === meetingWindow {
+            NSApp.setActivationPolicy(.accessory)
+            print("Meeting window closed - reverted to accessory mode")
         }
     }
 }

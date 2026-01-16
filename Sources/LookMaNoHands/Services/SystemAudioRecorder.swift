@@ -177,14 +177,14 @@ extension SystemAudioRecorder: SCStreamOutput {
         audioBuffer.append(contentsOf: audioSamples)
 
         // Optionally call chunk callback for streaming transcription
-        if let onAudioChunk = onAudioChunk, audioBuffer.count >= Int(targetSampleRate * 30) {
-            // Send 30-second chunks
-            let chunk = Array(audioBuffer.prefix(Int(targetSampleRate * 30)))
+        if let onAudioChunk = onAudioChunk, audioBuffer.count >= Int(targetSampleRate * 5) {
+            // Send 5-second chunks for faster, more responsive transcription
+            let chunk = Array(audioBuffer.prefix(Int(targetSampleRate * 5)))
             onAudioChunk(chunk)
 
-            // Keep overlap for next chunk (5 seconds)
-            let overlapSamples = Int(targetSampleRate * 5)
-            let samplesToRemove = Int(targetSampleRate * 30) - overlapSamples
+            // Keep overlap for next chunk (1 second)
+            let overlapSamples = Int(targetSampleRate * 1)
+            let samplesToRemove = Int(targetSampleRate * 5) - overlapSamples
             audioBuffer.removeFirst(samplesToRemove)
         }
     }

@@ -57,6 +57,25 @@ class AudioRecorder {
         print("AudioRecorder: Started recording")
     }
     
+    /// Get current buffer without stopping recording (for mixing scenarios)
+    /// - Returns: Audio samples as Float array at 16kHz
+    func getCurrentBuffer() -> [Float] {
+        guard isRecording else { return [] }
+
+        // Resample to 16kHz if needed
+        let resampled: [Float]
+        if abs(inputSampleRate - targetSampleRate) > 0.1 {
+            resampled = resampleToTarget(audioBuffer)
+        } else {
+            resampled = audioBuffer
+        }
+
+        // Normalize audio levels
+        let normalized = normalizeAudio(resampled)
+
+        return normalized
+    }
+
     /// Stop recording and return the captured audio data
     /// - Returns: Audio samples as Float array at 16kHz
     func stopRecording() -> [Float] {

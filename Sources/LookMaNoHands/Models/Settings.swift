@@ -128,8 +128,13 @@ If a follow-up meeting or next steps were discussed, describe them here. If not 
         static let indicatorPosition = "indicatorPosition"
     }
     
+    // MARK: - Audio Device Manager
+
+    /// Manager for audio input devices
+    let audioDeviceManager = AudioDeviceManager()
+
     // MARK: - Published Properties
-    
+
     /// The key used to trigger recording
     @Published var triggerKey: TriggerKey {
         didSet {

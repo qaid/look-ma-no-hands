@@ -28,11 +28,11 @@ class ContinuousTranscriber {
     /// Sample rate (should match recorder, Whisper expects 16kHz)
     private let sampleRate: Double = 16000
 
-    /// Chunk size in seconds (30 seconds for balance between latency and accuracy)
-    private let chunkDuration: TimeInterval = 30
+    /// Chunk size in seconds (5 seconds for fast, responsive transcription)
+    private let chunkDuration: TimeInterval = 5
 
-    /// Overlap between chunks in seconds (5 seconds to prevent word clipping)
-    private let overlapDuration: TimeInterval = 5
+    /// Overlap between chunks in seconds (1 second to prevent word clipping)
+    private let overlapDuration: TimeInterval = 1
 
     /// Minimum audio energy threshold for silence detection
     private let silenceThreshold: Float = 0.01

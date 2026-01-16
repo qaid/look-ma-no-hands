@@ -12,7 +12,6 @@ class MeetingState {
     var isAnalyzing = false
     var statusMessage = "Ready to start"
     var elapsedTime: TimeInterval = 0
-    var audioSource: AudioSource = .systemAudio
 }
 
 /// View for meeting transcription mode
@@ -28,14 +27,14 @@ struct MeetingView: View {
     @State private var showAdvancedPrompt = false
 
     // Services
-    private let systemAudioRecorder: SystemAudioRecorder
+    private let mixedAudioRecorder: MixedAudioRecorder
     private let continuousTranscriber: ContinuousTranscriber
     private let whisperService: WhisperService
     private let meetingAnalyzer: MeetingAnalyzer
 
     init(whisperService: WhisperService) {
         self.whisperService = whisperService
-        self.systemAudioRecorder = SystemAudioRecorder()
+        self.mixedAudioRecorder = MixedAudioRecorder()
         self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
         self.meetingAnalyzer = MeetingAnalyzer()
 
@@ -89,15 +88,6 @@ struct MeetingView: View {
                 .font(.headline)
 
             Spacer()
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.secondary)
-                    .imageScale(.large)
-            }
-            .buttonStyle(.plain)
         }
         .padding()
     }
@@ -121,21 +111,46 @@ struct MeetingView: View {
 
             Spacer()
 
+            // Microphone selector (disabled during recording)
+            Menu {
+                ForEach(Settings.shared.audioDeviceManager.availableDevices) { device in
+                    Button {
+                        Settings.shared.audioDeviceManager.selectDevice(device)
+                    } label: {
+                        HStack {
+                            Text(device.name)
+                            if device.id == Settings.shared.audioDeviceManager.selectedDevice.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                Button {
+                    Settings.shared.audioDeviceManager.refreshDevices()
+                } label: {
+                    Label("Refresh Devices", systemImage: "arrow.clockwise")
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.fill")
+                        .font(.caption)
+                    Text(Settings.shared.audioDeviceManager.selectedDevice.name)
+                        .font(.caption)
+                        .lineLimit(1)
+                }
+            }
+            .disabled(meetingState.isRecording)
+            .help("Select microphone input")
+
+            Spacer()
+
             // Timer
             Text(formatTime(meetingState.elapsedTime))
                 .font(.system(.body, design: .monospaced))
                 .foregroundColor(.secondary)
-
-            Spacer()
-
-            // Audio source
-            HStack(spacing: 4) {
-                Image(systemName: meetingState.audioSource == .systemAudio ? "speaker.wave.2.fill" : "mic.fill")
-                    .font(.caption)
-                Text(meetingState.audioSource.rawValue)
-                    .font(.caption)
-            }
-            .foregroundColor(.secondary)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -159,7 +174,7 @@ struct MeetingView: View {
                                 .font(.title3)
                                 .foregroundColor(.secondary)
 
-                            Text("Click Start to begin recording system audio")
+                            Text("Click Start to begin recording (captures both system audio and microphone)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -304,17 +319,17 @@ struct MeetingView: View {
             // Start continuous transcriber session
             continuousTranscriber.startSession()
 
-            // Start system audio recording
-            try await systemAudioRecorder.startRecording()
+            // Start mixed audio recording (system + microphone)
+            try await mixedAudioRecorder.startRecording()
 
             meetingState.isRecording = true
-            meetingState.statusMessage = "Recording"
+            meetingState.statusMessage = "Recording (system + microphone)"
             meetingState.elapsedTime = 0
 
             // Start timer
             startTimer()
 
-            print("MeetingView: Recording started")
+            print("MeetingView: Recording started (mixed audio)")
 
         } catch {
             print("MeetingView: Failed to start recording - \(error)")
@@ -344,8 +359,8 @@ struct MeetingView: View {
         // Stop timer
         stopTimer()
 
-        // Stop recording (audio chunks were already processed in real-time)
-        _ = await systemAudioRecorder.stopRecording()
+        // Stop mixed audio recording (audio chunks were already processed in real-time)
+        _ = await mixedAudioRecorder.stopRecording()
 
         // End transcription session (processes any remaining audio)
         let finalSegments = await continuousTranscriber.endSession()
@@ -500,10 +515,10 @@ struct MeetingView: View {
     }
 
     private func setupAudioRecorderCallback() {
-        systemAudioRecorder.onAudioChunk = { [weak continuousTranscriber] audioChunk in
+        mixedAudioRecorder.onAudioChunk = { [weak continuousTranscriber] audioChunk in
             guard let transcriber = continuousTranscriber else { return }
             Task {
-                // Send audio chunks to the transcriber for real-time processing
+                // Send mixed audio chunks to the transcriber for real-time processing
                 await transcriber.addAudio(audioChunk)
             }
         }
