@@ -7,10 +7,14 @@ Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock
 ### Voice Dictation
 - **Lightning Fast**: ~1 second transcription with Core ML acceleration (8-15x faster than competitors)
 - **System-wide**: Works in any app, any text field
-- **Multiple Triggers**:
-  - Caps Lock toggle (press once to start, again to stop)
-  - Menu bar control (Start/Stop Recording)
-- **Smart formatting**: Automatic capitalization, punctuation, and cleanup
+- **Fully Customizable Hotkeys**:
+  - Caps Lock toggle (default, press once to start, again to stop)
+  - Custom key combinations with real-time validation
+  - Predefined alternatives (Right Option, Fn key)
+  - Dynamic switching without app restart
+  - System-reserved hotkey protection
+- **Menu bar control**: Start/Stop Recording button
+- **Smart formatting**: Automatic capitalization, punctuation, context-aware insertion, and cleanup
 
 ### Meeting Transcription 🆕
 - **System audio capture**: Record video calls from Zoom, Meet, Teams, etc.
@@ -28,7 +32,7 @@ Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock
 - **100% Local**: Everything runs on your Mac, no cloud, no internet required
 - **Privacy first**: Your voice never leaves your computer
 - **Native macOS**:
-  - Beautiful floating recording indicator with pulsing animation
+  - Beautiful floating recording indicator with Siri-style animated multi-color border
   - Menu bar app with status icon that changes during recording
   - Settings window for permission and model management
   - Custom app icon
@@ -100,16 +104,22 @@ On first launch, grant:
 
 ## 🎯 Usage
 
-### Voice Dictation (Caps Lock)
+### Voice Dictation (Hotkey)
 1. Click any text field in any app
-2. Press **Caps Lock** to start recording (floating indicator appears)
+2. Press your configured hotkey to start recording (floating indicator appears with animated Siri-style border)
 3. Speak naturally
-4. Press **Caps Lock** again to stop
-5. Formatted text appears instantly!
+4. Press the hotkey again to stop
+5. Formatted text appears instantly with context-aware capitalization!
+
+**Custom Hotkey Configuration**:
+- Open **Settings → General → Recording Hotkey**
+- Click the record button and press your desired key combination (1-2 modifiers + key)
+- Real-time validation prevents system-reserved shortcuts
+- Changes apply immediately—no restart needed
 
 ### Voice Dictation (Menu Bar)
 1. Click the **Look Ma No Hands** menu bar icon
-2. Select **Start Recording (Caps Lock)**
+2. Select **Start Recording**
 3. Speak naturally
 4. Click the menu bar icon again and select **Stop Recording**
 
@@ -130,7 +140,10 @@ On first launch, grant:
 
 ### Settings Window
 Access via menu bar → **Settings** to:
-- **General Tab**: Configure trigger key, recording indicator preferences
+- **General Tab**:
+  - Configure recording hotkey with real-time validation (Raycast-style hotkey recorder)
+  - Recording indicator style preferences
+  - Predefined hotkey shortcuts (Caps Lock, Right Option, Fn)
 - **Models Tab**:
   - Download and switch Whisper models (tiny, base, small, medium)
   - Configure Ollama model for meeting notes
@@ -252,19 +265,22 @@ LookMaNoHands/
 │   │   ├── ContinuousTranscriber.swift # Real-time transcription
 │   │   ├── MeetingAnalyzer.swift     # Ollama integration
 │   │   ├── TextFormatter.swift       # Rule-based text cleanup
-│   │   ├── TextInsertionService.swift # Accessibility API
-│   │   └── KeyboardMonitor.swift     # Caps Lock detection
+│   │   ├── TextInsertionService.swift # Accessibility API + context-aware formatting
+│   │   └── KeyboardMonitor.swift     # Custom hotkey detection and validation
 │   ├── Views/            # SwiftUI + AppKit UI
-│   │   ├── RecordingIndicator.swift  # Floating indicator
+│   │   ├── RecordingIndicator.swift  # Floating indicator with animated border
 │   │   ├── SettingsView.swift        # Settings window
-│   │   └── MeetingView.swift         # Meeting transcription UI
+│   │   ├── MeetingView.swift         # Meeting transcription UI
+│   │   └── HotkeyRecorderView.swift  # Raycast-style hotkey configuration
 │   └── Models/           # State management
 │       ├── Settings.swift            # User preferences
+│       ├── Hotkey.swift              # Custom hotkey validation and management
 │       └── TranscriptionState.swift  # App state
 ├── docs/                 # Documentation
 │   ├── ARCHITECTURE.md
 │   ├── MEETING_TRANSCRIPTION_PLAN.md
-│   └── ROADMAP.md
+│   ├── ROADMAP.md
+│   └── enable-custom-hotkeys.md     # Custom hotkey feature documentation
 └── PERFORMANCE.md        # Optimization guide
 ```
 
@@ -328,7 +344,7 @@ swift build -c release
 ./deploy.sh
 ```
 
-## 🤝 Contributing
+## 👥 Contributing
 
 Contributions welcome! Please read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first.
 
@@ -336,7 +352,7 @@ Contributions welcome! Please read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 
 
 MIT License - see [LICENSE](LICENSE) file.
 
-## 🙏 Acknowledgments
+## 🙏🏾 Acknowledgments
 
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Fast Whisper inference
 - [SwiftWhisper](https://github.com/exPHAT/SwiftWhisper) - Swift bindings
