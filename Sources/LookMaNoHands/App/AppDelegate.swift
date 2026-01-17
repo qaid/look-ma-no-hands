@@ -168,8 +168,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Recording control
+        let hotkeyName = Settings.shared.effectiveHotkey.displayString
         let recordingItem = NSMenuItem(
-            title: "Start Recording (Caps Lock)",
+            title: "Start Recording (\(hotkeyName))",
             action: #selector(toggleRecording),
             keyEquivalent: ""
         )
@@ -529,7 +530,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Keyboard Monitoring Setup
 
     private func setupKeyboardMonitoring() {
-        let success = keyboardMonitor.startMonitoring { [weak self] in
+        // Get the configured hotkey from settings
+        let hotkey = Settings.shared.effectiveHotkey
+
+        NSLog("🎯 Setting up keyboard monitoring...")
+        NSLog("   Trigger key setting: %@", Settings.shared.triggerKey.rawValue)
+        NSLog("   Custom hotkey: %@", Settings.shared.customHotkey?.displayString ?? "nil")
+        NSLog("   Effective hotkey: %@ (isSingleModifier: %@)",
+              hotkey.displayString,
+              hotkey.isSingleModifierKey ? "YES" : "NO")
+
+        let success = keyboardMonitor.startMonitoring(hotkey: hotkey) { [weak self] in
             self?.handleTriggerKey()
         }
 
@@ -540,13 +551,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Try again after a delay in case permissions were just granted
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
                 NSLog("🔄 Retrying keyboard monitoring setup...")
-                if self?.keyboardMonitor.startMonitoring(onTrigger: { [weak self] in
+                let retryHotkey = Settings.shared.effectiveHotkey
+                if self?.keyboardMonitor.startMonitoring(hotkey: retryHotkey, onTrigger: { [weak self] in
                     self?.handleTriggerKey()
                 }) == true {
-                    NSLog("✅ Keyboard monitoring started on retry")
+                    NSLog("✅ Keyboard monitoring started on retry for %@", retryHotkey.displayString)
                 }
             }
         }
+
+        // Listen for hotkey configuration changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(hotkeyConfigurationDidChange),
+            name: .hotkeyConfigurationChanged,
+            object: nil
+        )
+    }
+
+    /// Handle hotkey configuration changes from Settings
+    @objc private func hotkeyConfigurationDidChange() {
+        let newHotkey = Settings.shared.effectiveHotkey
+
+        NSLog("📢 Hotkey configuration change notification received")
+        NSLog("   Trigger key setting: %@", Settings.shared.triggerKey.rawValue)
+        NSLog("   Custom hotkey: %@", Settings.shared.customHotkey?.displayString ?? "nil")
+        NSLog("   New effective hotkey: %@ (isSingleModifier: %@)",
+              newHotkey.displayString,
+              newHotkey.isSingleModifierKey ? "YES" : "NO")
+
+        keyboardMonitor.setHotkey(newHotkey)
+
+        // Update menu item text
+        updateRecordingMenuItem(isRecording: transcriptionState.isRecording)
     }
 
     // MARK: - Recording Workflow
@@ -759,10 +796,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Update the recording menu item text based on recording state
     private func updateRecordingMenuItem(isRecording: Bool) {
+        let hotkeyName = Settings.shared.effectiveHotkey.displayString
         if isRecording {
-            recordingMenuItem?.title = "Stop Recording (Caps Lock)"
+            recordingMenuItem?.title = "Stop Recording (\(hotkeyName))"
         } else {
-            recordingMenuItem?.title = "Start Recording (Caps Lock)"
+            recordingMenuItem?.title = "Start Recording (\(hotkeyName))"
         }
     }
 }

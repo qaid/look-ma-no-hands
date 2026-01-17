@@ -5,8 +5,24 @@ enum TriggerKey: String, CaseIterable, Identifiable {
     case capsLock = "Caps Lock"
     case rightOption = "Right Option"
     case fn = "Fn (Double-tap)"
-    
+    case custom = "Custom..."
+
     var id: String { rawValue }
+
+    /// Get the Hotkey for this trigger key
+    func toHotkey(customHotkey: Hotkey?) -> Hotkey? {
+        switch self {
+        case .capsLock: return .capsLock
+        case .rightOption: return .rightOption
+        case .fn: return .fn
+        case .custom: return customHotkey
+        }
+    }
+}
+
+/// Notification posted when hotkey configuration changes
+extension Notification.Name {
+    static let hotkeyConfigurationChanged = Notification.Name("hotkeyConfigurationChanged")
 }
 
 /// Available Whisper model sizes
@@ -193,6 +209,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
     
     private enum Keys {
         static let triggerKey = "triggerKey"
+        static let customHotkey = "customHotkey"
         static let whisperModel = "whisperModel"
         static let ollamaModel = "ollamaModel"
         static let meetingPrompt = "meetingPrompt"
@@ -215,6 +232,24 @@ Now produce the complete meeting notes following the format above. Ensure every 
         didSet {
             UserDefaults.standard.set(triggerKey.rawValue, forKey: Keys.triggerKey)
         }
+    }
+
+    /// Custom hotkey when triggerKey is .custom
+    @Published var customHotkey: Hotkey? {
+        didSet {
+            if let hotkey = customHotkey {
+                if let data = try? JSONEncoder().encode(hotkey) {
+                    UserDefaults.standard.set(data, forKey: Keys.customHotkey)
+                }
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.customHotkey)
+            }
+        }
+    }
+
+    /// Get the effective hotkey based on current settings
+    var effectiveHotkey: Hotkey {
+        triggerKey.toHotkey(customHotkey: customHotkey) ?? .capsLock
     }
     
     /// The Whisper model to use for transcription
@@ -270,7 +305,15 @@ Now produce the complete meeting notes following the format above. Ensure every 
         } else {
             self.triggerKey = .capsLock
         }
-        
+
+        // Load custom hotkey if saved
+        if let hotkeyData = UserDefaults.standard.data(forKey: Keys.customHotkey),
+           let hotkey = try? JSONDecoder().decode(Hotkey.self, from: hotkeyData) {
+            self.customHotkey = hotkey
+        } else {
+            self.customHotkey = nil
+        }
+
         if let savedWhisperModel = UserDefaults.standard.string(forKey: Keys.whisperModel),
            let model = WhisperModel(rawValue: savedWhisperModel) {
             self.whisperModel = model
@@ -308,6 +351,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
     /// Reset all settings to defaults
     func resetToDefaults() {
         triggerKey = .capsLock
+        customHotkey = nil
         whisperModel = .base
         ollamaModel = "qwen3:8b"
         meetingPrompt = Settings.defaultMeetingPrompt

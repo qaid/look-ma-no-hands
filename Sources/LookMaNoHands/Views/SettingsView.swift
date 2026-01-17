@@ -158,6 +158,22 @@ struct SettingsView: View {
                         Text(key.rawValue).tag(key)
                     }
                 }
+                .onChange(of: settings.triggerKey) { _, newValue in
+                    // Post notification when trigger key changes
+                    NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
+                }
+
+                // Show HotkeyRecorderView when custom is selected
+                if settings.triggerKey == .custom {
+                    HStack {
+                        Text("Custom Hotkey")
+                        Spacer()
+                        HotkeyRecorderView(hotkey: $settings.customHotkey)
+                            .onChange(of: settings.customHotkey) { _, _ in
+                                NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
+                            }
+                    }
+                }
 
                 Text("Press this key to start and stop recording")
                     .font(.caption)
