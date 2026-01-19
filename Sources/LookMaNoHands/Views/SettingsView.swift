@@ -39,6 +39,9 @@ struct SettingsView: View {
     // Selected tab
     @State private var selectedTab: SettingsTab = .general
 
+    // Hotkey change confirmation
+    @State private var showingHotkeyConfirmation = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
@@ -117,15 +120,7 @@ struct SettingsView: View {
 
             Section {
                 Button {
-                    // Reset onboarding flag and show restart alert
-                    settings.hasCompletedOnboarding = false
-
-                    let alert = NSAlert()
-                    alert.messageText = "Restart Required"
-                    alert.informativeText = "Please restart Look Ma No Hands to run the setup wizard again."
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: "OK")
-                    alert.runModal()
+                    showSetupWizardRestartConfirmation()
                 } label: {
                     Text("Run Setup Wizard Again")
                 }
@@ -161,6 +156,9 @@ struct SettingsView: View {
                 .onChange(of: settings.triggerKey) { _, newValue in
                     // Post notification when trigger key changes
                     NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
+
+                    // Show brief feedback that change was applied
+                    showHotkeyChangeConfirmation()
                 }
 
                 // Show HotkeyRecorderView when custom is selected
@@ -171,6 +169,9 @@ struct SettingsView: View {
                         HotkeyRecorderView(hotkey: $settings.customHotkey)
                             .onChange(of: settings.customHotkey) { _, _ in
                                 NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
+
+                                // Show brief feedback that change was applied
+                                showHotkeyChangeConfirmation()
                             }
                     }
                 }
@@ -178,6 +179,18 @@ struct SettingsView: View {
                 Text("Press this key to start and stop recording")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                // Show confirmation message when hotkey changes
+                if showingHotkeyConfirmation {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Trigger key updated (no restart needed)")
+                            .font(.caption)
+                            .foregroundColor(.green)
+                    }
+                    .padding(.top, 4)
+                }
             } header: {
                 Text("Trigger Key")
             }
@@ -634,6 +647,67 @@ struct SettingsView: View {
             return isAvailable ? "Downloaded" : "Not downloaded"
         } else {
             return "Checking..."
+        }
+    }
+
+    // MARK: - Hotkey Change Feedback
+
+    /// Show brief confirmation that hotkey change was applied
+    private func showHotkeyChangeConfirmation() {
+        showingHotkeyConfirmation = true
+
+        // Hide the message after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            withAnimation {
+                showingHotkeyConfirmation = false
+            }
+        }
+    }
+
+    // MARK: - Setup Wizard
+
+    /// Show confirmation dialog to restart app and run setup wizard again
+    private func showSetupWizardRestartConfirmation() {
+        let alert = NSAlert()
+        alert.messageText = "Restart Required"
+        alert.informativeText = "Look Ma No Hands needs to restart to run the setup wizard again."
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Restart")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            // Reset onboarding flag
+            settings.hasCompletedOnboarding = false
+
+            // Force UserDefaults to synchronize immediately
+            UserDefaults.standard.synchronize()
+
+            // Small delay to ensure settings are written to disk
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // Restart the app
+                self.restartApp()
+            }
+        }
+    }
+
+    /// Restart the application
+    private func restartApp() {
+        let bundlePath = Bundle.main.bundlePath
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+
+        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: bundlePath),
+                                          configuration: config) { _, error in
+            if let error = error {
+                print("Failed to relaunch app: \(error)")
+            } else {
+                // Only terminate if relaunch succeeded
+                DispatchQueue.main.async {
+                    NSApplication.shared.terminate(nil)
+                }
+            }
         }
     }
 }
