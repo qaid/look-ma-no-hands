@@ -13,6 +13,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var meetingWindow: NSWindow?
     private var onboardingWindow: NSWindow?
 
+    // Track if we just completed onboarding to avoid double-prompting
+    private var justCompletedOnboarding = false
+
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
 
@@ -74,6 +77,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.onboardingWindow?.close()
                 self.onboardingWindow = nil
 
+                // Mark that we just completed onboarding
+                self.justCompletedOnboarding = true
+
                 // Check if accessibility was granted during onboarding
                 if AXIsProcessTrusted() {
                     // Restart app to activate accessibility monitoring
@@ -81,6 +87,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.restartApp()
                 } else {
                     // Continue with normal initialization
+                    // (won't show accessibility prompt since we just did onboarding)
                     self.completeInitialization()
                 }
             }
@@ -378,10 +385,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if !trusted {
+        if !trusted && !justCompletedOnboarding {
             // Prompt user to grant accessibility permission
+            // (but not if we just finished onboarding, which already prompted)
             promptForAccessibilityPermission()
         }
+
+        // Reset the flag after checking
+        justCompletedOnboarding = false
     }
     
     private func promptForAccessibilityPermission() {
@@ -741,17 +752,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 print("Transcription: \(rawText)")
 
-                // Step 2: Format text using rule-based formatter (fast, no AI needed)
-                let formattedText = self.textFormatter.format(rawText)
-                await MainActor.run {
-                    self.transcriptionState.setFormattedText(formattedText)
-                }
-                print("Formatted text: \(formattedText)")
-
-                // Step 3: Insert text
+                // Step 2: Insert text with context-aware formatting
+                // TextInsertionService handles all formatting based on cursor position
                 await MainActor.run {
                     autoreleasepool {
-                        self.textInsertionService.insertText(formattedText)
+                        self.textInsertionService.insertText(rawText)
+                        self.transcriptionState.setFormattedText(rawText) // For display purposes
                         self.transcriptionState.completeProcessing()
                     }
                 }

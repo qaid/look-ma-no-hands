@@ -162,16 +162,26 @@ class KeyboardMonitor {
                 return
             }
 
-            // Check if the modifier is being pressed (not released)
+            // Check if the modifier state changed
             let isPressed = eventFlags.contains(relevantFlag)
             let wasPressed = lastModifierFlags.contains(relevantFlag)
 
             // Update state
             lastModifierFlags = eventFlags
 
-            // Only trigger on press (not release)
-            if isPressed && !wasPressed {
-                NSLog("🔔 KeyboardMonitor: %@ detected (press)", currentHotkey.displayString)
+            // For Caps Lock (a toggle key), trigger on BOTH press and release
+            // For other modifier keys, only trigger on press
+            let shouldTrigger: Bool
+            if currentHotkey.keyCode == 57 { // Caps Lock
+                // Trigger on any state change (toggle)
+                shouldTrigger = isPressed != wasPressed
+            } else {
+                // Trigger only on press (not release)
+                shouldTrigger = isPressed && !wasPressed
+            }
+
+            if shouldTrigger {
+                NSLog("🔔 KeyboardMonitor: %@ detected (toggle/press)", currentHotkey.displayString)
                 DispatchQueue.main.async { [weak self] in
                     self?.onTrigger?()
                 }

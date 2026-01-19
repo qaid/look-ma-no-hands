@@ -10,12 +10,15 @@ class TextInsertionService {
     
     /// Insert text into the currently focused text field
     /// Tries multiple methods in order of preference
-    /// - Parameter text: The text to insert
+    /// - Parameter text: The text to insert (raw transcription)
     /// - Returns: True if insertion was successful
     @discardableResult
     func insertText(_ text: String) -> Bool {
-        // Apply context-aware formatting before insertion
-        let formattedText = applyContextAwareFormatting(text)
+        // First apply basic cleanup
+        let cleanedText = basicCleanup(text)
+
+        // Then apply context-aware formatting before insertion
+        let formattedText = applyContextAwareFormatting(cleanedText)
 
         // Strategy 1: Try Accessibility API (cleanest method)
         if insertViaAccessibility(formattedText) {
@@ -221,10 +224,29 @@ class TextInsertionService {
         pasteboard.setString(text, forType: .string)
     }
 
+    // MARK: - Basic Text Cleanup
+
+    /// Apply basic cleanup to transcribed text without context
+    /// Only fixes obvious issues like whitespace and "I" pronoun
+    private func basicCleanup(_ text: String) -> String {
+        var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Fix excessive whitespace
+        result = result.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+
+        // Fix spaces before punctuation
+        result = result.replacingOccurrences(of: "\\s+([,\\.!?;:])", with: "$1", options: .regularExpression)
+
+        // Capitalize "I" when used as a pronoun
+        result = result.replacingOccurrences(of: "\\bi\\b", with: "I", options: .regularExpression)
+
+        return result
+    }
+
     // MARK: - Context-Aware Formatting
 
     /// Apply context-aware formatting based on surrounding text
-    /// Adjusts capitalization based on what comes before the cursor
+    /// Adjusts capitalization and punctuation based on what comes before the cursor
     private func applyContextAwareFormatting(_ text: String) -> String {
         guard !text.isEmpty else { return text }
 
@@ -268,64 +290,118 @@ class TextInsertionService {
         }
 
         // Analyze context before cursor
-        let shouldCapitalize = shouldCapitalizeBasedOnContext(currentText, cursorPosition: range.location)
+        let context = analyzeContext(currentText, cursorPosition: range.location)
 
-        // Adjust first character based on context
-        if shouldCapitalize {
-            // Already capitalized (Whisper does this), keep as-is
-            return text
+        var result = text
+
+        // Adjust capitalization based on context
+        if context.shouldCapitalize {
+            // Capitalize first letter (Whisper usually does this already)
+            result = result.prefix(1).uppercased() + result.dropFirst()
         } else {
             // Mid-sentence, lowercase the first character
-            return text.prefix(1).lowercased() + text.dropFirst()
+            result = result.prefix(1).lowercased() + result.dropFirst()
         }
+
+        // Adjust punctuation based on context
+        if context.shouldAddPunctuation {
+            // Add period at end if no punctuation present
+            let lastChar = result.last
+            if lastChar != nil && !".,!?;:".contains(lastChar!) {
+                result += "."
+            }
+        }
+        // If inserting mid-sentence, don't add punctuation
+
+        return result
     }
 
-    /// Determine if text should be capitalized based on what comes before cursor
-    private func shouldCapitalizeBasedOnContext(_ existingText: String, cursorPosition: Int) -> Bool {
-        // If cursor is at the very beginning, capitalize
+    /// Context information about where text will be inserted
+    private struct InsertionContext {
+        let shouldCapitalize: Bool
+        let shouldAddPunctuation: Bool
+    }
+
+    /// Analyze the context to determine formatting needs
+    private func analyzeContext(_ existingText: String, cursorPosition: Int) -> InsertionContext {
+        // If cursor is at the very beginning, capitalize and add punctuation
         guard cursorPosition > 0 else {
-            return true
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: true)
         }
+
+        // Check if we're at the end of the text
+        let isAtEnd = cursorPosition >= existingText.count
 
         // Get text before cursor (up to 10 characters for context)
         let startIndex = max(0, cursorPosition - 10)
         let contextStart = existingText.index(existingText.startIndex, offsetBy: startIndex)
         let contextEnd = existingText.index(existingText.startIndex, offsetBy: cursorPosition)
-        let context = String(existingText[contextStart..<contextEnd])
+        let beforeCursor = String(existingText[contextStart..<contextEnd])
+
+        // Get text after cursor (up to 10 characters)
+        var afterCursor = ""
+        if cursorPosition < existingText.count {
+            let afterStart = existingText.index(existingText.startIndex, offsetBy: cursorPosition)
+            let afterEnd = existingText.index(afterStart, offsetBy: min(10, existingText.count - cursorPosition))
+            afterCursor = String(existingText[afterStart..<afterEnd])
+        }
 
         // Trim whitespace to analyze the actual content
-        let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBefore = beforeCursor.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Empty context = beginning of field
-        guard !trimmedContext.isEmpty else {
-            return true
+        guard !trimmedBefore.isEmpty else {
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd)
         }
 
-        // Get the last non-whitespace character
-        guard let lastChar = trimmedContext.last else {
-            return true
+        // Get the last non-whitespace character before cursor
+        guard let lastChar = trimmedBefore.last else {
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd)
         }
 
-        // Sentence-ending punctuation followed by space = new sentence
+        var shouldCapitalize = false
+        var shouldAddPunctuation = isAtEnd
+
+        // Sentence-ending punctuation = new sentence
         let sentenceEnders: Set<Character> = [".", "!", "?"]
         if sentenceEnders.contains(lastChar) {
-            // Check if there's a space after the punctuation (before cursor)
-            let afterPunctuation = String(existingText[contextEnd..<existingText.index(existingText.startIndex, offsetBy: cursorPosition)])
-            if afterPunctuation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                return true
-            }
+            shouldCapitalize = true
+            shouldAddPunctuation = isAtEnd
         }
-
+        // Colon or semicolon = maybe capitalize (after colon, usually yes)
+        else if lastChar == ":" {
+            shouldCapitalize = true
+            shouldAddPunctuation = isAtEnd
+        }
+        // Comma or dash = mid-sentence, don't capitalize
+        else if ",;-—".contains(lastChar) {
+            shouldCapitalize = false
+            shouldAddPunctuation = false
+        }
+        // Opening quote/paren = depends on context
+        else if "\"'([{".contains(lastChar) {
+            shouldCapitalize = true
+            shouldAddPunctuation = false
+        }
         // Check for newlines (paragraph breaks)
-        if context.contains("\n") {
-            // If there's a newline near the cursor, it's likely a new sentence
-            let lastFewChars = String(context.suffix(3))
-            if lastFewChars.contains("\n") {
-                return true
-            }
+        else if beforeCursor.suffix(3).contains("\n") {
+            shouldCapitalize = true
+            shouldAddPunctuation = isAtEnd
+        }
+        // Default: mid-sentence
+        else {
+            shouldCapitalize = false
+            shouldAddPunctuation = false
         }
 
-        // Default: mid-sentence, don't capitalize
-        return false
+        // If there's text after cursor, don't add punctuation (we're in the middle)
+        if !afterCursor.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            shouldAddPunctuation = false
+        }
+
+        return InsertionContext(
+            shouldCapitalize: shouldCapitalize,
+            shouldAddPunctuation: shouldAddPunctuation
+        )
     }
 }
