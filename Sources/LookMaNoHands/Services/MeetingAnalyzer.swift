@@ -57,6 +57,57 @@ class MeetingAnalyzer {
         return structuredNotes
     }
 
+    /// Analyze a meeting transcript with streaming progress updates
+    /// - Parameters:
+    ///   - transcript: The raw transcript text
+    ///   - customPrompt: Optional custom prompt (defaults to Settings.meetingPrompt)
+    ///   - onProgress: Callback invoked with (character count, chunk text) for each chunk
+    /// - Returns: Structured meeting notes in markdown format
+    func analyzeMeetingStreaming(
+        transcript: String,
+        customPrompt: String? = nil,
+        onProgress: @escaping (Int, String) async -> Void
+    ) async throws -> String {
+        guard !transcript.isEmpty else {
+            throw AnalysisError.emptyTranscript
+        }
+
+        // Get prompt (custom or default)
+        let prompt = customPrompt ?? Settings.shared.meetingPrompt
+
+        // Build the full prompt with transcript
+        let fullPrompt = """
+\(prompt)
+
+# Transcript
+
+\(transcript)
+"""
+
+        // Set the model name first
+        ollamaService.modelName = Settings.shared.ollamaModel
+
+        print("MeetingAnalyzer: Starting streaming analysis with \(ollamaService.modelName) model...")
+
+        // Check if Ollama is available
+        let isAvailable = await ollamaService.isAvailable()
+        guard isAvailable else {
+            throw AnalysisError.ollamaUnavailable
+        }
+
+        var totalChars = 0
+
+        // Process with Ollama streaming
+        let structuredNotes = try await ollamaService.generateStreaming(prompt: fullPrompt) { chunk in
+            totalChars += chunk.count
+            await onProgress(totalChars, chunk)
+        }
+
+        print("MeetingAnalyzer: Streaming analysis complete, generated \(structuredNotes.count) characters")
+
+        return structuredNotes
+    }
+
     /// Check if Ollama is available for analysis
     func isAvailable() async -> Bool {
         return await ollamaService.isAvailable()

@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import Foundation
 
 /// State for managing meeting transcription session
 @Observable
@@ -12,6 +13,13 @@ class MeetingState {
     var isAnalyzing = false
     var statusMessage = "Ready to start"
     var elapsedTime: TimeInterval = 0
+
+    // Streaming progress
+    var generationProgress: Double = 0.0
+    var estimatedTotalChars: Int = 0
+    var receivedChars: Int = 0
+    var isStreaming: Bool = false
+    var streamedNotesPreview: String = ""
 }
 
 /// View for meeting transcription mode
@@ -25,18 +33,22 @@ struct MeetingView: View {
     @State private var customPrompt = Settings.shared.meetingPrompt
     @State private var jargonTerms = ""
     @State private var showAdvancedPrompt = false
+    @State private var menuRefreshTrigger = UUID()
+    @State private var lastProgressUpdate = Date()
 
     // Services
     private let mixedAudioRecorder: MixedAudioRecorder
     private let continuousTranscriber: ContinuousTranscriber
     private let whisperService: WhisperService
     private let meetingAnalyzer: MeetingAnalyzer
+    private let recordingIndicator: RecordingIndicatorWindowController?
 
-    init(whisperService: WhisperService) {
+    init(whisperService: WhisperService, recordingIndicator: RecordingIndicatorWindowController? = nil) {
         self.whisperService = whisperService
         self.mixedAudioRecorder = MixedAudioRecorder()
         self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
         self.meetingAnalyzer = MeetingAnalyzer()
+        self.recordingIndicator = recordingIndicator
 
         // Setup callbacks for continuous transcription
         setupTranscriberCallbacks()
@@ -254,16 +266,45 @@ struct MeetingView: View {
             }
             .disabled(meetingState.segments.isEmpty)
 
-            // Generate notes button
-            Button {
-                showPromptEditor = true
-            } label: {
-                HStack {
-                    Image(systemName: meetingState.isAnalyzing ? "hourglass" : "sparkles")
-                    Text(meetingState.isAnalyzing ? "Analyzing..." : "Generate Notes")
+            // Generate notes button with progress bar
+            VStack(spacing: 0) {
+                Button {
+                    showPromptEditor = true
+                } label: {
+                    HStack {
+                        Image(systemName: meetingState.isAnalyzing ? "hourglass" : "sparkles")
+                        Text(meetingState.isAnalyzing
+                            ? "Analyzing..."
+                            : (meetingState.structuredNotes != nil ? "Re-Generate Notes" : "Generate Notes")
+                        )
+                    }
+                }
+                .disabled(meetingState.segments.isEmpty || meetingState.isRecording || meetingState.isAnalyzing)
+
+                // Progress bar (4px tall, matches button width)
+                if meetingState.isAnalyzing && meetingState.isStreaming {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            // Background track
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 4)
+
+                            // Progress fill
+                            Rectangle()
+                                .fill(LinearGradient(
+                                    colors: [.blue, .cyan],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                                .frame(width: geometry.size.width * meetingState.generationProgress, height: 4)
+                                .animation(.linear(duration: 0.1), value: meetingState.generationProgress)
+                        }
+                    }
+                    .frame(height: 4)
+                    .cornerRadius(2)
                 }
             }
-            .disabled(meetingState.segments.isEmpty || meetingState.isRecording || meetingState.isAnalyzing)
 
             Spacer()
 
@@ -294,11 +335,15 @@ struct MeetingView: View {
                 .disabled(meetingState.structuredNotes == nil)
             } label: {
                 HStack {
-                    Image(systemName: "square.and.arrow.up")
-                    Text("Export")
+                    Image(systemName: meetingState.structuredNotes != nil
+                        ? "checkmark.circle.fill"
+                        : "square.and.arrow.up")
+                        .foregroundColor(meetingState.structuredNotes != nil ? .green : .primary)
+                    Text(meetingState.structuredNotes != nil ? "Export Ready" : "Export")
                 }
             }
             .disabled(meetingState.segments.isEmpty)
+            .id(menuRefreshTrigger)
         }
         .padding()
     }
@@ -307,24 +352,22 @@ struct MeetingView: View {
 
     private func startRecording() async {
         do {
-            // Check permission first
-            let hasPermission = await SystemAudioRecorder.requestPermission()
-            guard hasPermission else {
-                meetingState.statusMessage = "Screen recording permission denied"
-                return
-            }
-
             meetingState.statusMessage = "Starting..."
 
             // Start continuous transcriber session
             continuousTranscriber.startSession()
 
             // Start mixed audio recording (system + microphone)
+            // Note: ScreenCaptureKit requires screen recording permission for system audio
+            // The system will automatically request permission if not yet granted
             try await mixedAudioRecorder.startRecording()
 
             meetingState.isRecording = true
             meetingState.statusMessage = "Recording (system + microphone)"
             meetingState.elapsedTime = 0
+
+            // Show recording indicator overlay
+            recordingIndicator?.show()
 
             // Start timer
             startTimer()
@@ -355,6 +398,9 @@ struct MeetingView: View {
 
     private func stopRecording() async {
         meetingState.statusMessage = "Finalizing transcription..."
+
+        // Hide recording indicator overlay
+        recordingIndicator?.hide()
 
         // Stop timer
         stopTimer()
@@ -415,23 +461,108 @@ struct MeetingView: View {
     private func generateStructuredNotes(with prompt: String) async {
         guard !meetingState.segments.isEmpty else { return }
 
-        meetingState.isAnalyzing = true
-        meetingState.statusMessage = "Generating structured notes..."
+        // Initialize streaming state
+        await MainActor.run {
+            meetingState.isAnalyzing = true
+            meetingState.isStreaming = true
+            meetingState.generationProgress = 0.0
+            meetingState.receivedChars = 0
+            meetingState.streamedNotesPreview = ""
+            meetingState.statusMessage = "Generating structured notes..."
+            lastProgressUpdate = Date()
+        }
 
         // Build full transcript
         let fullTranscript = meetingState.segments
             .map { $0.text }
             .joined(separator: " ")
 
-        do {
-            let notes = try await meetingAnalyzer.analyzeMeeting(transcript: fullTranscript, customPrompt: prompt)
-            meetingState.structuredNotes = notes
-            meetingState.statusMessage = "Notes generated successfully"
-        } catch {
-            meetingState.statusMessage = "Failed to generate notes: \(error.localizedDescription)"
+        // Estimate expected response length
+        let estimatedLength = estimateResponseLength(transcriptLength: fullTranscript.count)
+        await MainActor.run {
+            meetingState.estimatedTotalChars = estimatedLength
         }
 
-        meetingState.isAnalyzing = false
+        do {
+            // Use streaming analysis with progress callback
+            let notes = try await meetingAnalyzer.analyzeMeetingStreaming(
+                transcript: fullTranscript,
+                customPrompt: prompt
+            ) { receivedChars, chunk in
+                // Throttle UI updates to every 50ms
+                await MainActor.run {
+                    let now = Date()
+                    if now.timeIntervalSince(lastProgressUpdate) >= 0.05 {
+                        meetingState.receivedChars = receivedChars
+                        meetingState.streamedNotesPreview += chunk
+                        meetingState.generationProgress = calculateProgress(
+                            received: receivedChars,
+                            estimated: estimatedLength
+                        )
+                        lastProgressUpdate = now
+                    }
+                }
+            }
+
+            print("MeetingView: Analysis complete, notes length: \(notes.count)")
+
+            await MainActor.run {
+                meetingState.structuredNotes = notes
+                meetingState.statusMessage = "Notes generated successfully"
+                meetingState.generationProgress = 1.0 // Set to 100%
+                meetingState.isAnalyzing = false
+                meetingState.isStreaming = false
+                menuRefreshTrigger = UUID() // Force menu to refresh
+                print("MeetingView: State updated - structuredNotes is now set: \(meetingState.structuredNotes != nil)")
+            }
+
+            // Send notification after state update
+            let isAuthorized = await NotificationService.shared.isAuthorized()
+            print("MeetingView: Notification authorized: \(isAuthorized)")
+
+            // Always try to send notification (will request permission if needed)
+            await NotificationService.shared.sendNotification(
+                title: "Meeting Notes Ready",
+                body: "Your structured meeting notes have been generated successfully."
+            )
+            print("MeetingView: Notification sent")
+        } catch {
+            print("MeetingView: Analysis failed: \(error)")
+            await MainActor.run {
+                meetingState.statusMessage = "Failed to generate notes: \(error.localizedDescription)"
+                meetingState.isAnalyzing = false
+                meetingState.isStreaming = false
+                resetGenerationState()
+            }
+        }
+    }
+
+    // Helper: Estimate expected response length based on transcript
+    private func estimateResponseLength(transcriptLength: Int) -> Int {
+        // Meeting notes typically 15-25% of transcript length
+        let baseEstimate = Int(Double(transcriptLength) * 0.20)
+        return min(max(baseEstimate, 500), 5000) // Clamp to 500-5000 chars
+    }
+
+    // Helper: Calculate progress with logarithmic scaling
+    private func calculateProgress(received: Int, estimated: Int) -> Double {
+        guard estimated > 0 else { return 0.0 }
+
+        let rawProgress = Double(received) / Double(estimated)
+
+        // Asymptotic approach: never quite reaches 100% until done
+        // Formula: -log(1 - x) / 3.0
+        let scaled = -log(1 - min(rawProgress, 0.95)) / 3.0
+
+        return min(scaled, 0.98) // Cap at 98% until stream completes
+    }
+
+    // Helper: Reset generation state
+    private func resetGenerationState() {
+        meetingState.generationProgress = 0.0
+        meetingState.receivedChars = 0
+        meetingState.estimatedTotalChars = 0
+        meetingState.streamedNotesPreview = ""
     }
 
     private func copyTranscript() {

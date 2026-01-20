@@ -79,40 +79,122 @@ class OllamaService {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
-        
+
         // Build request body
         let requestBody: [String: Any] = [
             "model": modelName,
             "prompt": prompt,
             "stream": false
         ]
-        
+
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.httpBody = jsonData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         print("OllamaService: Sending request to \(modelName)...")
-        
+
         let (data, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
             throw OllamaError.requestFailed
         }
-        
+
         // Parse response
         struct GenerateResponse: Codable {
             let response: String
         }
-        
+
         let generateResponse = try JSONDecoder().decode(GenerateResponse.self, from: data)
-        
+
         print("OllamaService: Received response")
-        
+
         return generateResponse.response.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Generate text from a prompt with streaming support
+    /// - Parameters:
+    ///   - prompt: The prompt to send to the model
+    ///   - onChunk: Callback invoked for each text chunk received
+    /// - Returns: Complete generated text
+    func generateStreaming(prompt: String, onChunk: @escaping (String) async -> Void) async throws -> String {
+        guard let url = URL(string: "\(baseURL)/api/generate") else {
+            throw OllamaError.invalidURL
+        }
+
+        // Build request body with streaming enabled
+        let requestBody: [String: Any] = [
+            "model": modelName,
+            "prompt": prompt,
+            "stream": true
+        ]
+
+        let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = jsonData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        print("OllamaService: Sending streaming request to \(modelName)...")
+
+        let (bytes, response) = try await session.bytes(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw OllamaError.requestFailed
+        }
+
+        var fullResponse = ""
+        var buffer = ""
+
+        // Process byte stream line by line
+        for try await byte in bytes {
+            let char = Character(UnicodeScalar(byte))
+            buffer.append(char)
+
+            // Process complete lines (NDJSON format)
+            if char == "\n" {
+                let line = buffer.trimmingCharacters(in: .whitespacesAndNewlines)
+                buffer = ""
+
+                if line.isEmpty { continue }
+
+                // Parse JSON line
+                if let chunk = parseStreamLine(line) {
+                    if chunk.done {
+                        print("OllamaService: Streaming complete")
+                        break
+                    }
+
+                    if !chunk.response.isEmpty {
+                        fullResponse += chunk.response
+                        await onChunk(chunk.response)
+                    }
+                }
+            }
+        }
+
+        return fullResponse.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Parse a single NDJSON line from the stream
+    /// - Parameter line: JSON string to parse
+    /// - Returns: Parsed chunk or nil if malformed
+    private func parseStreamLine(_ line: String) -> StreamChunk? {
+        guard let data = line.data(using: .utf8) else {
+            return nil
+        }
+
+        do {
+            return try JSONDecoder().decode(StreamChunk.self, from: data)
+        } catch {
+            print("OllamaService: Failed to parse stream line: \(error)")
+            return nil
+        }
     }
     
     // MARK: - Prompt Building
@@ -205,6 +287,11 @@ enum ContentType {
     case list
     case note
     case general
+}
+
+struct StreamChunk: Codable {
+    let response: String
+    let done: Bool
 }
 
 enum OllamaError: LocalizedError {
