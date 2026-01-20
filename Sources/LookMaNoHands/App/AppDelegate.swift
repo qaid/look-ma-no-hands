@@ -55,20 +55,33 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         NSLog("✅ AppDelegate: Menu bar setup complete")
 
-        // Check if first launch
-        if !Settings.shared.hasCompletedOnboarding {
+        // Check if first launch (but not if we just completed onboarding in this session)
+        if !Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
             NSLog("🆕 First launch detected - showing onboarding")
             showOnboarding()
             return  // Skip rest of initialization until onboarding completes
         }
 
+        // If we just completed onboarding, don't show it again
+        if justCompletedOnboarding {
+            NSLog("✅ Onboarding was just completed in this session - skipping")
+        }
+
         // Normal initialization for returning users
         completeInitialization()
+
+        // Request notification permission
+        Task {
+            _ = await NotificationService.shared.requestPermission()
+        }
     }
 
     // MARK: - Onboarding
 
     private func showOnboarding() {
+        // Switch to regular app mode so window appears in Dock and Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
+
         let onboardingView = OnboardingView(
             whisperService: whisperService,
             ollamaService: ollamaService,
@@ -79,6 +92,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 // Mark that we just completed onboarding
                 self.justCompletedOnboarding = true
+
+                // Revert to accessory mode (menu bar only)
+                NSApp.setActivationPolicy(.accessory)
 
                 // Check if accessibility was granted during onboarding
                 if AXIsProcessTrusted() {
@@ -99,10 +115,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Welcome to Look Ma No Hands"
         window.styleMask = [.titled, .closable]
         window.center()
-        window.makeKeyAndOrderFront(nil)
         window.isReleasedWhenClosed = false
+        window.level = .floating
 
         self.onboardingWindow = window
+
+        // Bring window to front and activate app
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Ensure window stays on top
+        window.orderFrontRegardless()
     }
 
     private func completeInitialization() {
@@ -158,8 +181,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            // Use system microphone icon
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Look Ma No Hands")
+            // Use emoji icon
+            button.image = emojiImage(from: "🙌🏾")
             button.action = #selector(togglePopover)
             button.target = self
         }
@@ -221,14 +244,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ))
         
         menu.addItem(NSMenuItem.separator())
-        
+
+        // Developer Reset
+        menu.addItem(NSMenuItem(
+            title: "Developer Reset",
+            action: #selector(developerReset),
+            keyEquivalent: ""
+        ))
+
+        menu.addItem(NSMenuItem.separator())
+
         // Quit
         menu.addItem(NSMenuItem(
             title: "Quit Look Ma No Hands",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
-        
+
         self.statusItem?.menu = menu
     }
     
@@ -245,6 +277,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func openSettings() {
         NSLog("📋 Opening Settings window...")
+
+        // Switch to regular app mode so window appears in Dock and Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
 
         // If window already exists, just bring it to front
         if let window = settingsWindow {
@@ -264,6 +299,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Look Ma No Hands Settings"
         window.center()
         window.isReleasedWhenClosed = false
+        window.delegate = self
 
         // Create SwiftUI settings view and wrap it in NSHostingView
         let settingsView = SettingsView()
@@ -312,7 +348,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.delegate = self
 
         // Create SwiftUI meeting view and wrap it in NSHostingView
-        let meetingView = MeetingView(whisperService: whisperService)
+        let meetingView = MeetingView(whisperService: whisperService, recordingIndicator: recordingIndicator)
         let hostingView = NSHostingView(rootView: meetingView)
         window.contentView = hostingView
 
@@ -785,16 +821,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu Bar Icon Updates
 
+    /// Create an NSImage from an emoji string
+    private func emojiImage(from emoji: String, size: CGFloat = 18) -> NSImage? {
+        let font = NSFont.systemFont(ofSize: size)
+        let attributes: [NSAttributedString.Key: Any] = [.font: font]
+        let textSize = (emoji as NSString).size(withAttributes: attributes)
+
+        let image = NSImage(size: NSSize(width: textSize.width + 4, height: textSize.height + 4))
+        image.lockFocus()
+
+        let rect = NSRect(x: 2, y: 2, width: textSize.width, height: textSize.height)
+        (emoji as NSString).draw(in: rect, withAttributes: attributes)
+
+        image.unlockFocus()
+        image.isTemplate = false
+        return image
+    }
+
     /// Update menu bar icon based on recording state
     func updateMenuBarIcon(isRecording: Bool) {
         guard let button = statusItem?.button else { return }
 
-        if isRecording {
-            button.image = NSImage(systemSymbolName: "mic.circle.fill", accessibilityDescription: "Recording")
-            // Could also change the color here using button.contentTintColor
-        } else {
-            button.image = NSImage(systemSymbolName: "mic.fill", accessibilityDescription: "Look Ma No Hands")
-        }
+        // Use same emoji for both states
+        // Recording indicator window already shows recording status
+        button.image = emojiImage(from: "🙌🏾")
 
         // Update menu item text
         updateRecordingMenuItem(isRecording: isRecording)
@@ -809,6 +859,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             recordingMenuItem?.title = "Start Recording (\(hotkeyName))"
         }
     }
+
+    // MARK: - Developer Tools
+
+    /// Reset app permissions and settings (for development)
+    @objc private func developerReset() {
+        let alert = NSAlert()
+        alert.messageText = "Developer Reset"
+        alert.informativeText = "This will:\n• Reset onboarding status\n• Clear all app settings\n• Restart the app\n\nYou'll need to grant permissions again on next launch."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset & Restart")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            // Reset onboarding status
+            Settings.shared.hasCompletedOnboarding = false
+
+            // Clear UserDefaults for this app
+            if let bundleID = Bundle.main.bundleIdentifier {
+                UserDefaults.standard.removePersistentDomain(forName: bundleID)
+                UserDefaults.standard.synchronize()
+            }
+
+            // Note: Cannot programmatically revoke system permissions (microphone, accessibility, screen recording)
+            // User must manually revoke these in System Settings if needed
+            print("Developer reset complete - app will now restart")
+
+            // Restart the app to show onboarding
+            restartApp()
+        }
+    }
 }
 
 // MARK: - NSWindowDelegate
@@ -821,6 +902,18 @@ extension AppDelegate: NSWindowDelegate {
         if window === meetingWindow {
             NSApp.setActivationPolicy(.accessory)
             print("Meeting window closed - reverted to accessory mode")
+        }
+
+        // If the settings window is closing, revert to accessory mode
+        if window === settingsWindow {
+            NSApp.setActivationPolicy(.accessory)
+            print("Settings window closed - reverted to accessory mode")
+        }
+
+        // If the onboarding window is closing, revert to accessory mode
+        if window === onboardingWindow {
+            NSApp.setActivationPolicy(.accessory)
+            print("Onboarding window closed - reverted to accessory mode")
         }
     }
 }
