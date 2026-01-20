@@ -115,6 +115,35 @@ LookMaNoHands/
 - [x] Documentation (README, PERFORMANCE, CLAUDE)
 
 ---
+## Current Development Focus
+
+### Meeting Type Selection & Quality Check Feature
+
+We are implementing automatic meeting type detection and quality verification for the meeting transcription feature.
+
+**Feature Overview:**
+- Automatic detection of meeting type (standup, 1:1, kickoff, brainstorming, general)
+- Specialized prompts for each meeting type
+- Quality check that verifies generated notes against transcript
+
+**Implementation Plan:** See `docs/MEETING_TYPES_PLAN.md` for full details.
+
+**New Files to Create:**
+- `Sources/LookMaNoHands/Models/MeetingType.swift`
+- `Sources/LookMaNoHands/Models/QualityReport.swift`
+- `Sources/LookMaNoHands/Services/PromptManager.swift`
+- `Sources/LookMaNoHands/Services/MeetingTypeDetector.swift`
+- `Sources/LookMaNoHands/Services/QualityChecker.swift`
+- `Sources/LookMaNoHands/Views/MeetingTypePickerView.swift`
+- `Sources/LookMaNoHands/Views/QualityReportView.swift`
+- `Resources/Prompts/*.txt` (6 prompt template files)
+
+**Files to Modify:**
+- `Sources/LookMaNoHands/Services/MeetingAnalyzer.swift`
+- `Sources/LookMaNoHands/Views/MeetingView.swift`
+- `Sources/LookMaNoHands/Views/SettingsView.swift`
+
+---
 
 ## Future Phases: Meeting Transcription Mode
 
