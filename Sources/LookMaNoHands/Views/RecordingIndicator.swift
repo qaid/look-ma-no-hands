@@ -1,48 +1,50 @@
 import SwiftUI
 import AppKit
+import Combine
 
 /// Floating window that appears during recording to show the user that audio is being captured
-/// Uses native macOS design patterns with an animated Siri-style multi-color border
+/// Shows live transcription text at the cursor position (Apple-style)
 struct RecordingIndicator: View {
 
     @State private var isPulsing = false
     @State private var borderRotation: Double = 0
     @State private var borderOpacity: Double = 1.0
+    @Binding var transcriptionText: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Pulsing red recording dot with smooth animation
-            Circle()
-                .fill(
-                    RadialGradient(
-                        gradient: Gradient(colors: [.red, Color.red.opacity(0.8)]),
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: 8
-                    )
-                )
-                .frame(width: 14, height: 14)
-                .scaleEffect(isPulsing ? 1.3 : 1.0)
-                .opacity(isPulsing ? 0.7 : 1.0)
+        HStack(spacing: 8) {
+            // Pulsing microphone icon
+            Image(systemName: "mic.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 12))
+                .scaleEffect(isPulsing ? 1.2 : 1.0)
                 .animation(
                     .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
                     value: isPulsing
                 )
 
-            Text("Recording")
-                .font(.system(size: 16, weight: .medium, design: .rounded))
-                .foregroundColor(.primary)
+            // Live transcription (last 50 chars)
+            if !transcriptionText.isEmpty {
+                Text(String(transcriptionText.suffix(50)))
+                    .font(.system(size: 14))
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+            } else {
+                Text("Listening...")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         )
         .overlay(
-            // Siri-style animated multi-color border
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            // Thin Siri-style animated multi-color border
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(
                     AngularGradient(
                         gradient: Gradient(colors: [
@@ -56,7 +58,7 @@ struct RecordingIndicator: View {
                         center: .center,
                         angle: .degrees(borderRotation)
                     ),
-                    lineWidth: 3
+                    lineWidth: 2  // Thinner border
                 )
                 .opacity(borderOpacity)
         )
@@ -85,14 +87,49 @@ struct RecordingIndicator: View {
     }
 }
 
+/// Preview-compatible version without binding
+struct RecordingIndicatorPreview: View {
+    @State private var isPulsing = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "mic.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 12))
+                .scaleEffect(isPulsing ? 1.2 : 1.0)
+
+            Text("Listening...")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .onAppear {
+            isPulsing = true
+        }
+    }
+}
+
 // MARK: - Window Controller
+
+/// Observable state for the recording indicator
+class RecordingIndicatorState: ObservableObject {
+    @Published var transcriptionText: String = ""
+}
 
 /// Controls the floating indicator window - persistent window approach
 class RecordingIndicatorWindowController {
 
     private var window: NSWindow?
-    private let windowWidth: CGFloat = 160
-    private let windowHeight: CGFloat = 46
+    private var hostingView: NSHostingView<RecordingIndicator>?
+    private let windowWidth: CGFloat = 300  // Wider for transcription text
+    private let windowHeight: CGFloat = 32
+    private var positionUpdateTimer: Timer?
+    private let state = RecordingIndicatorState()
 
     init() {
         // Create window once during initialization
@@ -100,8 +137,15 @@ class RecordingIndicatorWindowController {
     }
 
     private func setupWindow() {
-        // Create hosting view
-        let contentView = NSHostingView(rootView: RecordingIndicator())
+        // Create a binding manually
+        let binding = Binding<String>(
+            get: { self.state.transcriptionText },
+            set: { self.state.transcriptionText = $0 }
+        )
+
+        // Create hosting view with binding to transcription text
+        let contentView = NSHostingView(rootView: RecordingIndicator(transcriptionText: binding))
+        self.hostingView = contentView
 
         // Create window
         let window = NSWindow(
@@ -119,9 +163,6 @@ class RecordingIndicatorWindowController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
 
-        // Position will be set when showing based on user preference
-        updatePosition()
-
         // Start hidden
         window.alphaValue = 0
         window.orderOut(nil)
@@ -129,8 +170,48 @@ class RecordingIndicatorWindowController {
         self.window = window
     }
 
-    /// Update window position based on user preference
-    private func updatePosition() {
+    /// Update transcription text displayed in the indicator
+    func updateTranscription(_ text: String) {
+        DispatchQueue.main.async {
+            self.state.transcriptionText = text
+        }
+    }
+
+    /// Update window position for cursor-based positioning
+    func updatePosition(for cursorRect: NSRect) {
+        guard let window = window else { return }
+
+        // Position indicator below cursor with small offset
+        var origin = NSPoint(
+            x: cursorRect.midX - (windowWidth / 2),  // Center horizontally on cursor
+            y: cursorRect.minY - windowHeight - 8     // 8pt below cursor
+        )
+
+        // Handle screen edge cases
+        if let screen = NSScreen.main {
+            let screenFrame = screen.visibleFrame
+
+            // Too close to bottom edge? Show above cursor instead
+            if origin.y < screenFrame.minY + 20 {
+                origin.y = cursorRect.maxY + 8  // 8pt above cursor
+            }
+
+            // Too close to left edge?
+            if origin.x < screenFrame.minX + 10 {
+                origin.x = screenFrame.minX + 10
+            }
+
+            // Too close to right edge?
+            if origin.x + windowWidth > screenFrame.maxX - 10 {
+                origin.x = screenFrame.maxX - windowWidth - 10
+            }
+        }
+
+        window.setFrameOrigin(origin)
+    }
+
+    /// Update window position using fixed positioning (fallback)
+    private func updatePositionFixed() {
         guard let window = window, let screen = NSScreen.main else { return }
 
         let screenFrame = screen.visibleFrame
@@ -154,8 +235,17 @@ class RecordingIndicatorWindowController {
     func show() {
         guard let window = window else { return }
 
-        // Update position in case settings changed
-        updatePosition()
+        // Try cursor positioning first, fallback to fixed positioning
+        if let cursorRect = CursorPositionService.shared.getCursorScreenPosition() {
+            updatePosition(for: cursorRect)
+            print("RecordingIndicator: Using cursor-based positioning")
+
+            // Start periodic position updates (in case cursor moves)
+            startPositionUpdates()
+        } else {
+            updatePositionFixed()
+            print("RecordingIndicator: Using fixed positioning (cursor detection failed)")
+        }
 
         // Make window visible first
         window.orderFront(nil)
@@ -168,9 +258,32 @@ class RecordingIndicatorWindowController {
         }
     }
 
+    /// Start periodic position updates
+    private func startPositionUpdates() {
+        // Update position every 200ms while recording
+        positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if let cursorRect = CursorPositionService.shared.getCursorScreenPosition() {
+                self.updatePosition(for: cursorRect)
+            }
+        }
+    }
+
+    /// Stop periodic position updates
+    private func stopPositionUpdates() {
+        positionUpdateTimer?.invalidate()
+        positionUpdateTimer = nil
+    }
+
     /// Hide the recording indicator
     func hide() {
         guard let window = window else { return }
+
+        // Stop position updates
+        stopPositionUpdates()
+
+        // Clear transcription text
+        state.transcriptionText = ""
 
         // Animate fade-out
         NSAnimationContext.runAnimationGroup({ context in

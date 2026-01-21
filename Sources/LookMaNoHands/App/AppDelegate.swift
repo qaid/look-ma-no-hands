@@ -763,7 +763,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update UI immediately
         transcriptionState.stopRecording()
         updateMenuBarIcon(isRecording: false)
-        recordingIndicator.hide()
+
+        // Keep indicator visible during transcription
+        recordingIndicator.updateTranscription("Transcribing...")
 
         print("Recording stopped, processing \(audioSamples.count) samples")
 
@@ -784,9 +786,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let rawText = try await self.whisperService.transcribe(samples: samples)
                 await MainActor.run {
                     self.transcriptionState.setTranscription(rawText)
+                    // Show transcription briefly in indicator before insertion
+                    self.recordingIndicator.updateTranscription(rawText)
                 }
 
                 print("Transcription: \(rawText)")
+
+                // Show transcription for 1.5 seconds
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
 
                 // Step 2: Insert text with context-aware formatting
                 // TextInsertionService handles all formatting based on cursor position
@@ -800,9 +807,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 print("Text inserted successfully")
 
+                // Hide indicator after insertion
+                await MainActor.run {
+                    self.recordingIndicator.hide()
+                }
+
             } catch {
                 await MainActor.run {
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
+                    self.recordingIndicator.hide()
                 }
                 print("Processing error: \(error)")
             }
