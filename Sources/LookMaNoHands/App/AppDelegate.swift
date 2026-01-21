@@ -777,7 +777,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Process recorded audio: transcribe and format
     private func processRecording(samples: [Float]) async {
-        // Wrap entire processing in autorelease pool to prevent memory buildup
+        // Use high priority to minimize latency
         await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
@@ -786,14 +786,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let rawText = try await self.whisperService.transcribe(samples: samples)
                 await MainActor.run {
                     self.transcriptionState.setTranscription(rawText)
-                    // Show transcription briefly in indicator before insertion
+                    // Show transcription in indicator before insertion
                     self.recordingIndicator.updateTranscription(rawText)
                 }
 
                 print("Transcription: \(rawText)")
 
-                // Show transcription for 1.5 seconds
-                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                // Brief preview (reduced from 1.5s to 0.4s for faster insertion)
+                try? await Task.sleep(nanoseconds: 400_000_000)
 
                 // Step 2: Insert text with context-aware formatting
                 // TextInsertionService handles all formatting based on cursor position
