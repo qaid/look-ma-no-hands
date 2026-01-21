@@ -763,7 +763,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update UI immediately
         transcriptionState.stopRecording()
         updateMenuBarIcon(isRecording: false)
-        recordingIndicator.hide()
+
+        // Keep indicator visible during transcription
+        recordingIndicator.updateTranscription("Transcribing...")
 
         print("Recording stopped, processing \(audioSamples.count) samples")
 
@@ -775,7 +777,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Process recorded audio: transcribe and format
     private func processRecording(samples: [Float]) async {
-        // Wrap entire processing in autorelease pool to prevent memory buildup
+        // Use high priority to minimize latency
         await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
@@ -784,9 +786,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let rawText = try await self.whisperService.transcribe(samples: samples)
                 await MainActor.run {
                     self.transcriptionState.setTranscription(rawText)
+                    // Show transcription in indicator before insertion
+                    self.recordingIndicator.updateTranscription(rawText)
                 }
 
                 print("Transcription: \(rawText)")
+
+                // Brief preview (reduced from 1.5s to 0.4s for faster insertion)
+                try? await Task.sleep(nanoseconds: 400_000_000)
 
                 // Step 2: Insert text with context-aware formatting
                 // TextInsertionService handles all formatting based on cursor position
@@ -800,9 +807,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 print("Text inserted successfully")
 
+                // Hide indicator after insertion
+                await MainActor.run {
+                    self.recordingIndicator.hide()
+                }
+
             } catch {
                 await MainActor.run {
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
+                    self.recordingIndicator.hide()
                 }
                 print("Processing error: \(error)")
             }

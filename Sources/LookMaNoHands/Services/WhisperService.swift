@@ -14,7 +14,8 @@ class WhisperService {
     private(set) var isModelLoaded = false
 
     /// Serial queue to ensure only one transcription happens at a time
-    private let transcriptionQueue = DispatchQueue(label: "com.whisperdictation.transcription", qos: .userInitiated)
+    /// Using userInteractive for maximum priority - transcription is time-sensitive
+    private let transcriptionQueue = DispatchQueue(label: "com.whisperdictation.transcription", qos: .userInteractive)
     
     // MARK: - Initialization
     
@@ -87,7 +88,8 @@ class WhisperService {
                     return
                 }
 
-                Task {
+                // Use Task with high priority for time-sensitive transcription
+                Task(priority: .userInitiated) {
                     do {
                         // Transcribe using SwiftWhisper
                         let segments = try await whisper.transcribe(audioFrames: samples)
