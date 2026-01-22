@@ -141,10 +141,25 @@ class TextInsertionService {
             // Append at end if no selection
             range = CFRange(location: currentText.count, length: 0)
         }
-        
-        // Build new text with insertion
-        let startIndex = currentText.index(currentText.startIndex, offsetBy: range.location)
-        let endIndex = currentText.index(startIndex, offsetBy: range.length)
+
+        // Clamp range to valid bounds
+        let safeLocation = min(range.location, currentText.count)
+        let maxLength = currentText.count - safeLocation
+        let safeLength = min(range.length, maxLength)
+
+        // Build new text with insertion using safe indices
+        guard let startIndex = currentText.index(currentText.startIndex, offsetBy: safeLocation, limitedBy: currentText.endIndex),
+              let endIndex = currentText.index(startIndex, offsetBy: safeLength, limitedBy: currentText.endIndex) else {
+            // Index calculation failed, fall back to appending
+            let newText = currentText + text
+            let setResult = AXUIElementSetAttributeValue(
+                element,
+                kAXValueAttribute as CFString,
+                newText as CFTypeRef
+            )
+            return setResult == .success
+        }
+
         var newText = currentText
         newText.replaceSubrange(startIndex..<endIndex, with: text)
         
@@ -329,23 +344,44 @@ class TextInsertionService {
             return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: true)
         }
 
+        // Safely clamp cursor position to valid range
+        let safePosition = min(cursorPosition, existingText.count)
+
         // Check if we're at the end of the text
-        let isAtEnd = cursorPosition >= existingText.count
+        let isAtEnd = safePosition >= existingText.count
 
         // Get text before cursor (up to 10 characters for context)
-        let startIndex = max(0, cursorPosition - 10)
-        let contextStart = existingText.index(existingText.startIndex, offsetBy: startIndex)
-        let contextEnd = existingText.index(existingText.startIndex, offsetBy: cursorPosition)
+        let startOffset = max(0, safePosition - 10)
+
+        guard let contextStart = existingText.index(existingText.startIndex, offsetBy: startOffset, limitedBy: existingText.endIndex),
+              let contextEnd = existingText.index(existingText.startIndex, offsetBy: safePosition, limitedBy: existingText.endIndex) else {
+            // Index calculation failed - treat as beginning of text
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd)
+        }
+
         let beforeCursor = String(existingText[contextStart..<contextEnd])
 
         // Get text after cursor (up to 10 characters)
         var afterCursor = ""
-        if cursorPosition < existingText.count {
-            let afterStart = existingText.index(existingText.startIndex, offsetBy: cursorPosition)
-            let afterEnd = existingText.index(afterStart, offsetBy: min(10, existingText.count - cursorPosition))
-            afterCursor = String(existingText[afterStart..<afterEnd])
+        if safePosition < existingText.count {
+            guard let afterStart = existingText.index(existingText.startIndex, offsetBy: safePosition, limitedBy: existingText.endIndex) else {
+                // Failed to get after start, skip after context
+                return analyzeBeforeContext(beforeCursor: beforeCursor, isAtEnd: isAtEnd)
+            }
+
+            let remainingLength = existingText.count - safePosition
+            let lengthToRead = min(10, remainingLength)
+
+            if let afterEnd = existingText.index(afterStart, offsetBy: lengthToRead, limitedBy: existingText.endIndex) {
+                afterCursor = String(existingText[afterStart..<afterEnd])
+            }
         }
 
+        return analyzeBeforeContext(beforeCursor: beforeCursor, isAtEnd: isAtEnd, afterCursor: afterCursor)
+    }
+
+    /// Analyze the text before cursor to determine formatting
+    private func analyzeBeforeContext(beforeCursor: String, isAtEnd: Bool, afterCursor: String = "") -> InsertionContext {
         // Trim whitespace to analyze the actual content
         let trimmedBefore = beforeCursor.trimmingCharacters(in: .whitespacesAndNewlines)
 
