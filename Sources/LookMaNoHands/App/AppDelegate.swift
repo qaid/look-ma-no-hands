@@ -36,11 +36,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Application Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSLog("🚀 AppDelegate: applicationDidFinishLaunching called")
+        // FIRST: Install crash handlers before anything else
+        CrashReporter.shared.install()
+
+        // Start memory monitoring
+        MemoryMonitor.shared.startMonitoring()
+        MemoryMonitor.shared.onMemoryWarning = { memoryMB in
+            Logger.shared.warning("Memory warning callback: \(memoryMB)MB", category: .memory)
+        }
+        MemoryMonitor.shared.onMemoryCritical = { memoryMB in
+            Logger.shared.fault("Memory critical callback: \(memoryMB)MB - consider stopping recording", category: .memory)
+        }
+
+        // Check for previous crash and notify user
+        if let lastCrash = CrashReporter.shared.getLastCrashReport() {
+            Logger.shared.warning("Previous crash detected: \(lastCrash.url.lastPathComponent)", category: .crash)
+            // Show crash report dialog after a short delay to allow UI to initialize
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.showCrashRecoveryDialog(crashReport: lastCrash)
+            }
+        }
+
+        Logger.shared.info("AppDelegate: applicationDidFinishLaunching called", category: .app)
 
         // Hide dock icon (menu bar app only)
         NSApp.setActivationPolicy(.accessory)
-        NSLog("✅ AppDelegate: Set activation policy")
+        Logger.shared.info("AppDelegate: Set activation policy to accessory", category: .app)
 
         // Register URL event handler for URL scheme support
         NSAppleEventManager.shared().setEventHandler(
@@ -830,6 +851,41 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    /// Show crash recovery dialog when a previous crash is detected
+    private func showCrashRecoveryDialog(crashReport: (url: URL, content: String)) {
+        let alert = NSAlert()
+        alert.messageText = "Previous Crash Detected"
+        alert.informativeText = "Look Ma No Hands crashed during the previous session. Would you like to view the crash report?\n\nThis information can help diagnose the issue."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "View Report")
+        alert.addButton(withTitle: "Open Log Folder")
+        alert.addButton(withTitle: "Dismiss")
+
+        let response = alert.runModal()
+
+        switch response {
+        case .alertFirstButtonReturn:
+            // View report - open in TextEdit
+            NSWorkspace.shared.open(crashReport.url)
+        case .alertSecondButtonReturn:
+            // Open log folder
+            NSWorkspace.shared.open(CrashReporter.shared.crashDirectoryURL)
+        default:
+            break
+        }
+
+        // Archive the crash report so we don't show it again
+        let archiveName = "viewed-\(crashReport.url.lastPathComponent)"
+        let archiveURL = crashReport.url.deletingLastPathComponent().appendingPathComponent(archiveName)
+        try? FileManager.default.moveItem(at: crashReport.url, to: archiveURL)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Logger.shared.info("App terminating normally", category: .app)
+        MemoryMonitor.shared.stopMonitoring()
+        Logger.shared.shutdown()
     }
 
     // MARK: - Menu Bar Icon Updates
