@@ -8,6 +8,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case recording = "Recording"
     case models = "Models"
     case permissions = "Permissions"
+    case diagnostics = "Diagnostics"
     case about = "About"
 
     var id: String { rawValue }
@@ -18,6 +19,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .recording: return "mic.circle"
         case .models: return "cpu"
         case .permissions: return "lock.shield"
+        case .diagnostics: return "ant.circle"
         case .about: return "info.circle"
         }
     }
@@ -66,6 +68,8 @@ struct SettingsView: View {
                     modelsTab
                 case .permissions:
                     permissionsTab
+                case .diagnostics:
+                    diagnosticsTab
                 case .about:
                     aboutTab
                 }
@@ -433,8 +437,198 @@ struct SettingsView: View {
         }
     }
     
+    // MARK: - Diagnostics Tab
+
+    private var diagnosticsTab: some View {
+        VStack(spacing: 0) {
+            // Memory Status Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Memory Status")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Button {
+                        // Force refresh
+                        _ = MemoryMonitor.shared.getCurrentMemoryUsageMB()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading) {
+                        Text("Current Usage")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(MemoryMonitor.shared.getFormattedMemoryUsage())
+                            .font(.title2)
+                            .fontWeight(.medium)
+                            .foregroundColor(memoryStatusColor)
+                    }
+
+                    VStack(alignment: .leading) {
+                        Text("Peak Usage")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text("\(MemoryMonitor.shared.peakMemoryUsageMB) MB")
+                            .font(.title2)
+                            .fontWeight(.medium)
+                    }
+                }
+
+                // Memory status explanation
+                HStack(spacing: 6) {
+                    Image(systemName: memoryStatusIcon)
+                        .foregroundColor(memoryStatusColor)
+                        .font(.caption)
+                    Text(memoryStatusMessage)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(16)
+
+            Divider()
+
+            // Log Files Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Log Files")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Button("Open Log Folder") {
+                        NSWorkspace.shared.open(Logger.shared.logDirectoryURL)
+                    }
+                    .controlSize(.small)
+                }
+
+                let logFiles = Logger.shared.getLogFiles()
+                if logFiles.isEmpty {
+                    Text("No log files found")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(logFiles.prefix(3), id: \.self) { file in
+                        HStack {
+                            Image(systemName: "doc.text")
+                                .foregroundColor(.secondary)
+                            Text(file.lastPathComponent)
+                                .font(.caption)
+                            Spacer()
+                            Button("Open") {
+                                NSWorkspace.shared.open(file)
+                            }
+                            .controlSize(.mini)
+                        }
+                    }
+                    if logFiles.count > 3 {
+                        Text("+ \(logFiles.count - 3) more files")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .padding(16)
+
+            Divider()
+
+            // Crash Reports Section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Crash Reports")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Spacer()
+                    Button("Open Crash Folder") {
+                        NSWorkspace.shared.open(CrashReporter.shared.crashDirectoryURL)
+                    }
+                    .controlSize(.small)
+                }
+
+                let crashReports = CrashReporter.shared.getAllCrashReports()
+                if crashReports.isEmpty {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("No crash reports")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    ForEach(crashReports.prefix(3), id: \.self) { file in
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text(file.lastPathComponent)
+                                .font(.caption)
+                            Spacer()
+                            Button("View") {
+                                NSWorkspace.shared.open(file)
+                            }
+                            .controlSize(.mini)
+                        }
+                    }
+                    if crashReports.count > 3 {
+                        Text("+ \(crashReports.count - 3) more reports")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Button("Clear All Crash Reports", role: .destructive) {
+                        CrashReporter.shared.deleteAllCrashReports()
+                    }
+                    .controlSize(.small)
+                    .padding(.top, 4)
+                }
+            }
+            .padding(16)
+
+            Spacer()
+        }
+    }
+
+    /// Color for memory status display
+    private var memoryStatusColor: Color {
+        let memoryMB = MemoryMonitor.shared.getCurrentMemoryUsageMB()
+        if memoryMB > MemoryMonitor.shared.criticalThresholdMB {
+            return .red
+        } else if memoryMB > MemoryMonitor.shared.warningThresholdMB {
+            return .orange
+        } else {
+            return .primary
+        }
+    }
+
+    /// Icon for memory status
+    private var memoryStatusIcon: String {
+        let memoryMB = MemoryMonitor.shared.lastMemoryUsageMB
+        if memoryMB > MemoryMonitor.shared.criticalThresholdMB {
+            return "exclamationmark.triangle.fill"
+        } else if memoryMB > MemoryMonitor.shared.warningThresholdMB {
+            return "info.circle.fill"
+        } else {
+            return "checkmark.circle.fill"
+        }
+    }
+
+    /// Explanatory message for current memory status
+    private var memoryStatusMessage: String {
+        let memoryMB = MemoryMonitor.shared.lastMemoryUsageMB
+        if memoryMB > MemoryMonitor.shared.criticalThresholdMB {
+            return "High memory usage. Stop recording if the app becomes unresponsive."
+        } else if memoryMB > MemoryMonitor.shared.warningThresholdMB {
+            return "Elevated but normal with a Whisper model loaded. Monitor during long recordings."
+        } else {
+            return "Normal. Memory includes the loaded Whisper model (~75-150 MB)."
+        }
+    }
+
     // MARK: - About Tab
-    
+
     private var aboutTab: some View {
         VStack(spacing: 20) {
             Image(systemName: "mic.fill")
