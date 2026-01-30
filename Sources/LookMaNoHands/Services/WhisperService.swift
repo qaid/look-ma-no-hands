@@ -49,14 +49,25 @@ class WhisperService {
             throw WhisperError.modelNotFound(modelName)
         }
 
-        print("WhisperService: Loading model from \(modelPath)")
+        Logger.shared.info("Loading Whisper model '\(modelName)' from \(modelPath)", category: .whisper)
+
+        // Check if Core ML model exists
+        let coreMLFileName = "ggml-\(modelName)-encoder.mlmodelc"
+        let coreMLPath = modelPath.replacingOccurrences(of: modelFileName, with: coreMLFileName)
+        let hasCoreML = FileManager.default.fileExists(atPath: coreMLPath)
+
+        if hasCoreML {
+            Logger.shared.info("✅ Core ML model found at \(coreMLPath) - GPU acceleration will be available", category: .whisper)
+        } else {
+            Logger.shared.warning("⚠️ Core ML model NOT found (expected at \(coreMLPath)) - will use CPU only (slower)", category: .whisper)
+        }
 
         // Load the model using SwiftWhisper
         let modelURL = URL(fileURLWithPath: modelPath)
         self.whisper = Whisper(fromFileURL: modelURL)
 
         isModelLoaded = true
-        print("WhisperService: Model loaded successfully")
+        Logger.shared.info("✅ Whisper model '\(modelName)' loaded successfully (Core ML: \(hasCoreML ? "YES" : "NO"))", category: .whisper)
     }
     
     /// Transcribe audio samples to text
@@ -72,7 +83,8 @@ class WhisperService {
         }
 
         let startTime = Date()
-        print("WhisperService: Transcribing \(samples.count) samples (\(String(format: "%.1f", Double(samples.count) / 16000.0))s of audio)...")
+        let audioDuration = Double(samples.count) / 16000.0
+        Logger.shared.info("🎤 Starting transcription: \(samples.count) samples (\(String(format: "%.1f", audioDuration))s of audio)", category: .transcription)
 
         // Use a serial queue to ensure only one transcription at a time
         // Whisper instance can't handle concurrent requests
@@ -91,8 +103,12 @@ class WhisperService {
                 // Use Task with high priority for time-sensitive transcription
                 Task(priority: .userInitiated) {
                     do {
+                        let transcribeStart = Date()
+
                         // Transcribe using SwiftWhisper
                         let segments = try await whisper.transcribe(audioFrames: samples)
+
+                        let transcribeElapsed = Date().timeIntervalSince(transcribeStart)
 
                         // Combine all segments into a single string
                         let transcription = segments
@@ -100,11 +116,15 @@ class WhisperService {
                             .joined(separator: " ")
                             .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                        let elapsed = Date().timeIntervalSince(startTime)
-                        print("WhisperService: Transcription complete in \(String(format: "%.2f", elapsed))s - \(transcription)")
+                        let totalElapsed = Date().timeIntervalSince(startTime)
+                        let realTimeRatio = totalElapsed / audioDuration
+
+                        Logger.shared.info("✅ Transcription complete in \(String(format: "%.2f", totalElapsed))s (transcribe: \(String(format: "%.2f", transcribeElapsed))s, RTF: \(String(format: "%.2f", realTimeRatio))x) - \"\(transcription)\"", category: .transcription)
 
                         continuation.resume(returning: transcription)
                     } catch {
+                        let elapsed = Date().timeIntervalSince(startTime)
+                        Logger.shared.error("❌ Transcription failed after \(String(format: "%.2f", elapsed))s: \(error.localizedDescription)", category: .transcription)
                         continuation.resume(throwing: error)
                     }
                 }
