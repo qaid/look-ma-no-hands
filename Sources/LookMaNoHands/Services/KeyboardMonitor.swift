@@ -51,17 +51,23 @@ class KeyboardMonitor {
     /// - Parameters:
     ///   - hotkey: The hotkey to monitor for (defaults to Caps Lock)
     ///   - callback: Called when the trigger key is pressed
+    ///   - showPrompt: Whether to show the system permission prompt if not granted (defaults to false)
     /// - Returns: True if monitoring started successfully
     @discardableResult
-    func startMonitoring(hotkey: Hotkey = .capsLock, onTrigger callback: @escaping TriggerCallback) -> Bool {
+    func startMonitoring(hotkey: Hotkey = .capsLock, showPrompt: Bool = false, onTrigger callback: @escaping TriggerCallback) -> Bool {
         guard !isMonitoring else { return true }
 
-        // Check accessibility permission and prompt if needed
-        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let trusted = AXIsProcessTrustedWithOptions(options)
+        // Check accessibility permission (optionally prompting)
+        let trusted: Bool
+        if showPrompt {
+            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            trusted = AXIsProcessTrustedWithOptions(options)
+        } else {
+            trusted = AXIsProcessTrusted()
+        }
 
         guard trusted else {
-            print("KeyboardMonitor: Accessibility permission not granted - prompt shown")
+            print("KeyboardMonitor: Accessibility permission not granted\(showPrompt ? " - prompt shown" : "")")
             return false
         }
 

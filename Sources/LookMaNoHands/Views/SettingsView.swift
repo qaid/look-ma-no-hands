@@ -44,6 +44,9 @@ struct SettingsView: View {
     // Hotkey change confirmation
     @State private var showingHotkeyConfirmation = false
 
+    // Permission polling timer
+    @State private var permissionCheckTimer: Timer?
+
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
@@ -54,33 +57,45 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .padding()
+            .onChange(of: selectedTab) { oldValue, newValue in
+                handleTabChange(to: newValue)
+            }
 
             Divider()
 
-            // Content area
-            Group {
-                switch selectedTab {
-                case .general:
-                    generalTab
-                case .recording:
-                    recordingTab
-                case .models:
-                    modelsTab
-                case .permissions:
-                    permissionsTab
-                case .diagnostics:
-                    diagnosticsTab
-                case .about:
-                    aboutTab
+            // Content area with scrolling
+            ScrollView {
+                Group {
+                    switch selectedTab {
+                    case .general:
+                        generalTab
+                    case .recording:
+                        recordingTab
+                    case .models:
+                        modelsTab
+                    case .permissions:
+                        permissionsTab
+                    case .diagnostics:
+                        diagnosticsTab
+                    case .about:
+                        aboutTab
+                    }
                 }
+                .padding()
             }
-            .padding()
         }
-        .frame(width: 550, height: 400)
+        .frame(minWidth: 550, minHeight: 450)
         .onAppear {
             checkPermissions()
             checkOllamaStatus()
             checkWhisperModelStatus()
+            // Start permission polling if on permissions tab
+            if selectedTab == .permissions {
+                startPermissionPolling()
+            }
+        }
+        .onDisappear {
+            stopPermissionPolling()
         }
     }
     
@@ -90,32 +105,36 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Show recording indicator", isOn: $settings.showIndicator)
+                    .help("Display a floating window while recording")
 
                 if settings.showIndicator {
-                    Picker("Indicator Position", selection: $settings.indicatorPosition) {
+                    Picker("Position", selection: $settings.indicatorPosition) {
                         ForEach(IndicatorPosition.allCases) { position in
                             Text(position.rawValue).tag(position)
                         }
                     }
                     .pickerStyle(.segmented)
+                    .padding(.leading, 20)
+                    .help("Choose where the recording indicator appears on screen")
                 }
 
-                Text("Display a floating indicator while recording")
+                Text("A floating indicator shows your transcription in real-time while recording")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } header: {
-                Text("Display")
+                Text("Recording Indicator")
             }
 
             Section {
-                HStack {
+                HStack(spacing: 8) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
+                        .font(.body)
                     Text("Automatic formatting enabled")
                         .font(.body)
                 }
 
-                Text("Applies capitalization and punctuation to transcribed text")
+                Text("Intelligently applies capitalization, punctuation, and spacing based on context")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } header: {
@@ -126,24 +145,30 @@ struct SettingsView: View {
                 Button {
                     showSetupWizardRestartConfirmation()
                 } label: {
-                    Text("Run Setup Wizard Again")
+                    Label("Run Setup Wizard Again", systemImage: "arrow.clockwise")
                 }
+                .help("Re-run the initial onboarding experience")
 
-                Text("Re-run the initial setup wizard to reconfigure Ollama, models, and permissions")
+                Text("Reconfigure Whisper models, Ollama, and permissions from scratch")
                     .font(.caption)
                     .foregroundColor(.secondary)
             } header: {
-                Text("Setup")
+                Text("Configuration")
             }
 
             Spacer()
+                .frame(height: 20)
+
+            Divider()
 
             HStack {
                 Spacer()
-                Button("Reset to Defaults") {
+                Button("Reset All Settings to Defaults", role: .destructive) {
                     settings.resetToDefaults()
                 }
+                .help("Reset all preferences (does not affect downloaded models or permissions)")
             }
+            .padding(.top, 8)
         }
     }
 
@@ -368,9 +393,19 @@ struct SettingsView: View {
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 220)
                         .disabled(true)
+                        .help("Ollama model configuration (currently fixed to qwen3:8b)")
 
                     connectionStatusView(ollamaStatus, label: "")
                         .frame(width: 100, alignment: .leading)
+                }
+
+                // Help text explaining why it's disabled
+                HStack {
+                    Spacer()
+                        .frame(width: 80)
+                    Text("Model selection will be customizable in a future update")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 // Connection check button
@@ -423,17 +458,27 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-            }
 
-            Section {
-                Button {
-                    checkPermissions()
-                } label: {
-                    Label("Refresh Permission Status", systemImage: "arrow.clockwise")
+                Divider()
+                    .padding(.vertical, 4)
+
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                    Text("Permission status updates automatically")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
 
             Spacer()
+        }
+        .onAppear {
+            startPermissionPolling()
+        }
+        .onDisappear {
+            stopPermissionPolling()
         }
     }
     
@@ -642,18 +687,48 @@ struct SettingsView: View {
             Text("Version 0.1.0")
                 .foregroundColor(.secondary)
 
-            Text("Local voice dictation with AI-powered formatting")
+            Text("Fast, local voice dictation for macOS")
                 .multilineTextAlignment(.center)
+                .foregroundColor(.secondary)
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 8) {
-                Link("Whisper.cpp on GitHub", destination: URL(string: "https://github.com/ggerganov/whisper.cpp")!)
-                Link("Ollama", destination: URL(string: "https://ollama.ai")!)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Features")
+                    .font(.headline)
+
+                FeatureListItem(icon: "bolt.fill", text: "Lightning-fast transcription with Whisper")
+                FeatureListItem(icon: "lock.fill", text: "100% local - your voice never leaves your Mac")
+                FeatureListItem(icon: "waveform", text: "Smart text formatting and punctuation")
+                FeatureListItem(icon: "keyboard", text: "Works in any app with Caps Lock trigger")
+            }
+            .frame(maxWidth: 400)
+
+            Divider()
+
+            VStack(spacing: 8) {
+                Text("Powered By")
+                    .font(.headline)
+
+                Link(destination: URL(string: "https://github.com/ggerganov/whisper.cpp")!) {
+                    Label("Whisper.cpp - Local speech recognition", systemImage: "link")
+                        .font(.caption)
+                }
+
+                Link(destination: URL(string: "https://ollama.ai")!) {
+                    Label("Ollama - Local LLM for meeting notes", systemImage: "link")
+                        .font(.caption)
+                }
+
+                Link(destination: URL(string: "https://github.com/qaid/look-ma-no-hands")!) {
+                    Label("Source code on GitHub", systemImage: "link")
+                        .font(.caption)
+                }
             }
 
             Spacer()
         }
+        .padding()
     }
     
     // MARK: - Helper Views
@@ -672,15 +747,16 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            
+
             Spacer()
-            
+
             permissionStatusBadge(state)
-            
+
             if state != .granted {
-                Button("Grant") {
+                Button(title == "Accessibility" ? "Open Settings" : "Grant") {
                     action()
                 }
+                .help(title == "Accessibility" ? "Opens System Settings where you can grant permission" : "Request \(title.lowercased()) permission")
             }
         }
         .padding(.vertical, 4)
@@ -744,7 +820,38 @@ struct SettingsView: View {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
     }
-    
+
+    // MARK: - Permission Polling
+
+    /// Start automatic permission status polling
+    private func startPermissionPolling() {
+        // Stop any existing timer first
+        stopPermissionPolling()
+
+        // Initial check
+        checkPermissions()
+
+        // Poll every second for permission changes
+        permissionCheckTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            self.checkPermissions()
+        }
+    }
+
+    /// Stop automatic permission status polling
+    private func stopPermissionPolling() {
+        permissionCheckTimer?.invalidate()
+        permissionCheckTimer = nil
+    }
+
+    /// Handle tab changes to manage permission polling
+    private func handleTabChange(to newTab: SettingsTab) {
+        if newTab == .permissions {
+            startPermissionPolling()
+        } else {
+            stopPermissionPolling()
+        }
+    }
+
     private func checkOllamaStatus() {
         ollamaStatus = .checking
 
@@ -902,6 +1009,24 @@ struct SettingsView: View {
                     NSApplication.shared.terminate(nil)
                 }
             }
+        }
+    }
+}
+
+/// Feature list item for About tab
+struct FeatureListItem: View {
+    let icon: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(.accentColor)
+                .frame(width: 20)
+
+            Text(text)
+                .font(.body)
         }
     }
 }
