@@ -156,7 +156,7 @@ final class CrashReporter {
 
         if let lastTranscription = state.lastTranscription {
             report += """
-        Last Transcription: \(lastTranscription.prefix(500))...
+        Last Transcription: [REDACTED - \(lastTranscription.count) characters]
 
         """
         }
