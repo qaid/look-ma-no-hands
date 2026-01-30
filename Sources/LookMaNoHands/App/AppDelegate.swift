@@ -77,6 +77,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("✅ AppDelegate: Menu bar setup complete")
 
         // Check if first launch (but not if we just completed onboarding in this session)
+        NSLog("🔍 Onboarding check: hasCompletedOnboarding=%@, justCompletedOnboarding=%@",
+              Settings.shared.hasCompletedOnboarding ? "true" : "false",
+              justCompletedOnboarding ? "true" : "false")
+
         if !Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
             NSLog("🆕 First launch detected - showing onboarding")
             showOnboarding()
@@ -100,13 +104,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Onboarding
 
     private func showOnboarding() {
+        NSLog("🎬 showOnboarding() - Creating onboarding window")
+
         // Switch to regular app mode so window appears in Dock and Cmd+Tab
         NSApp.setActivationPolicy(.regular)
+        NSLog("   ✓ Set activation policy to .regular")
 
         let onboardingView = OnboardingView(
             whisperService: whisperService,
             ollamaService: ollamaService,
             onComplete: {
+                NSLog("🎬 Onboarding onComplete callback triggered")
+
                 // Called when user clicks "Finish"
                 self.onboardingWindow?.close()
                 self.onboardingWindow = nil
@@ -129,8 +138,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         )
+        NSLog("   ✓ Created OnboardingView")
 
         let hostingController = NSHostingController(rootView: onboardingView)
+        NSLog("   ✓ Created NSHostingController")
 
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Welcome to Look Ma No Hands"
@@ -138,15 +149,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         window.level = .floating
+        NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
 
         // Bring window to front and activate app
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        NSLog("   ✓ Made window key and front")
 
         // Ensure window stays on top
         window.orderFrontRegardless()
+        NSLog("✅ Onboarding window should now be visible")
     }
 
     private func completeInitialization() {
@@ -942,18 +956,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            // Reset onboarding status
-            Settings.shared.hasCompletedOnboarding = false
-
             // Clear UserDefaults for this app
             if let bundleID = Bundle.main.bundleIdentifier {
+                NSLog("🔄 Developer Reset: Clearing UserDefaults for bundle: %@", bundleID)
                 UserDefaults.standard.removePersistentDomain(forName: bundleID)
                 UserDefaults.standard.synchronize()
+            } else {
+                NSLog("⚠️ Developer Reset: No bundle identifier found!")
             }
 
             // Note: Cannot programmatically revoke system permissions (microphone, accessibility, screen recording)
             // User must manually revoke these in System Settings if needed
-            print("Developer reset complete - app will now restart")
+            NSLog("✅ Developer reset complete - app will now restart")
 
             // Restart the app to show onboarding
             restartApp()

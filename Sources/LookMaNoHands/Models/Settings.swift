@@ -341,8 +341,10 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
+            NSLog("📖 Settings: Loaded hasCompletedOnboarding from UserDefaults: %@", self.hasCompletedOnboarding ? "true" : "false")
         } else {
             self.hasCompletedOnboarding = false
+            NSLog("📖 Settings: No saved onboarding status - defaulting to false (first launch)")
         }
     }
     
