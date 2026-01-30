@@ -15,6 +15,7 @@ final class Logger {
     private lazy var appLogger = OSLog(subsystem: subsystem, category: "App")
     private lazy var audioLogger = OSLog(subsystem: subsystem, category: "Audio")
     private lazy var whisperLogger = OSLog(subsystem: subsystem, category: "Whisper")
+    private lazy var transcriptionLogger = OSLog(subsystem: subsystem, category: "Transcription")
     private lazy var accessibilityLogger = OSLog(subsystem: subsystem, category: "Accessibility")
     private lazy var keyboardLogger = OSLog(subsystem: subsystem, category: "Keyboard")
     private lazy var memoryLogger = OSLog(subsystem: subsystem, category: "Memory")
@@ -39,6 +40,7 @@ final class Logger {
         case app = "App"
         case audio = "Audio"
         case whisper = "Whisper"
+        case transcription = "Transcription"
         case accessibility = "Accessibility"
         case keyboard = "Keyboard"
         case memory = "Memory"
@@ -164,6 +166,7 @@ final class Logger {
         case .app: return appLogger
         case .audio: return audioLogger
         case .whisper: return whisperLogger
+        case .transcription: return transcriptionLogger
         case .accessibility: return accessibilityLogger
         case .keyboard: return keyboardLogger
         case .memory: return memoryLogger

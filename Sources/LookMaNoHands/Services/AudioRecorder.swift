@@ -81,32 +81,38 @@ class AudioRecorder {
     func stopRecording() -> [Float] {
         guard isRecording else { return [] }
 
+        let stopTime = Date()
         audioEngine?.stop()
         audioEngine?.inputNode.removeTap(onBus: 0)
         audioEngine = nil
         isRecording = false
 
         // Calculate recording duration
-        let duration = Date().timeIntervalSince(recordingStartTime ?? Date())
-        print("AudioRecorder: Stopped recording after \(String(format: "%.2f", duration))s, captured \(audioBuffer.count) samples at \(inputSampleRate) Hz")
+        let duration = stopTime.timeIntervalSince(recordingStartTime ?? Date())
+        Logger.shared.info("🛑 Recording stopped: \(String(format: "%.2f", duration))s, \(audioBuffer.count) samples at \(Int(inputSampleRate)) Hz", category: .audio)
 
         // Warn if recording is too short
         if duration < minimumDuration {
-            print("AudioRecorder: Warning - Recording is very short (\(String(format: "%.2f", duration))s), may not transcribe well")
+            Logger.shared.warning("Recording is very short (\(String(format: "%.2f", duration))s), may not transcribe well", category: .audio)
         }
+
+        let processingStart = Date()
 
         // Resample to 16kHz if needed
         let resampled: [Float]
         if abs(inputSampleRate - targetSampleRate) > 0.1 {
-            print("AudioRecorder: Resampling from \(inputSampleRate) Hz to \(targetSampleRate) Hz")
+            Logger.shared.debug("Resampling from \(Int(inputSampleRate)) Hz to \(Int(targetSampleRate)) Hz", category: .audio)
             resampled = resampleToTarget(audioBuffer)
-            print("AudioRecorder: Resampled to \(resampled.count) samples")
+            Logger.shared.debug("Resampled to \(resampled.count) samples", category: .audio)
         } else {
             resampled = audioBuffer
         }
 
         // Normalize audio levels
         let normalized = normalizeAudio(resampled)
+
+        let processingTime = Date().timeIntervalSince(processingStart)
+        Logger.shared.info("✅ Audio processing complete in \(String(format: "%.3f", processingTime))s, output: \(normalized.count) samples", category: .audio)
 
         return normalized
     }

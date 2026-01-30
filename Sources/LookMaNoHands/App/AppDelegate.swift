@@ -792,6 +792,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Stop recording and begin transcription pipeline
     private func stopRecordingAndTranscribe() {
+        let pipelineStart = Date()
+        Logger.shared.info("⏹️ Stop recording triggered", category: .transcription)
+
         // Stop recording and get audio samples
         let audioSamples = audioRecorder.stopRecording()
 
@@ -802,36 +805,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Keep indicator visible during transcription
         recordingIndicator.updateTranscription("Transcribing...")
 
-        print("Recording stopped, processing \(audioSamples.count) samples")
+        Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
+
+        // Safety timeout: Hide indicator after 10 seconds if transcription is taking too long
+        // This prevents the "stuck indicator" UX issue while transcription continues in background
+        let indicatorTimeoutTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
+            if !Task.isCancelled {
+                Logger.shared.warning("⏱️ Indicator timeout reached - hiding indicator (transcription continues in background)", category: .transcription)
+                recordingIndicator.hide()
+            }
+        }
 
         // Process the audio in background
         Task {
-            await processRecording(samples: audioSamples)
+            await processRecording(samples: audioSamples, pipelineStart: pipelineStart)
+            // Cancel the timeout task if we finish before it fires
+            indicatorTimeoutTask.cancel()
         }
     }
 
     /// Process recorded audio: transcribe and format
-    private func processRecording(samples: [Float]) async {
+    private func processRecording(samples: [Float], pipelineStart: Date) async {
         // Use high priority to minimize latency
         await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
             do {
                 // Step 1: Transcribe with Whisper
+                let transcribeStart = Date()
                 let rawText = try await self.whisperService.transcribe(samples: samples)
+                let transcribeTime = Date().timeIntervalSince(transcribeStart)
+
                 await MainActor.run {
                     self.transcriptionState.setTranscription(rawText)
                     // Show transcription in indicator before insertion
                     self.recordingIndicator.updateTranscription(rawText)
                 }
 
-                print("Transcription: \(rawText)")
+                Logger.shared.info("📝 Transcription result: \"\(rawText)\" (took \(String(format: "%.2f", transcribeTime))s)", category: .transcription)
 
-                // Brief preview (reduced from 1.5s to 0.4s for faster insertion)
-                try? await Task.sleep(nanoseconds: 400_000_000)
+                // Brief preview - reduced to 200ms for snappier UX
+                let previewStart = Date()
+                try? await Task.sleep(nanoseconds: 200_000_000)
+                let previewTime = Date().timeIntervalSince(previewStart)
 
                 // Step 2: Insert text with context-aware formatting
                 // TextInsertionService handles all formatting based on cursor position
+                let insertStart = Date()
                 await MainActor.run {
                     autoreleasepool {
                         self.textInsertionService.insertText(rawText)
@@ -839,20 +860,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.transcriptionState.completeProcessing()
                     }
                 }
+                let insertTime = Date().timeIntervalSince(insertStart)
 
-                print("Text inserted successfully")
+                Logger.shared.info("✅ Text inserted in \(String(format: "%.3f", insertTime))s", category: .transcription)
 
                 // Hide indicator after insertion
                 await MainActor.run {
                     self.recordingIndicator.hide()
                 }
 
+                let totalTime = Date().timeIntervalSince(pipelineStart)
+                Logger.shared.info("🎉 Full pipeline complete in \(String(format: "%.2f", totalTime))s (transcribe: \(String(format: "%.2f", transcribeTime))s, preview: \(String(format: "%.2f", previewTime))s, insert: \(String(format: "%.3f", insertTime))s)", category: .transcription)
+
             } catch {
+                let failTime = Date().timeIntervalSince(pipelineStart)
+                Logger.shared.error("❌ Processing failed after \(String(format: "%.2f", failTime))s: \(error.localizedDescription)", category: .transcription)
+
                 await MainActor.run {
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
                     self.recordingIndicator.hide()
                 }
-                print("Processing error: \(error)")
             }
         }.value
     }
