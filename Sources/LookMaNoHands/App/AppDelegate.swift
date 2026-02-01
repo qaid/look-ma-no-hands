@@ -253,24 +253,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Permissions section
-        let permissionsItem = NSMenuItem(title: "Permissions", action: nil, keyEquivalent: "")
-        let permissionsSubmenu = NSMenu()
-        permissionsSubmenu.addItem(NSMenuItem(
-            title: "Microphone: Checking...",
-            action: nil,
-            keyEquivalent: ""
-        ))
-        permissionsSubmenu.addItem(NSMenuItem(
-            title: "Accessibility: Checking...",
-            action: nil,
-            keyEquivalent: ""
-        ))
-        permissionsItem.submenu = permissionsSubmenu
-        menu.addItem(permissionsItem)
-
-        menu.addItem(NSMenuItem.separator())
-        
         // Settings
         menu.addItem(NSMenuItem(
             title: "Settings...",
@@ -414,19 +396,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.transcriptionState.hasMicrophonePermission = granted
                 print("Microphone permission: \(granted ? "Granted" : "Denied")")
 
-                // Update menu item
-                if let menu = self?.statusItem?.menu {
-                    if let permissionsItem = menu.items.first(where: { $0.title == "Permissions" }),
-                       let submenu = permissionsItem.submenu {
-                        for item in submenu.items {
-                            if item.title.starts(with: "Microphone:") {
-                                item.title = "Microphone: \(granted ? "✓ Granted" : "✗ Denied")"
-                                break
-                            }
-                        }
-                    }
-                }
-
                 if !granted {
                     self?.showAlert(
                         title: "Microphone Permission Required",
@@ -442,19 +411,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let trusted = AXIsProcessTrusted()
         transcriptionState.hasAccessibilityPermission = trusted
         print("Accessibility permission: \(trusted ? "Granted" : "Not granted")")
-
-        // Update menu item
-        if let menu = statusItem?.menu {
-            if let permissionsItem = menu.items.first(where: { $0.title == "Permissions" }),
-               let submenu = permissionsItem.submenu {
-                for item in submenu.items {
-                    if item.title.starts(with: "Accessibility:") {
-                        item.title = "Accessibility: \(trusted ? "✓ Granted" : "✗ Not granted")"
-                        break
-                    }
-                }
-            }
-        }
 
         if !trusted && !justCompletedOnboarding {
             // Prompt user to grant accessibility permission
@@ -697,6 +653,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         transcriptionState.startRecording()
         updateMenuBarIcon(isRecording: true)
 
+        // Connect recorder to indicator for waveform
+        recordingIndicator.setAudioRecorder(audioRecorder)
+
         // Show recording indicator
         recordingIndicator.show()
 
@@ -802,31 +761,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         transcriptionState.stopRecording()
         updateMenuBarIcon(isRecording: false)
 
-        // Keep indicator visible during transcription
-        recordingIndicator.updateTranscription("Transcribing...")
+        // Hide indicator immediately to avoid frozen waveform
+        // (waveform stops animating when isRecording = false)
+        recordingIndicator.hide()
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
-
-        // Safety timeout: Hide indicator after 10 seconds if transcription is taking too long
-        // This prevents the "stuck indicator" UX issue while transcription continues in background
-        let indicatorTimeoutTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 10_000_000_000) // 10 seconds
-            if !Task.isCancelled {
-                Logger.shared.warning("⏱️ Indicator timeout reached - hiding indicator (transcription continues in background)", category: .transcription)
-                recordingIndicator.hide()
-            }
-        }
 
         // Process the audio in background
         Task {
             await processRecording(samples: audioSamples, pipelineStart: pipelineStart)
-            // Cancel the timeout task if we finish before it fires
-            indicatorTimeoutTask.cancel()
         }
     }
 
     /// Process recorded audio: transcribe and format
     private func processRecording(samples: [Float], pipelineStart: Date) async {
+        let audioLength = Double(samples.count) / 16000.0
+        Logger.shared.info("⏱️ Starting processing for \(String(format: "%.1f", audioLength))s of audio", category: .transcription)
+
         // Use high priority to minimize latency
         await Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
@@ -834,43 +785,36 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 // Step 1: Transcribe with Whisper
                 let transcribeStart = Date()
+                Logger.shared.info("🔄 Starting Whisper transcription...", category: .transcription)
+
                 let rawText = try await self.whisperService.transcribe(samples: samples)
                 let transcribeTime = Date().timeIntervalSince(transcribeStart)
 
+                Logger.shared.info("📝 Whisper complete: \"\(rawText)\" (took \(String(format: "%.3f", transcribeTime))s, ratio: \(String(format: "%.1f", transcribeTime / audioLength))x)", category: .transcription)
+
+                let stateUpdateStart = Date()
                 await MainActor.run {
                     self.transcriptionState.setTranscription(rawText)
-                    // Show transcription in indicator before insertion
-                    self.recordingIndicator.updateTranscription(rawText)
                 }
-
-                Logger.shared.info("📝 Transcription result: \"\(rawText)\" (took \(String(format: "%.2f", transcribeTime))s)", category: .transcription)
-
-                // Brief preview - reduced to 200ms for snappier UX
-                let previewStart = Date()
-                try? await Task.sleep(nanoseconds: 200_000_000)
-                let previewTime = Date().timeIntervalSince(previewStart)
+                let stateUpdateTime = Date().timeIntervalSince(stateUpdateStart)
+                Logger.shared.info("💾 State updated in \(String(format: "%.3f", stateUpdateTime))s", category: .transcription)
 
                 // Step 2: Insert text with context-aware formatting
-                // TextInsertionService handles all formatting based on cursor position
                 let insertStart = Date()
+                Logger.shared.info("⌨️ Starting text insertion...", category: .transcription)
+
                 await MainActor.run {
                     autoreleasepool {
                         self.textInsertionService.insertText(rawText)
-                        self.transcriptionState.setFormattedText(rawText) // For display purposes
+                        self.transcriptionState.setFormattedText(rawText)
                         self.transcriptionState.completeProcessing()
                     }
                 }
                 let insertTime = Date().timeIntervalSince(insertStart)
-
                 Logger.shared.info("✅ Text inserted in \(String(format: "%.3f", insertTime))s", category: .transcription)
 
-                // Hide indicator after insertion
-                await MainActor.run {
-                    self.recordingIndicator.hide()
-                }
-
                 let totalTime = Date().timeIntervalSince(pipelineStart)
-                Logger.shared.info("🎉 Full pipeline complete in \(String(format: "%.2f", totalTime))s (transcribe: \(String(format: "%.2f", transcribeTime))s, preview: \(String(format: "%.2f", previewTime))s, insert: \(String(format: "%.3f", insertTime))s)", category: .transcription)
+                Logger.shared.info("🎉 TOTAL PIPELINE: \(String(format: "%.3f", totalTime))s (whisper: \(String(format: "%.3f", transcribeTime))s, state: \(String(format: "%.3f", stateUpdateTime))s, insert: \(String(format: "%.3f", insertTime))s)", category: .transcription)
 
             } catch {
                 let failTime = Date().timeIntervalSince(pipelineStart)
@@ -878,7 +822,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 await MainActor.run {
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
-                    self.recordingIndicator.hide()
                 }
             }
         }.value
