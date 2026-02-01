@@ -2,39 +2,49 @@ import SwiftUI
 import AppKit
 import Combine
 
-/// Floating window that appears during recording to show the user that audio is being captured
-/// Shows live transcription text at the cursor position (Apple-style)
-struct RecordingIndicator: View {
-
-    @State private var isPulsing = false
-    @State private var borderRotation: Double = 0
-    @State private var borderOpacity: Double = 1.0
-    @Binding var transcriptionText: String
+/// Waveform visualization using animated frequency bars
+struct WaveformBarsView: View {
+    @Binding var frequencyBands: [Float]
 
     var body: some View {
-        HStack(spacing: 8) {
-            // Pulsing microphone icon
-            Image(systemName: "mic.fill")
-                .foregroundColor(.red)
-                .font(.system(size: 12))
-                .scaleEffect(isPulsing ? 1.2 : 1.0)
-                .animation(
-                    .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
-                    value: isPulsing
+        Canvas { context, size in
+            let barCount = frequencyBands.count
+            let barSpacing: CGFloat = 2  // Closer together
+            let totalSpacing = CGFloat(barCount - 1) * barSpacing
+            let barWidth = (size.width - totalSpacing) / CGFloat(barCount)
+
+            for (index, level) in frequencyBands.enumerated() {
+                let x = CGFloat(index) * (barWidth + barSpacing)
+                let barHeight = max(CGFloat(level) * size.height, 3.0) // Minimum 3pt
+                let y = (size.height - barHeight) / 2
+
+                let rect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
+                // Less rounded corners - barWidth / 4 instead of barWidth / 2
+                let path = Path(roundedRect: rect, cornerRadius: barWidth / 4)
+
+                // Gradient: blue to purple based on amplitude
+                let color = Color(
+                    red: 0.3 + Double(level) * 0.5,
+                    green: 0.6 - Double(level) * 0.3,
+                    blue: 1.0
                 )
 
-            // Live transcription (last 50 chars)
-            if !transcriptionText.isEmpty {
-                Text(String(transcriptionText.suffix(50)))
-                    .font(.system(size: 14))
-                    .lineLimit(1)
-                    .foregroundColor(.primary)
-            } else {
-                Text("Listening...")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
+                context.fill(path, with: .color(color.opacity(0.8)))
             }
         }
+        .frame(width: 300, height: 38)
+    }
+}
+
+/// Floating window that appears during recording to show the user that audio is being captured
+/// Shows animated waveform visualization at the cursor position (Apple-style)
+struct RecordingIndicator: View {
+
+    @ObservedObject var state: RecordingIndicatorState
+
+    var body: some View {
+        // Just the waveform visualization
+        WaveformBarsView(frequencyBands: $state.frequencyBands)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
@@ -43,47 +53,14 @@ struct RecordingIndicator: View {
                 .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
         )
         .overlay(
-            // Thin Siri-style animated multi-color border
+            // Simple static blue border - no expensive conic gradient animations
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Color(red: 0.3, green: 0.6, blue: 1.0),   // Blue
-                            Color(red: 0.8, green: 0.3, blue: 1.0),   // Purple
-                            Color(red: 1.0, green: 0.3, blue: 0.6),   // Pink
-                            Color(red: 1.0, green: 0.5, blue: 0.3),   // Orange
-                            Color(red: 0.3, green: 1.0, blue: 0.6),   // Green
-                            Color(red: 0.3, green: 0.6, blue: 1.0)    // Blue (loop)
-                        ]),
-                        center: .center,
-                        angle: .degrees(borderRotation)
-                    ),
-                    lineWidth: 2  // Thinner border
+                    Color(red: 0.3, green: 0.6, blue: 1.0),
+                    lineWidth: 2
                 )
-                .opacity(borderOpacity)
+                .opacity(0.8)
         )
-        .onAppear {
-            isPulsing = true
-
-            // Start continuous rotation animation for the border
-            withAnimation(
-                .linear(duration: 3.0)
-                .repeatForever(autoreverses: false)
-            ) {
-                borderRotation = 360
-            }
-
-            // Pulsing opacity for the border
-            withAnimation(
-                .easeInOut(duration: 1.5)
-                .repeatForever(autoreverses: true)
-            ) {
-                borderOpacity = 0.6
-            }
-        }
-        .onDisappear {
-            isPulsing = false
-        }
     }
 }
 
@@ -118,7 +95,27 @@ struct RecordingIndicatorPreview: View {
 
 /// Observable state for the recording indicator
 class RecordingIndicatorState: ObservableObject {
-    @Published var transcriptionText: String = ""
+    @Published var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
+
+    // Exponential smoothing for fluid animation
+    func updateFrequencyBands(_ newBands: [Float]) {
+        guard frequencyBands.count == newBands.count else {
+            frequencyBands = newBands
+            return
+        }
+
+        // Smooth transition: 70% old + 30% new
+        // IMPORTANT: Create new array instead of modifying in place
+        // so @Published detects the change
+        var smoothedBands: [Float] = []
+        for i in 0..<newBands.count {
+            let smoothed = frequencyBands[i] * 0.7 + newBands[i] * 0.3
+            smoothedBands.append(smoothed)
+        }
+
+        // Assign new array to trigger @Published
+        frequencyBands = smoothedBands
+    }
 }
 
 /// Controls the floating indicator window - persistent window approach
@@ -126,9 +123,11 @@ class RecordingIndicatorWindowController {
 
     private var window: NSWindow?
     private var hostingView: NSHostingView<RecordingIndicator>?
-    private let windowWidth: CGFloat = 300  // Wider for transcription text
-    private let windowHeight: CGFloat = 32
+    private let windowWidth: CGFloat = 340  // Adjusted for waveform-only layout
+    private let windowHeight: CGFloat = 60
     private var positionUpdateTimer: Timer?
+    private var audioUpdateTimer: DispatchSourceTimer?
+    private weak var audioRecorder: AudioRecorder?
     private let state = RecordingIndicatorState()
 
     init() {
@@ -136,15 +135,14 @@ class RecordingIndicatorWindowController {
         setupWindow()
     }
 
-    private func setupWindow() {
-        // Create a binding manually
-        let binding = Binding<String>(
-            get: { self.state.transcriptionText },
-            set: { self.state.transcriptionText = $0 }
-        )
+    /// Set audio recorder reference for waveform visualization
+    func setAudioRecorder(_ recorder: AudioRecorder) {
+        self.audioRecorder = recorder
+    }
 
-        // Create hosting view with binding to transcription text
-        let contentView = NSHostingView(rootView: RecordingIndicator(transcriptionText: binding))
+    private func setupWindow() {
+        // Pass the state object directly so it can be observed
+        let contentView = NSHostingView(rootView: RecordingIndicator(state: state))
         self.hostingView = contentView
 
         // Create window
@@ -170,10 +168,39 @@ class RecordingIndicatorWindowController {
         self.window = window
     }
 
-    /// Update transcription text displayed in the indicator
-    func updateTranscription(_ text: String) {
+    /// Start polling audio levels for waveform visualization
+    private func startAudioLevelUpdates() {
+        print("🎬 Starting audio level updates (30 FPS)")
+
+        // Use DispatchSourceTimer instead of RunLoop timer
+        // This runs on dispatch queue and isn't affected by menu tracking
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: .milliseconds(33))  // ~30 FPS
+
+        timer.setEventHandler { [weak self] in
+            guard let self = self, let recorder = self.audioRecorder else {
+                return
+            }
+
+            let bands = recorder.getFrequencyBands(bandCount: 40)  // More bars for thinner look
+            self.state.updateFrequencyBands(bands)
+        }
+
+        timer.resume()
+        audioUpdateTimer = timer
+
+        print("✅ Audio update timer started with DispatchSource (30 FPS, 40 bands)")
+    }
+
+    /// Stop audio updates and reset to idle state
+    private func stopAudioLevelUpdates() {
+        audioUpdateTimer?.cancel()
+        audioUpdateTimer = nil
+
+        // Reset to idle state with explicit assignment
         DispatchQueue.main.async {
-            self.state.transcriptionText = text
+            self.state.frequencyBands = Array(repeating: 0.0, count: 40)
+            print("🛑 Audio updates stopped, bands reset to zero")
         }
     }
 
@@ -247,6 +274,9 @@ class RecordingIndicatorWindowController {
             print("RecordingIndicator: Using fixed positioning (cursor detection failed)")
         }
 
+        // Start audio level updates
+        startAudioLevelUpdates()
+
         // Make window visible first
         window.orderFront(nil)
 
@@ -282,8 +312,8 @@ class RecordingIndicatorWindowController {
         // Stop position updates
         stopPositionUpdates()
 
-        // Clear transcription text
-        state.transcriptionText = ""
+        // Stop audio updates
+        stopAudioLevelUpdates()
 
         // Animate fade-out
         NSAnimationContext.runAnimationGroup({ context in
