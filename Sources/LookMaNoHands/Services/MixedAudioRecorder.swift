@@ -173,4 +173,12 @@ class MixedAudioRecorder {
 
         return normalized
     }
+
+    // MARK: - Frequency Visualization
+
+    /// Get frequency bands for waveform visualization
+    /// Delegates to microphone recorder since that's the primary audio source for visualization
+    func getFrequencyBands(bandCount: Int) -> [Float] {
+        return microphoneRecorder.getFrequencyBands(bandCount: bandCount)
+    }
 }

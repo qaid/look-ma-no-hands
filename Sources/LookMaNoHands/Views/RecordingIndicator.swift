@@ -6,6 +6,7 @@ import Combine
 struct WaveformBarsView: View {
     @Binding var frequencyBands: [Float]
     @Environment(\.colorScheme) var colorScheme
+    var fixedWidth: CGFloat? = nil  // Optional fixed width for floating indicator
 
     var body: some View {
         Canvas { context, size in
@@ -49,7 +50,7 @@ struct WaveformBarsView: View {
                 context.fill(path, with: .color(color.opacity(colorScheme == .dark ? 0.8 : 0.9)))
             }
         }
-        .frame(width: 300, height: 38)
+        .frame(width: fixedWidth, height: 38)
     }
 }
 
@@ -63,7 +64,7 @@ struct RecordingIndicator: View {
 
     var body: some View {
         // Just the waveform visualization
-        WaveformBarsView(frequencyBands: $state.frequencyBands)
+        WaveformBarsView(frequencyBands: $state.frequencyBands, fixedWidth: 300)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
@@ -311,12 +312,20 @@ class RecordingIndicatorWindowController {
 
     /// Start periodic position updates
     private func startPositionUpdates() {
-        // Update position every 200ms while recording
-        positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
+        // Update position every 100ms to smoothly follow mouse cursor
+        positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            if let cursorRect = CursorPositionService.shared.getCursorScreenPosition() {
-                self.updatePosition(for: cursorRect)
-            }
+
+            // Always use mouse cursor position for smooth tracking
+            let mouseLocation = NSEvent.mouseLocation
+            let cursorRect = NSRect(
+                x: mouseLocation.x,
+                y: mouseLocation.y,
+                width: 2,
+                height: 20
+            )
+
+            self.updatePosition(for: cursorRect)
         }
     }
 
