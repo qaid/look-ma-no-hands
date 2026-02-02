@@ -5,6 +5,7 @@ import Combine
 /// Waveform visualization using animated frequency bars
 struct WaveformBarsView: View {
     @Binding var frequencyBands: [Float]
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         Canvas { context, size in
@@ -15,21 +16,37 @@ struct WaveformBarsView: View {
 
             for (index, level) in frequencyBands.enumerated() {
                 let x = CGFloat(index) * (barWidth + barSpacing)
-                let barHeight = max(CGFloat(level) * size.height, 3.0) // Minimum 3pt
+                // IMPROVED: Balanced scaling to show dynamic range without constant peaking
+                // Audio is already amplified 50x in AudioRecorder, so values are often near 1.0
+                // Use power of 2.5 to compress high values more than low values
+                // This creates more perceptual dynamic range
+                let normalizedLevel = pow(CGFloat(level), 2.5)
+                let barHeight = max(normalizedLevel * size.height, 3.0) // Minimum 3pt
                 let y = (size.height - barHeight) / 2
 
                 let rect = CGRect(x: x, y: y, width: barWidth, height: barHeight)
                 // Less rounded corners - barWidth / 4 instead of barWidth / 2
                 let path = Path(roundedRect: rect, cornerRadius: barWidth / 4)
 
-                // Gradient: blue to purple based on amplitude
-                let color = Color(
-                    red: 0.3 + Double(level) * 0.5,
-                    green: 0.6 - Double(level) * 0.3,
-                    blue: 1.0
-                )
+                // IMPROVED: Automatic light/dark mode color adaptation
+                let color: Color
+                if colorScheme == .dark {
+                    // Dark mode: blue to purple gradient (original)
+                    color = Color(
+                        red: 0.3 + Double(level) * 0.5,
+                        green: 0.6 - Double(level) * 0.3,
+                        blue: 1.0
+                    )
+                } else {
+                    // Light mode: deeper blue with better contrast
+                    color = Color(
+                        red: 0.1 + Double(level) * 0.3,
+                        green: 0.4 - Double(level) * 0.2,
+                        blue: 0.9 - Double(level) * 0.2
+                    )
+                }
 
-                context.fill(path, with: .color(color.opacity(0.8)))
+                context.fill(path, with: .color(color.opacity(colorScheme == .dark ? 0.8 : 0.9)))
             }
         }
         .frame(width: 300, height: 38)
@@ -38,9 +55,11 @@ struct WaveformBarsView: View {
 
 /// Floating window that appears during recording to show the user that audio is being captured
 /// Shows animated waveform visualization at the cursor position (Apple-style)
+/// IMPORTANT: Only shown in dictation mode, NOT in meeting transcription mode
 struct RecordingIndicator: View {
 
     @ObservedObject var state: RecordingIndicatorState
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         // Just the waveform visualization
@@ -50,13 +69,15 @@ struct RecordingIndicator: View {
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.15), radius: 5, x: 0, y: 2)
         )
         .overlay(
-            // Simple static blue border - no expensive conic gradient animations
+            // IMPROVED: Border color adapts to light/dark mode
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .strokeBorder(
-                    Color(red: 0.3, green: 0.6, blue: 1.0),
+                    colorScheme == .dark
+                        ? Color(red: 0.3, green: 0.6, blue: 1.0)  // Light blue for dark mode
+                        : Color(red: 0.1, green: 0.4, blue: 0.8), // Deeper blue for light mode
                     lineWidth: 2
                 )
                 .opacity(0.8)
