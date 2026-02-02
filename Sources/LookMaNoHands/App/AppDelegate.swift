@@ -16,6 +16,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Track if we just completed onboarding to avoid double-prompting
     private var justCompletedOnboarding = false
 
+    // Track meeting recording state for close warning
+    var isMeetingRecording = false
+
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
 
@@ -365,7 +368,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.delegate = self
 
         // Create SwiftUI meeting view and wrap it in NSHostingView
-        let meetingView = MeetingView(whisperService: whisperService, recordingIndicator: recordingIndicator)
+        let meetingView = MeetingView(whisperService: whisperService, recordingIndicator: recordingIndicator, appDelegate: self)
         let hostingView = NSHostingView(rootView: meetingView)
         window.contentView = hostingView
 
@@ -948,6 +951,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - NSWindowDelegate
 
 extension AppDelegate: NSWindowDelegate {
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        // Check if meeting window is trying to close while recording
+        guard sender === meetingWindow else { return true }
+        guard isMeetingRecording else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = "Recording in Progress"
+        alert.informativeText = "Are you sure you want to stop recording and close this window? Any unsaved transcription will be lost."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Stop & Close")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            // User confirmed - allow close
+            isMeetingRecording = false
+            return true
+        } else {
+            // User cancelled - prevent close
+            return false
+        }
+    }
+
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
 

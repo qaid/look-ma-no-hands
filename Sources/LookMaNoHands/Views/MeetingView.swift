@@ -2,6 +2,32 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Foundation
 
+/// Preset note generation styles
+enum NotePreset {
+    case quickSummary
+    case detailedNotes
+
+    var prompt: String {
+        switch self {
+        case .quickSummary:
+            return """
+            Summarize this meeting transcript concisely:
+
+            ## Key Points
+            - List the 3-5 main topics discussed
+
+            ## Action Items
+            - List specific tasks and owners
+
+            ## Decisions Made
+            - List concrete decisions
+            """
+        case .detailedNotes:
+            return Settings.shared.meetingPrompt
+        }
+    }
+}
+
 /// State for managing meeting transcription session
 @Observable
 class MeetingState {
@@ -33,8 +59,11 @@ struct MeetingView: View {
     @State private var customPrompt = Settings.shared.meetingPrompt
     @State private var jargonTerms = ""
     @State private var showAdvancedPrompt = false
+    @State private var showCustomization = false
     @State private var menuRefreshTrigger = UUID()
     @State private var lastProgressUpdate = Date()
+    @State private var showClearConfirmation = false
+    @State private var analysisTask: Task<Void, Never>?
 
     // Services
     private let mixedAudioRecorder: MixedAudioRecorder
@@ -42,13 +71,15 @@ struct MeetingView: View {
     private let whisperService: WhisperService
     private let meetingAnalyzer: MeetingAnalyzer
     private let recordingIndicator: RecordingIndicatorWindowController?
+    private weak var appDelegate: AppDelegate?
 
-    init(whisperService: WhisperService, recordingIndicator: RecordingIndicatorWindowController? = nil) {
+    init(whisperService: WhisperService, recordingIndicator: RecordingIndicatorWindowController? = nil, appDelegate: AppDelegate? = nil) {
         self.whisperService = whisperService
         self.mixedAudioRecorder = MixedAudioRecorder()
         self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
         self.meetingAnalyzer = MeetingAnalyzer()
         self.recordingIndicator = recordingIndicator
+        self.appDelegate = appDelegate
 
         // Setup callbacks for continuous transcription
         setupTranscriberCallbacks()
@@ -176,22 +207,37 @@ struct MeetingView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if meetingState.segments.isEmpty && !meetingState.isRecording {
-                        // Empty state
-                        VStack(spacing: 12) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary)
+                        // Empty state with improved visual hierarchy
+                        VStack(spacing: 16) {
+                            Image(systemName: "waveform.circle")
+                                .font(.system(size: 64))
+                                .foregroundColor(.accentColor)
+                                .symbolEffect(.pulse)
 
-                            Text("No transcript yet")
-                                .font(.title3)
-                                .foregroundColor(.secondary)
+                            VStack(spacing: 8) {
+                                Text("Ready to Record")
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
 
-                            Text("Click Start to begin recording (captures both system audio and microphone)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                Text("Captures system audio and microphone")
+                                    .font(.body)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            // Visual CTA
+                            VStack(spacing: 8) {
+                                Image(systemName: "arrow.down")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary.opacity(0.6))
+
+                                Text("Click Start Recording below")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary.opacity(0.6))
+                            }
+                            .padding(.top, 8)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding()
+                        .padding(40)
                     } else {
                         // Show segments with timestamps
                         ForEach(Array(meetingState.segments.enumerated()), id: \.offset) { index, segment in
@@ -257,7 +303,7 @@ struct MeetingView: View {
 
             // Clear transcript button
             Button {
-                clearTranscript()
+                showClearConfirmation = true
             } label: {
                 HStack {
                     Image(systemName: "trash")
@@ -265,84 +311,92 @@ struct MeetingView: View {
                 }
             }
             .disabled(meetingState.segments.isEmpty)
-
-            // Generate notes button with progress bar
-            VStack(spacing: 0) {
-                Button {
-                    showPromptEditor = true
-                } label: {
-                    HStack {
-                        Image(systemName: meetingState.isAnalyzing ? "hourglass" : "sparkles")
-                        Text(meetingState.isAnalyzing
-                            ? "Analyzing..."
-                            : (meetingState.structuredNotes != nil ? "Re-Generate Notes" : "Generate Notes")
-                        )
-                    }
+            .confirmationDialog(
+                "Clear Transcript?",
+                isPresented: $showClearConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Clear Transcript", role: .destructive) {
+                    clearTranscript()
                 }
-                .disabled(meetingState.segments.isEmpty || meetingState.isRecording || meetingState.isAnalyzing)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will permanently delete \(meetingState.segments.count) transcript segments.")
+            }
 
-                // Progress bar (4px tall, matches button width)
-                if meetingState.isAnalyzing && meetingState.isStreaming {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            // Background track
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(height: 4)
-
-                            // Progress fill
-                            Rectangle()
-                                .fill(LinearGradient(
-                                    colors: [.blue, .cyan],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ))
-                                .frame(width: geometry.size.width * meetingState.generationProgress, height: 4)
-                                .animation(.linear(duration: 0.1), value: meetingState.generationProgress)
-                        }
-                    }
-                    .frame(height: 4)
-                    .cornerRadius(2)
+            // Generate notes button with overlaid progress bar and cancellation
+            Button {
+                if meetingState.isAnalyzing {
+                    cancelAnalysis()
+                } else {
+                    showPromptEditor = true
+                }
+            } label: {
+                HStack {
+                    Image(systemName: meetingState.isAnalyzing ? "xmark.circle.fill" : "sparkles")
+                    Text(meetingState.isAnalyzing
+                        ? "Cancel (\(Int(meetingState.generationProgress * 100))%)"
+                        : (meetingState.structuredNotes != nil ? "Re-Generate Notes" : "Generate Notes")
+                    )
                 }
             }
+            .overlay(alignment: .bottom) {
+                if meetingState.isAnalyzing && meetingState.isStreaming {
+                    ProgressView(value: meetingState.generationProgress)
+                        .progressViewStyle(.linear)
+                        .tint(.blue)
+                        .frame(height: 4)
+                        .padding(.horizontal, 2)
+                        .padding(.bottom, -2)
+                }
+            }
+            .disabled(meetingState.segments.isEmpty || meetingState.isRecording)
+            .help(generateNotesHelpText)
 
             Spacer()
 
-            // Export button
-            Menu {
-                Button("Copy Transcript") {
-                    copyTranscript()
-                }
+            // Export buttons - split into Transcript and Notes
+            HStack(spacing: 12) {
+                // Transcript export (always available if segments exist)
+                Menu {
+                    Section("Transcript") {
+                        Button("Copy Transcript") {
+                            copyTranscript()
+                        }
+                        Button("Copy Timestamped") {
+                            copyTimestampedTranscript()
+                        }
 
-                Button("Copy Notes (Markdown)") {
-                    copyStructuredNotes()
-                }
-                .disabled(meetingState.structuredNotes == nil)
+                        Divider()
 
-                Divider()
-
-                Button("Save Transcript (Text)...") {
-                    saveTranscript()
+                        Button("Save as Text...") {
+                            saveTranscript()
+                        }
+                        Button("Save with Timestamps...") {
+                            saveTimestampedTranscript()
+                        }
+                    }
+                } label: {
+                    Label("Export Transcript", systemImage: "doc.text")
                 }
+                .disabled(meetingState.segments.isEmpty)
+                .help("Export raw transcript in various formats")
 
-                Button("Save Transcript (Timestamped)...") {
-                    saveTimestampedTranscript()
-                }
-
-                Button("Save Notes (Markdown)...") {
-                    saveStructuredNotes()
-                }
-                .disabled(meetingState.structuredNotes == nil)
-            } label: {
-                HStack {
-                    Image(systemName: meetingState.structuredNotes != nil
-                        ? "checkmark.circle.fill"
-                        : "square.and.arrow.up")
-                        .foregroundColor(meetingState.structuredNotes != nil ? .green : .primary)
-                    Text(meetingState.structuredNotes != nil ? "Export Ready" : "Export")
+                // Notes export (only when generated)
+                if meetingState.structuredNotes != nil {
+                    Menu {
+                        Button("Copy Notes") {
+                            copyStructuredNotes()
+                        }
+                        Button("Save Notes...") {
+                            saveStructuredNotes()
+                        }
+                    } label: {
+                        Label("Export Notes", systemImage: "note.text")
+                    }
+                    .help("Export AI-generated meeting notes")
                 }
             }
-            .disabled(meetingState.segments.isEmpty)
             .id(menuRefreshTrigger)
         }
         .padding()
@@ -366,8 +420,10 @@ struct MeetingView: View {
             meetingState.statusMessage = "Recording (system + microphone)"
             meetingState.elapsedTime = 0
 
-            // Show recording indicator overlay
-            recordingIndicator?.show()
+            // Notify AppDelegate that recording started
+            appDelegate?.isMeetingRecording = true
+
+            // Note: No waveform indicator for meeting mode - it's dictation-only
 
             // Start timer
             startTimer()
@@ -399,8 +455,7 @@ struct MeetingView: View {
     private func stopRecording() async {
         meetingState.statusMessage = "Finalizing transcription..."
 
-        // Hide recording indicator overlay
-        recordingIndicator?.hide()
+        // Note: No waveform indicator for meeting mode - it's dictation-only
 
         // Stop timer
         stopTimer()
@@ -416,6 +471,9 @@ struct MeetingView: View {
 
         meetingState.isRecording = false
         meetingState.statusMessage = "Recording stopped - \(finalSegments.count) segments"
+
+        // Notify AppDelegate that recording stopped
+        appDelegate?.isMeetingRecording = false
 
         print("MeetingView: Recording stopped, \(finalSegments.count) segments transcribed")
     }
@@ -461,6 +519,9 @@ struct MeetingView: View {
     private func generateStructuredNotes(with prompt: String) async {
         guard !meetingState.segments.isEmpty else { return }
 
+        // Cancel any existing analysis task
+        analysisTask?.cancel()
+
         // Initialize streaming state
         await MainActor.run {
             meetingState.isAnalyzing = true
@@ -472,69 +533,101 @@ struct MeetingView: View {
             lastProgressUpdate = Date()
         }
 
-        // Build full transcript
-        let fullTranscript = meetingState.segments
-            .map { $0.text }
-            .joined(separator: " ")
+        // Create cancellable task
+        analysisTask = Task {
 
-        // Estimate expected response length
-        let estimatedLength = estimateResponseLength(transcriptLength: fullTranscript.count)
-        await MainActor.run {
-            meetingState.estimatedTotalChars = estimatedLength
-        }
+            // Build full transcript
+            let fullTranscript = meetingState.segments
+                .map { $0.text }
+                .joined(separator: " ")
 
-        do {
-            // Use streaming analysis with progress callback
-            let notes = try await meetingAnalyzer.analyzeMeetingStreaming(
-                transcript: fullTranscript,
-                customPrompt: prompt
-            ) { receivedChars, chunk in
-                // Throttle UI updates to every 50ms
-                await MainActor.run {
-                    let now = Date()
-                    if now.timeIntervalSince(lastProgressUpdate) >= 0.05 {
-                        meetingState.receivedChars = receivedChars
-                        meetingState.streamedNotesPreview += chunk
-                        meetingState.generationProgress = calculateProgress(
-                            received: receivedChars,
-                            estimated: estimatedLength
-                        )
-                        lastProgressUpdate = now
+            // Estimate expected response length
+            let estimatedLength = estimateResponseLength(transcriptLength: fullTranscript.count)
+            await MainActor.run {
+                meetingState.estimatedTotalChars = estimatedLength
+            }
+
+            do {
+                // Check for cancellation before starting
+                if Task.isCancelled {
+                    await MainActor.run {
+                        meetingState.statusMessage = "Note generation cancelled"
+                        meetingState.isAnalyzing = false
+                        meetingState.isStreaming = false
+                        resetGenerationState()
+                    }
+                    return
+                }
+
+                // Use streaming analysis with progress callback
+                let notes = try await meetingAnalyzer.analyzeMeetingStreaming(
+                    transcript: fullTranscript,
+                    customPrompt: prompt
+                ) { receivedChars, chunk in
+                    // Check for cancellation during streaming
+                    guard !Task.isCancelled else { return }
+
+                    // Throttle UI updates to every 50ms
+                    await MainActor.run {
+                        let now = Date()
+                        if now.timeIntervalSince(lastProgressUpdate) >= 0.05 {
+                            meetingState.receivedChars = receivedChars
+                            meetingState.streamedNotesPreview += chunk
+                            meetingState.generationProgress = calculateProgress(
+                                received: receivedChars,
+                                estimated: estimatedLength
+                            )
+                            lastProgressUpdate = now
+                        }
                     }
                 }
-            }
 
-            print("MeetingView: Analysis complete, notes length: \(notes.count)")
+                // Check for cancellation after completion
+                if Task.isCancelled {
+                    await MainActor.run {
+                        meetingState.statusMessage = "Note generation cancelled"
+                        meetingState.isAnalyzing = false
+                        meetingState.isStreaming = false
+                        resetGenerationState()
+                    }
+                    return
+                }
 
-            await MainActor.run {
-                meetingState.structuredNotes = notes
-                meetingState.statusMessage = "Notes generated successfully"
-                meetingState.generationProgress = 1.0 // Set to 100%
-                meetingState.isAnalyzing = false
-                meetingState.isStreaming = false
-                menuRefreshTrigger = UUID() // Force menu to refresh
-                print("MeetingView: State updated - structuredNotes is now set: \(meetingState.structuredNotes != nil)")
-            }
+                print("MeetingView: Analysis complete, notes length: \(notes.count)")
 
-            // Send notification after state update
-            let isAuthorized = await NotificationService.shared.isAuthorized()
-            print("MeetingView: Notification authorized: \(isAuthorized)")
+                await MainActor.run {
+                    meetingState.structuredNotes = notes
+                    meetingState.statusMessage = "Notes generated successfully"
+                    meetingState.generationProgress = 1.0 // Set to 100%
+                    meetingState.isAnalyzing = false
+                    meetingState.isStreaming = false
+                    menuRefreshTrigger = UUID() // Force menu to refresh
+                    print("MeetingView: State updated - structuredNotes is now set: \(meetingState.structuredNotes != nil)")
+                }
 
-            // Always try to send notification (will request permission if needed)
-            await NotificationService.shared.sendNotification(
-                title: "Meeting Notes Ready",
-                body: "Your structured meeting notes have been generated successfully."
-            )
-            print("MeetingView: Notification sent")
-        } catch {
-            print("MeetingView: Analysis failed: \(error)")
-            await MainActor.run {
-                meetingState.statusMessage = "Failed to generate notes: \(error.localizedDescription)"
-                meetingState.isAnalyzing = false
-                meetingState.isStreaming = false
-                resetGenerationState()
+                // Send notification after state update
+                let isAuthorized = await NotificationService.shared.isAuthorized()
+                print("MeetingView: Notification authorized: \(isAuthorized)")
+
+                // Always try to send notification (will request permission if needed)
+                await NotificationService.shared.sendNotification(
+                    title: "Meeting Notes Ready",
+                    body: "Your structured meeting notes have been generated successfully."
+                )
+                print("MeetingView: Notification sent")
+            } catch {
+                print("MeetingView: Analysis failed: \(error)")
+                await MainActor.run {
+                    meetingState.statusMessage = "Failed to generate notes: \(error.localizedDescription)"
+                    meetingState.isAnalyzing = false
+                    meetingState.isStreaming = false
+                    resetGenerationState()
+                }
             }
         }
+
+        await analysisTask?.value
+        analysisTask = nil
     }
 
     // Helper: Estimate expected response length based on transcript
@@ -557,6 +650,17 @@ struct MeetingView: View {
         return min(scaled, 0.98) // Cap at 98% until stream completes
     }
 
+    // Helper: Cancel analysis task
+    private func cancelAnalysis() {
+        analysisTask?.cancel()
+        analysisTask = nil
+
+        meetingState.isAnalyzing = false
+        meetingState.isStreaming = false
+        meetingState.statusMessage = "Note generation cancelled"
+        resetGenerationState()
+    }
+
     // Helper: Reset generation state
     private func resetGenerationState() {
         meetingState.generationProgress = 0.0
@@ -574,6 +678,19 @@ struct MeetingView: View {
         NSPasteboard.general.setString(text, forType: .string)
 
         meetingState.statusMessage = "Transcript copied to clipboard"
+    }
+
+    private func copyTimestampedTranscript() {
+        let text = meetingState.segments
+            .map { segment in
+                "[\(formatTimestamp(segment.startTime))] \(segment.text)"
+            }
+            .joined(separator: "\n\n")
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+
+        meetingState.statusMessage = "Timestamped transcript copied to clipboard"
     }
 
     private func copyStructuredNotes() {
@@ -661,7 +778,7 @@ struct MeetingView: View {
         VStack(spacing: 20) {
             // Header
             HStack {
-                Text("Customize Meeting Notes")
+                Text("Generate Meeting Notes")
                     .font(.title2)
                     .fontWeight(.semibold)
 
@@ -677,85 +794,146 @@ struct MeetingView: View {
                 .buttonStyle(.plain)
             }
 
-            // Description
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Customize how the transcript is analyzed. Add domain-specific terms to improve accuracy.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            // Quick generate options - primary interface
+            VStack(alignment: .leading, spacing: 12) {
+                Text("What type of notes do you need?")
+                    .font(.headline)
 
-                HStack {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(.blue)
-                    Text("Using model: \(Settings.shared.ollamaModel)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
+                HStack(spacing: 12) {
+                    // Preset 1: Quick summary
+                    Button {
+                        generateWithPreset(.quickSummary)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Image(systemName: "list.bullet.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.blue)
+                            Text("Quick Summary")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Key points and action items")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Preset 2: Detailed notes
+                    Button {
+                        generateWithPreset(.detailedNotes)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Image(systemName: "doc.text.fill")
+                                .font(.title2)
+                                .foregroundColor(.purple)
+                            Text("Detailed Notes")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Text("Full summary with context")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(Color(NSColor.controlBackgroundColor))
+                        .cornerRadius(8)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Jargon/Terms input (Priority 1)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Domain-Specific Terms & Jargon")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+            Divider()
 
-                        TextEditor(text: $jargonTerms)
-                            .font(.body)
-                            .frame(minHeight: 80)
-                            .border(Color.gray.opacity(0.3), width: 1)
-                            .cornerRadius(4)
-
-                        Text("Enter technical terms, acronyms, or jargon (comma-separated). Example: \"LLM, RAG, embeddings, vector database\"")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Divider()
-
-                    // Advanced prompt editing (Priority 2 - Progressive disclosure)
-                    DisclosureGroup(
-                        isExpanded: $showAdvancedPrompt,
-                        content: {
+            // Customization - secondary, progressive disclosure
+            DisclosureGroup(
+                isExpanded: $showCustomization,
+                content: {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            // Jargon/Terms input
                             VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Full Prompt")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
+                                Text("Domain-Specific Terms & Jargon")
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
 
-                                    Spacer()
-
-                                    Button("Reset to Default") {
-                                        customPrompt = Settings.defaultMeetingPrompt
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                }
-
-                                TextEditor(text: $customPrompt)
-                                    .font(.system(.body, design: .monospaced))
-                                    .frame(minHeight: 200)
+                                TextEditor(text: $jargonTerms)
+                                    .font(.body)
+                                    .frame(minHeight: 60)
                                     .border(Color.gray.opacity(0.3), width: 1)
                                     .cornerRadius(4)
 
-                                Text("The transcript will be automatically appended after this prompt.")
+                                Text("Enter technical terms, acronyms, or jargon (comma-separated)")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            .padding(.top, 8)
-                        },
-                        label: {
-                            Text("Advanced: Edit Full Prompt")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+
+                            Divider()
+
+                            // Advanced prompt editing
+                            DisclosureGroup(
+                                isExpanded: $showAdvancedPrompt,
+                                content: {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Full Prompt")
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+
+                                            Spacer()
+
+                                            Button("Reset to Default") {
+                                                customPrompt = Settings.defaultMeetingPrompt
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .controlSize(.small)
+                                        }
+
+                                        TextEditor(text: $customPrompt)
+                                            .font(.system(.body, design: .monospaced))
+                                            .frame(minHeight: 150)
+                                            .border(Color.gray.opacity(0.3), width: 1)
+                                            .cornerRadius(4)
+
+                                        Text("The transcript will be automatically appended after this prompt.")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.top, 8)
+                                },
+                                label: {
+                                    Text("Advanced: Edit Full Prompt")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                            )
                         }
-                    )
+                        .padding(.vertical, 8)
+                    }
+                },
+                label: {
+                    Text("Customize Notes")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
                 }
-                .padding(.vertical, 8)
+            )
+
+            Spacer()
+
+            // Model info
+            HStack {
+                Image(systemName: "info.circle")
+                    .foregroundColor(.blue)
+                Text("Using model: \(Settings.shared.ollamaModel)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
             }
 
-            // Action buttons
+            // Action buttons (only show if customization expanded)
             HStack {
                 Button("Cancel") {
                     showPromptEditor = false
@@ -764,18 +942,27 @@ struct MeetingView: View {
 
                 Spacer()
 
-                Button("Generate Notes") {
-                    showPromptEditor = false
-                    Task {
-                        await generateStructuredNotes(with: buildFinalPrompt())
+                if showCustomization {
+                    Button("Generate with Custom Settings") {
+                        showPromptEditor = false
+                        Task {
+                            await generateStructuredNotes(with: buildFinalPrompt())
+                        }
                     }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
                 }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
             }
         }
         .padding(24)
         .frame(width: 650, height: 550)
+    }
+
+    private func generateWithPreset(_ preset: NotePreset) {
+        showPromptEditor = false
+        Task {
+            await generateStructuredNotes(with: preset.prompt)
+        }
     }
 
     private func buildFinalPrompt() -> String {
@@ -801,6 +988,18 @@ When these terms appear, preserve their exact formatting and context. If they're
         }
 
         return finalPrompt
+    }
+
+    // MARK: - Computed Properties
+
+    private var generateNotesHelpText: String {
+        if meetingState.isAnalyzing {
+            return "Generating structured notes via Ollama..."
+        } else if meetingState.structuredNotes != nil {
+            return "Re-generate notes with different settings"
+        } else {
+            return "Generate AI-powered meeting notes"
+        }
     }
 
     // MARK: - Formatting
