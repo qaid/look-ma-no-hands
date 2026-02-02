@@ -353,18 +353,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        // Create meeting window
+        // Create meeting window with improved dimensions
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
 
-        window.title = "Meeting Transcription"
+        window.title = "Look Ma No Hands - Meeting Transcription"
         window.center()
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 600, height: 400)
+        window.minSize = NSSize(width: 600, height: 450)
+        window.maxSize = NSSize(width: 1400, height: 1200)
+        window.setFrameAutosaveName("MeetingTranscriptionWindow")
         window.delegate = self
 
         // Create SwiftUI meeting view and wrap it in NSHostingView

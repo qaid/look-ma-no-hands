@@ -2,6 +2,29 @@ import SwiftUI
 import UniformTypeIdentifiers
 import Foundation
 
+// MARK: - Typography & Color System
+
+extension Font {
+    // Craft.do-inspired typography scale
+    static let meetingTitle = Font.system(size: 16, weight: .semibold)
+    static let meetingBody = Font.system(size: 16, weight: .regular)
+    static let meetingMetadata = Font.system(size: 14, weight: .regular)
+    static let meetingCaption = Font.system(size: 13, weight: .regular)
+    static let meetingTimestamp = Font.system(size: 13, weight: .medium, design: .monospaced)
+}
+
+extension Color {
+    // Semantic colors that adapt to light/dark mode
+    static let meetingPrimary = Color(nsColor: .labelColor)
+    static let meetingSecondary = Color(nsColor: .secondaryLabelColor)
+    static let meetingTertiary = Color(nsColor: .tertiaryLabelColor)
+    static let meetingAccent = Color.accentColor
+    static let meetingBackground = Color(nsColor: .textBackgroundColor)
+    static let meetingChrome = Color(nsColor: .controlBackgroundColor)
+}
+
+// MARK: - Note Presets
+
 /// Preset note generation styles
 enum NotePreset {
     case quickSummary
@@ -28,17 +51,67 @@ enum NotePreset {
     }
 }
 
+// MARK: - Recording Session Model
+
+/// Represents a single recording session within a meeting
+struct RecordingSession: Identifiable {
+    let id = UUID()
+    let startTime: Date
+    var endTime: Date?
+    var duration: TimeInterval {
+        guard let end = endTime else { return 0 }
+        return end.timeIntervalSince(startTime)
+    }
+    var segmentRange: Range<Int> // Range of transcript segments for this recording
+}
+
+/// Status of the meeting transcription
+enum MeetingStatus: Equatable {
+    case ready
+    case missingModel
+    case missingPermissions
+    case recording
+    case processing
+    case completed
+
+    var displayText: String {
+        switch self {
+        case .ready: return "Ready"
+        case .missingModel: return "Model Required"
+        case .missingPermissions: return "Permissions Required"
+        case .recording: return "Recording"
+        case .processing: return "Processing"
+        case .completed: return "Completed"
+        }
+    }
+
+    var badgeColor: Color {
+        switch self {
+        case .ready: return .green
+        case .missingModel, .missingPermissions: return .orange
+        case .recording: return .red
+        case .processing: return .blue
+        case .completed: return .green
+        }
+    }
+}
+
 /// State for managing meeting transcription session
 @Observable
 class MeetingState {
+    var status: MeetingStatus = .ready
     var isRecording = false
     var isPaused = false
     var currentTranscript = ""
     var segments: [TranscriptSegment] = []
+    var recordingSessions: [RecordingSession] = []
+    var selectedSessionIndex: Int? = nil
     var structuredNotes: String?
     var isAnalyzing = false
     var statusMessage = "Ready to start"
     var elapsedTime: TimeInterval = 0
+    var sessionStartDate: Date?
+    var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
 
     // Streaming progress
     var generationProgress: Double = 0.0
@@ -46,6 +119,37 @@ class MeetingState {
     var receivedChars: Int = 0
     var isStreaming: Bool = false
     var streamedNotesPreview: String = ""
+
+    // Computed properties
+    var meetingTitle: String {
+        if let date = sessionStartDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "MMM d, yyyy h:mm a"
+            return "Meeting - \(formatter.string(from: date))"
+        }
+        return "Meeting Recording"
+    }
+
+    var canRecord: Bool {
+        status != .missingModel && status != .missingPermissions
+    }
+
+    // Exponential smoothing for fluid waveform animation
+    func updateFrequencyBands(_ newBands: [Float]) {
+        guard frequencyBands.count == newBands.count else {
+            frequencyBands = newBands
+            return
+        }
+
+        // Smooth transition: 70% old + 30% new
+        var smoothedBands: [Float] = []
+        for i in 0..<newBands.count {
+            let smoothed = frequencyBands[i] * 0.7 + newBands[i] * 0.3
+            smoothedBands.append(smoothed)
+        }
+
+        frequencyBands = smoothedBands
+    }
 }
 
 /// View for meeting transcription mode
@@ -55,6 +159,7 @@ struct MeetingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var meetingState = MeetingState()
     @State private var timer: Timer?
+    @State private var audioUpdateTimer: Timer?
     @State private var showPromptEditor = false
     @State private var customPrompt = Settings.shared.meetingPrompt
     @State private var jargonTerms = ""
@@ -64,6 +169,10 @@ struct MeetingView: View {
     @State private var lastProgressUpdate = Date()
     @State private var showClearConfirmation = false
     @State private var analysisTask: Task<Void, Never>?
+    @State private var showTranscript = true
+    @State private var showSettings = false
+    @State private var showExportMenu = false
+    @State private var scrollProxy: ScrollViewProxy?
 
     // Services
     private let mixedAudioRecorder: MixedAudioRecorder
@@ -88,27 +197,42 @@ struct MeetingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header with title and close button
+            // Header: Meeting Title + Status Badge (no branding)
             headerView
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
 
             Divider()
 
-            // Status bar with timer and audio source
-            statusBar
+            // Recording Visualization Area
+            recordingVisualizationView
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
 
             Divider()
 
-            // Live transcript display
+            // Transcription Section with fixed height
             transcriptView
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
 
             Divider()
 
-            // Control buttons
-            controlsView
+            // Bottom Action Buttons
+            bottomActionsView
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
         }
-        .frame(width: 700, height: 500)
+        .frame(minWidth: 600, minHeight: 450)
         .sheet(isPresented: $showPromptEditor) {
             promptEditorSheet
+        }
+        .popover(isPresented: $showSettings, arrowEdge: .bottom) {
+            settingsPopover
+        }
+        .onAppear {
+            checkStatus()
         }
         .onDisappear {
             // Cleanup when window closes
@@ -117,214 +241,278 @@ struct MeetingView: View {
                     await stopRecording()
                 }
             }
+            stopAudioLevelUpdates()
         }
     }
 
     // MARK: - Header
 
     private var headerView: some View {
-        HStack {
+        HStack(spacing: 12) {
             Image(systemName: "mic.fill")
-                .foregroundColor(.blue)
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
 
-            Text("Meeting Transcription")
-                .font(.headline)
+            Text(meetingState.meetingTitle)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.primary)
 
             Spacer()
+
+            // Status Badge
+            statusBadge
         }
-        .padding()
     }
 
-    // MARK: - Status Bar
+    private var statusBadge: some View {
+        Text(meetingState.status.displayText)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(meetingState.status.badgeColor)
+            )
+    }
 
-    private var statusBar: some View {
-        HStack {
-            // Recording indicator
-            HStack(spacing: 6) {
-                if meetingState.isRecording {
-                    Circle()
-                        .fill(.red)
-                        .frame(width: 8, height: 8)
-                }
+    // MARK: - Recording Visualization
 
-                Text(meetingState.statusMessage)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-
-            Spacer()
-
-            // Microphone selector (disabled during recording)
-            Menu {
-                ForEach(Settings.shared.audioDeviceManager.availableDevices) { device in
-                    Button {
-                        Settings.shared.audioDeviceManager.selectDevice(device)
-                    } label: {
-                        HStack {
-                            Text(device.name)
-                            if device.id == Settings.shared.audioDeviceManager.selectedDevice.id {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    Settings.shared.audioDeviceManager.refreshDevices()
-                } label: {
-                    Label("Refresh Devices", systemImage: "arrow.clockwise")
-                }
+    private var recordingVisualizationView: some View {
+        HStack(spacing: 12) {
+            // Record/Stop Button
+            Button {
+                handleRecordingToggle()
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "mic.fill")
-                        .font(.caption)
-                    Text(Settings.shared.audioDeviceManager.selectedDevice.name)
-                        .font(.caption)
-                        .lineLimit(1)
-                }
+                Image(systemName: meetingState.isRecording ? "stop.circle.fill" : "record.circle")
+                    .font(.system(size: 32))
+                    .foregroundColor(.red)
             }
-            .disabled(meetingState.isRecording)
-            .help("Select microphone input")
+            .buttonStyle(.plain)
+            .disabled(!meetingState.canRecord)
+            .keyboardShortcut(.space, modifiers: [])
+            .help(meetingState.isRecording ? "Stop recording" : "Start recording")
 
-            Spacer()
+            // Waveform or Recording Bars
+            if meetingState.isRecording {
+                // Live waveform during recording
+                liveWaveformView
+            } else if !meetingState.recordingSessions.isEmpty {
+                // Recording bars showing completed recordings
+                recordingBarsView
+            } else {
+                // Empty state placeholder
+                emptyVisualizationState
+            }
 
-            // Timer
-            Text(formatTime(meetingState.elapsedTime))
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(.secondary)
+            // Duration display
+            if meetingState.isRecording || !meetingState.recordingSessions.isEmpty {
+                Text(formatTime(totalDuration))
+                    .font(.meetingTimestamp)
+                    .foregroundColor(.meetingSecondary)
+                    .frame(width: 60)
+            }
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .background(Color(NSColor.controlBackgroundColor))
+        .frame(height: 60)
+    }
+
+    private var emptyVisualizationState: some View {
+        RoundedRectangle(cornerRadius: 8)
+            .fill(Color.meetingChrome.opacity(0.5))
+            .frame(maxWidth: .infinity)
+            .overlay(
+                Text("Ready to record")
+                    .font(.meetingMetadata)
+                    .foregroundColor(.meetingTertiary)
+            )
+    }
+
+    private var liveWaveformView: some View {
+        WaveformBarsView(frequencyBands: $meetingState.frequencyBands)
+            .frame(maxWidth: .infinity)
+            .frame(height: 50)
+    }
+
+    private var recordingBarsView: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(meetingState.recordingSessions.enumerated()), id: \.offset) { index, session in
+                recordingBar(for: session, at: index)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func recordingBar(for session: RecordingSession, at index: Int) -> some View {
+        let isSelected = meetingState.selectedSessionIndex == index
+
+        return RoundedRectangle(cornerRadius: 6)
+            .fill(isSelected ? Color.blue : Color.meetingChrome)
+            .frame(maxWidth: .infinity)
+            .frame(height: 40)
+            .overlay(
+                Text("\(formatTime(session.duration))")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .secondary)
+            )
+            .onTapGesture {
+                selectRecordingSession(at: index)
+            }
+    }
+
+    private var totalDuration: TimeInterval {
+        if meetingState.isRecording {
+            return meetingState.recordingSessions.reduce(0) { $0 + $1.duration } + meetingState.elapsedTime
+        }
+        return meetingState.recordingSessions.reduce(0) { $0 + $1.duration }
     }
 
     // MARK: - Transcript View
 
     private var transcriptView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    if meetingState.segments.isEmpty && !meetingState.isRecording {
-                        // Empty state with improved visual hierarchy
-                        VStack(spacing: 16) {
-                            Image(systemName: "waveform.circle")
-                                .font(.system(size: 64))
-                                .foregroundColor(.accentColor)
-                                .symbolEffect(.pulse)
+        VStack(spacing: 0) {
+            // Transcript header with Clear button
+            HStack {
+                Button(action: { showTranscript.toggle() }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: showTranscript ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.secondary)
 
-                            VStack(spacing: 8) {
-                                Text("Ready to Record")
-                                    .font(.title2)
-                                    .fontWeight(.semibold)
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 14))
+                        Text("Transcription")
+                            .font(.system(size: 15, weight: .medium))
 
-                                Text("Captures system audio and microphone")
-                                    .font(.body)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            // Visual CTA
-                            VStack(spacing: 8) {
-                                Image(systemName: "arrow.down")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary.opacity(0.6))
-
-                                Text("Click Start Recording below")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary.opacity(0.6))
-                            }
-                            .padding(.top, 8)
+                        if !meetingState.segments.isEmpty {
+                            Text("\(meetingState.segments.count) segments")
+                                .font(.system(size: 13))
+                                .foregroundColor(.secondary)
                         }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(40)
-                    } else {
-                        // Show segments with timestamps
-                        ForEach(Array(meetingState.segments.enumerated()), id: \.offset) { index, segment in
-                            HStack(alignment: .top, spacing: 12) {
-                                // Timestamp
-                                Text(formatTimestamp(segment.startTime))
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                                    .frame(width: 60, alignment: .leading)
-
-                                // Text
-                                Text(segment.text)
-                                    .font(.body)
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(.vertical, 4)
-                            .id(index)
-                        }
-
-                        // Auto-scroll anchor
-                        Color.clear
-                            .frame(height: 1)
-                            .id("bottom")
                     }
                 }
-                .padding()
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                // Clear button inside transcript frame
+                Button {
+                    showClearConfirmation = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 12))
+                        Text("Clear")
+                            .font(.system(size: 13))
+                    }
+                    .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(meetingState.segments.isEmpty)
+                .keyboardShortcut("k", modifiers: .command)
+                .confirmationDialog(
+                    "Clear Transcript?",
+                    isPresented: $showClearConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Clear Transcript", role: .destructive) {
+                        clearTranscript()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This will permanently delete \(meetingState.segments.count) transcript segments.")
+                }
             }
-            .onChange(of: meetingState.segments.count) { _, _ in
-                // Auto-scroll to bottom when new segment arrives
-                withAnimation {
-                    proxy.scrollTo("bottom", anchor: .bottom)
+            .padding(.bottom, 8)
+
+            if showTranscript {
+                // Fixed height transcript content
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if meetingState.segments.isEmpty {
+                                Text("No transcript yet")
+                                    .font(.meetingMetadata)
+                                    .foregroundColor(.meetingTertiary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.vertical, 40)
+                            } else {
+                                // Show segments with timestamps
+                                ForEach(Array(meetingState.segments.enumerated()), id: \.offset) { index, segment in
+                                    let isHighlighted = isSegmentInSelectedSession(index: index)
+
+                                    HStack(alignment: .top, spacing: 12) {
+                                        // Timestamp
+                                        Text(formatTimestamp(segment.startTime))
+                                            .font(.meetingTimestamp)
+                                            .foregroundColor(isHighlighted ? .blue : .meetingSecondary)
+                                            .frame(width: 60, alignment: .leading)
+                                            .accessibilityLabel("Time \(formatTimestamp(segment.startTime))")
+
+                                        // Text
+                                        Text(segment.text)
+                                            .font(.meetingBody)
+                                            .foregroundColor(isHighlighted ? .primary : .meetingPrimary)
+                                            .textSelection(.enabled)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .accessibilityLabel("Transcript: \(segment.text)")
+                                    }
+                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(isHighlighted ? Color.blue.opacity(0.1) : Color.clear)
+                                    )
+                                    .id(index)
+                                    .accessibilityElement(children: .combine)
+                                }
+
+                                // Auto-scroll anchor
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id("bottom")
+                            }
+                        }
+                        .padding(.top, 8)
+                    }
+                    .frame(height: 200)  // Fixed height to prevent window scrolling
+                    .onChange(of: meetingState.segments.count) { _, _ in
+                        // Auto-scroll to bottom when new segment arrives
+                        withAnimation {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
+                    }
+                    .onAppear {
+                        // Capture scroll proxy for use in selectRecordingSession
+                        scrollProxy = proxy
+                    }
                 }
             }
         }
     }
 
-    // MARK: - Controls
+    // MARK: - Bottom Actions
 
-    private var controlsView: some View {
-        HStack(spacing: 16) {
-            // Start/Stop button
+    private var bottomActionsView: some View {
+        HStack(spacing: 12) {
+            // Export Button with Popover
             Button {
-                if meetingState.isRecording {
-                    Task {
-                        await stopRecording()
-                    }
-                } else {
-                    Task {
-                        await startRecording()
-                    }
-                }
+                showExportMenu.toggle()
             } label: {
-                HStack {
-                    Image(systemName: meetingState.isRecording ? "stop.fill" : "record.circle")
-                    Text(meetingState.isRecording ? "Stop Recording" : "Start Recording")
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 16))
+                    Text("Export")
+                        .font(.system(size: 15))
                 }
-                .frame(minWidth: 140)
+                .frame(width: 120, height: 32)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(meetingState.isRecording ? .red : .blue)
-            .disabled(meetingState.statusMessage.contains("Processing"))
-
-            // Clear transcript button
-            Button {
-                showClearConfirmation = true
-            } label: {
-                HStack {
-                    Image(systemName: "trash")
-                    Text("Clear")
-                }
-            }
+            .buttonStyle(.bordered)
             .disabled(meetingState.segments.isEmpty)
-            .confirmationDialog(
-                "Clear Transcript?",
-                isPresented: $showClearConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Clear Transcript", role: .destructive) {
-                    clearTranscript()
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("This will permanently delete \(meetingState.segments.count) transcript segments.")
+            .popover(isPresented: $showExportMenu, arrowEdge: .bottom) {
+                exportPopover
             }
 
-            // Generate notes button with overlaid progress bar and cancellation
+            // Summary Button (or Cancel when analyzing)
             Button {
                 if meetingState.isAnalyzing {
                     cancelAnalysis()
@@ -332,88 +520,344 @@ struct MeetingView: View {
                     showPromptEditor = true
                 }
             } label: {
-                HStack {
-                    Image(systemName: meetingState.isAnalyzing ? "xmark.circle.fill" : "sparkles")
-                    Text(meetingState.isAnalyzing
-                        ? "Cancel (\(Int(meetingState.generationProgress * 100))%)"
-                        : (meetingState.structuredNotes != nil ? "Re-Generate Notes" : "Generate Notes")
-                    )
+                HStack(spacing: 8) {
+                    if meetingState.isAnalyzing {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .progressViewStyle(.circular)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16))
+                    }
+                    Text(meetingState.isAnalyzing ? "Cancel" : "Summary")
+                        .font(.system(size: 15))
                 }
+                .frame(width: 120, height: 32)
             }
-            .overlay(alignment: .bottom) {
-                if meetingState.isAnalyzing && meetingState.isStreaming {
-                    ProgressView(value: meetingState.generationProgress)
-                        .progressViewStyle(.linear)
-                        .tint(.blue)
-                        .frame(height: 4)
-                        .padding(.horizontal, 2)
-                        .padding(.bottom, -2)
-                }
-            }
+            .buttonStyle(.bordered)
             .disabled(meetingState.segments.isEmpty || meetingState.isRecording)
-            .help(generateNotesHelpText)
+            .keyboardShortcut("n", modifiers: .command)
 
             Spacer()
 
-            // Export buttons - split into Transcript and Notes
-            HStack(spacing: 12) {
-                // Transcript export (always available if segments exist)
-                Menu {
-                    Section("Transcript") {
-                        Button("Copy Transcript") {
-                            copyTranscript()
-                        }
-                        Button("Copy Timestamped") {
-                            copyTimestampedTranscript()
-                        }
-
-                        Divider()
-
-                        Button("Save as Text...") {
-                            saveTranscript()
-                        }
-                        Button("Save with Timestamps...") {
-                            saveTimestampedTranscript()
-                        }
-                    }
-                } label: {
-                    Label("Export Transcript", systemImage: "doc.text")
+            // Settings Button (right side)
+            Button {
+                showSettings.toggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16))
+                    Text("Settings")
+                        .font(.system(size: 15))
                 }
-                .disabled(meetingState.segments.isEmpty)
-                .help("Export raw transcript in various formats")
-
-                // Notes export (only when generated)
-                if meetingState.structuredNotes != nil {
-                    Menu {
-                        Button("Copy Notes") {
-                            copyStructuredNotes()
-                        }
-                        Button("Save Notes...") {
-                            saveStructuredNotes()
-                        }
-                    } label: {
-                        Label("Export Notes", systemImage: "note.text")
-                    }
-                    .help("Export AI-generated meeting notes")
-                }
+                .frame(width: 120, height: 32)
             }
-            .id(menuRefreshTrigger)
+            .buttonStyle(.bordered)
         }
-        .padding()
+    }
+
+    // MARK: - Settings Popover
+
+    private var settingsPopover: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Settings")
+                .font(.system(size: 15, weight: .semibold))
+
+            Divider()
+
+            // Microphone Selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Microphone")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                Picker("", selection: Binding(
+                    get: { Settings.shared.audioDeviceManager.selectedDevice },
+                    set: { Settings.shared.audioDeviceManager.selectDevice($0) }
+                )) {
+                    ForEach(Settings.shared.audioDeviceManager.availableDevices) { device in
+                        Text(device.name).tag(device)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 220)
+
+                Button {
+                    Settings.shared.audioDeviceManager.refreshDevices()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 11))
+                        Text("Refresh Devices")
+                            .font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.blue)
+            }
+
+            Divider()
+
+            // Model Selection
+            VStack(alignment: .leading, spacing: 8) {
+                Text("LLM Model")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.secondary)
+
+                TextField("Model name", text: Binding(
+                    get: { Settings.shared.ollamaModel },
+                    set: { Settings.shared.ollamaModel = $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+
+                Text("e.g., llama2, mistral, qwen")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(width: 260)
+    }
+
+    // MARK: - Export Popover
+
+    private var exportPopover: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Transcript Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Transcript")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+
+                Button {
+                    copyTranscript()
+                    showExportMenu = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 14))
+                            .frame(width: 20)
+                        Text("Copy Transcript")
+                            .font(.system(size: 14))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    copyTimestampedTranscript()
+                    showExportMenu = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "clock")
+                            .font(.system(size: 14))
+                            .frame(width: 20)
+                        Text("Copy Timestamped")
+                            .font(.system(size: 14))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                Button {
+                    saveTranscript()
+                    showExportMenu = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 14))
+                            .frame(width: 20)
+                        Text("Save as Text...")
+                            .font(.system(size: 14))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    saveTimestampedTranscript()
+                    showExportMenu = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "square.and.arrow.down.on.square")
+                            .font(.system(size: 14))
+                            .frame(width: 20)
+                        Text("Save with Timestamps...")
+                            .font(.system(size: 14))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.bottom, 8)
+
+            // Notes Section (if available)
+            if meetingState.structuredNotes != nil {
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Notes")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+
+                    Button {
+                        copyStructuredNotes()
+                        showExportMenu = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 14))
+                                .frame(width: 20)
+                            Text("Copy Notes")
+                                .font(.system(size: 14))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        saveStructuredNotes()
+                        showExportMenu = false
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 14))
+                                .frame(width: 20)
+                            Text("Save Notes...")
+                                .font(.system(size: 14))
+                            Spacer()
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 8)
+            }
+        }
+        .frame(width: 240)
+    }
+
+    // MARK: - Helper Functions
+
+    private func checkStatus() {
+        // Check if model is loaded
+        if !whisperService.isModelLoaded {
+            meetingState.status = .missingModel
+            return
+        }
+
+        // Check permissions
+        // TODO: Add permission checks
+
+        meetingState.status = .ready
+    }
+
+    private func selectRecordingSession(at index: Int) {
+        // Toggle selection - clicking the same bar deselects it
+        if meetingState.selectedSessionIndex == index {
+            meetingState.selectedSessionIndex = nil
+        } else {
+            meetingState.selectedSessionIndex = index
+
+            // Expand transcript if collapsed
+            if !showTranscript {
+                showTranscript = true
+            }
+
+            // Scroll to first segment of this recording session
+            guard index < meetingState.recordingSessions.count else { return }
+            let session = meetingState.recordingSessions[index]
+            let firstSegmentIndex = session.segmentRange.lowerBound
+
+            // Scroll to the first segment with animation
+            withAnimation(.easeInOut(duration: 0.3)) {
+                scrollProxy?.scrollTo(firstSegmentIndex, anchor: .top)
+            }
+        }
+    }
+
+    /// Check if a segment index belongs to the currently selected recording session
+    private func isSegmentInSelectedSession(index: Int) -> Bool {
+        guard let selectedIndex = meetingState.selectedSessionIndex,
+              selectedIndex < meetingState.recordingSessions.count else {
+            return false
+        }
+
+        let session = meetingState.recordingSessions[selectedIndex]
+        return session.segmentRange.contains(index)
+    }
+
+    private func startAudioLevelUpdates() {
+        let recorder = self.mixedAudioRecorder
+        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [meetingState] _ in
+            let bands = recorder.getFrequencyBands(bandCount: 40)
+            Task { @MainActor in
+                meetingState.updateFrequencyBands(bands)
+            }
+        }
+    }
+
+    private func stopAudioLevelUpdates() {
+        audioUpdateTimer?.invalidate()
+        audioUpdateTimer = nil
+        meetingState.frequencyBands = Array(repeating: 0.0, count: 40)
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    private func handleRecordingToggle() {
+        if meetingState.isRecording {
+            Task {
+                await stopRecording()
+            }
+        } else if meetingState.canRecord {
+            Task {
+                await startRecording()
+            }
+        }
     }
 
     // MARK: - Recording Control
 
     private func startRecording() async {
         do {
+            // Set session start date on first recording
+            if meetingState.sessionStartDate == nil {
+                meetingState.sessionStartDate = Date()
+            }
+
+            meetingState.status = .recording
             meetingState.statusMessage = "Starting..."
 
             // Start continuous transcriber session
             continuousTranscriber.startSession()
 
             // Start mixed audio recording (system + microphone)
-            // Note: ScreenCaptureKit requires screen recording permission for system audio
-            // The system will automatically request permission if not yet granted
             try await mixedAudioRecorder.startRecording()
 
             meetingState.isRecording = true
@@ -423,16 +867,14 @@ struct MeetingView: View {
             // Notify AppDelegate that recording started
             appDelegate?.isMeetingRecording = true
 
-            // Note: No waveform indicator for meeting mode - it's dictation-only
-
-            // Start timer
+            // Start timer and audio visualization
             startTimer()
+            startAudioLevelUpdates()
 
             print("MeetingView: Recording started (mixed audio)")
 
         } catch {
             print("MeetingView: Failed to start recording - \(error)")
-            print("MeetingView: Error details: \(String(describing: error))")
 
             let errorMessage: String
             if let recorderError = error as? RecorderError {
@@ -441,6 +883,7 @@ struct MeetingView: View {
                     errorMessage = "No display available for recording"
                 case .permissionDenied:
                     errorMessage = "Screen recording permission denied"
+                    meetingState.status = .missingPermissions
                 case .captureFailure(let details):
                     errorMessage = "Capture failed: \(details)"
                 }
@@ -449,27 +892,43 @@ struct MeetingView: View {
             }
 
             meetingState.statusMessage = "Error: \(errorMessage)"
+            meetingState.status = .ready
         }
     }
 
     private func stopRecording() async {
+        meetingState.status = .processing
         meetingState.statusMessage = "Finalizing transcription..."
 
-        // Note: No waveform indicator for meeting mode - it's dictation-only
-
-        // Stop timer
+        // Stop timer and audio visualization
         stopTimer()
+        stopAudioLevelUpdates()
 
-        // Stop mixed audio recording (audio chunks were already processed in real-time)
+        // Stop mixed audio recording
         _ = await mixedAudioRecorder.stopRecording()
 
-        // End transcription session (processes any remaining audio)
+        // End transcription session
         let finalSegments = await continuousTranscriber.endSession()
 
-        // Update with all segments (includes real-time + any final processing)
+        // Create recording session
+        let sessionStartIndex = meetingState.segments.count
+        let sessionEndIndex = finalSegments.count
+
+        // Only create session if we have new segments
+        if sessionEndIndex > sessionStartIndex {
+            let newSession = RecordingSession(
+                startTime: Date().addingTimeInterval(-meetingState.elapsedTime),
+                endTime: Date(),
+                segmentRange: sessionStartIndex..<sessionEndIndex
+            )
+            meetingState.recordingSessions.append(newSession)
+        }
+
+        // Update with all segments
         meetingState.segments = finalSegments
 
         meetingState.isRecording = false
+        meetingState.status = .completed
         meetingState.statusMessage = "Recording stopped - \(finalSegments.count) segments"
 
         // Notify AppDelegate that recording stopped
