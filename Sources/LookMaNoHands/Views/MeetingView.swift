@@ -112,6 +112,7 @@ class MeetingState {
     var elapsedTime: TimeInterval = 0
     var sessionStartDate: Date?
     var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
+    var isActive = true  // Flag to indicate if the view is active
 
     // Streaming progress
     var generationProgress: Double = 0.0
@@ -235,13 +236,18 @@ struct MeetingView: View {
             checkStatus()
         }
         .onDisappear {
+            // Mark state as inactive to prevent timer callbacks
+            meetingState.isActive = false
+
+            // Stop all timers immediately
+            stopAudioLevelUpdates()
+
             // Cleanup when window closes
             if meetingState.isRecording {
                 Task {
                     await stopRecording()
                 }
             }
-            stopAudioLevelUpdates()
         }
     }
 
@@ -813,11 +819,24 @@ struct MeetingView: View {
     }
 
     private func startAudioLevelUpdates() {
+        // Stop any existing timer first
+        stopAudioLevelUpdates()
+
         let recorder = self.mixedAudioRecorder
-        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [meetingState] _ in
+        let state = self.meetingState
+
+        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { timer in
+            // Check if timer is still valid and state is active
+            guard timer.isValid, state.isActive else {
+                timer.invalidate()
+                return
+            }
+
             let bands = recorder.getFrequencyBands(bandCount: 40)
             Task { @MainActor in
-                meetingState.updateFrequencyBands(bands)
+                // Double-check state is still active before updating
+                guard state.isActive else { return }
+                state.updateFrequencyBands(bands)
             }
         }
     }
