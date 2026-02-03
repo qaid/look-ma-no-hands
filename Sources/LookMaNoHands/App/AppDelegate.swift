@@ -587,6 +587,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.handleTriggerKey()
         }
 
+        // Set up ESC key cancellation callback
+        keyboardMonitor.setCancellationCallback { [weak self] in
+            self?.handleCancelKey()
+        }
+
         if success {
             NSLog("✅ Keyboard monitoring started successfully")
         } else {
@@ -644,6 +649,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             print("Ignoring trigger - currently processing")
         }
+    }
+
+    /// Handle ESC key press - cancels recording without transcribing
+    private func handleCancelKey() {
+        NSLog("⎋ ESC key pressed - canceling recording")
+
+        guard transcriptionState.isRecording else {
+            NSLog("⎋ Not recording - ignoring ESC key")
+            return
+        }
+
+        // Stop the audio recorder without saving (discard samples)
+        _ = audioRecorder.stopRecording()
+
+        // Update state to idle (skips processing)
+        transcriptionState.cancelRecording()
+
+        // Update UI
+        updateMenuBarIcon(isRecording: false)
+        recordingIndicator.hide()
+
+        NSLog("✅ Recording canceled - no text will be inserted")
     }
 
     /// Start recording audio
