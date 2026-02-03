@@ -24,6 +24,7 @@ class SystemAudioRecorder: NSObject {
 
     /// Buffer to store captured audio samples
     private var audioBuffer: [Float] = []
+    private let bufferLock = NSLock()  // Thread-safe access to audioBuffer
 
     /// Sample rate for recording (Whisper expects 16kHz)
     private let targetSampleRate: Double = 16000
@@ -119,7 +120,9 @@ class SystemAudioRecorder: NSObject {
         }
 
         isRecording = true
-        audioBuffer.removeAll()
+        bufferLock.withLock {
+            audioBuffer.removeAll()
+        }
 
         print("SystemAudioRecorder: Started recording system audio")
     }
@@ -140,8 +143,11 @@ class SystemAudioRecorder: NSObject {
         stream = nil
         isRecording = false
 
-        let samples = audioBuffer
-        audioBuffer.removeAll()
+        let samples = bufferLock.withLock {
+            let copy = audioBuffer
+            audioBuffer.removeAll()
+            return copy
+        }
 
         print("SystemAudioRecorder: Stopped recording, captured \(samples.count) samples")
 
@@ -173,19 +179,22 @@ extension SystemAudioRecorder: SCStreamOutput {
             return
         }
 
-        // Add to buffer
-        audioBuffer.append(contentsOf: audioSamples)
+        // Thread-safe buffer operations
+        bufferLock.withLock {
+            // Add to buffer
+            audioBuffer.append(contentsOf: audioSamples)
 
-        // Optionally call chunk callback for streaming transcription
-        if let onAudioChunk = onAudioChunk, audioBuffer.count >= Int(targetSampleRate * 5) {
-            // Send 5-second chunks for faster, more responsive transcription
-            let chunk = Array(audioBuffer.prefix(Int(targetSampleRate * 5)))
-            onAudioChunk(chunk)
+            // Optionally call chunk callback for streaming transcription
+            if let onAudioChunk = onAudioChunk, audioBuffer.count >= Int(targetSampleRate * 5) {
+                // Send 5-second chunks for faster, more responsive transcription
+                let chunk = Array(audioBuffer.prefix(Int(targetSampleRate * 5)))
+                onAudioChunk(chunk)
 
-            // Keep overlap for next chunk (1 second)
-            let overlapSamples = Int(targetSampleRate * 1)
-            let samplesToRemove = Int(targetSampleRate * 5) - overlapSamples
-            audioBuffer.removeFirst(samplesToRemove)
+                // Keep overlap for next chunk (1 second)
+                let overlapSamples = Int(targetSampleRate * 1)
+                let samplesToRemove = Int(targetSampleRate * 5) - overlapSamples
+                audioBuffer.removeFirst(samplesToRemove)
+            }
         }
     }
 

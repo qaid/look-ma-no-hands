@@ -10,6 +10,7 @@ class AudioRecorder {
 
     private var audioEngine: AVAudioEngine?
     private var audioBuffer: [Float] = []
+    private let bufferLock = NSLock()  // Thread-safe access to audioBuffer
     private var inputSampleRate: Double = 0
     private var recordingStartTime: Date?
 
@@ -30,8 +31,10 @@ class AudioRecorder {
     func startRecording() throws {
         guard !isRecording else { return }
 
-        // Clear any previous buffer
-        audioBuffer = []
+        // Clear any previous buffer (thread-safe)
+        bufferLock.withLock {
+            audioBuffer = []
+        }
 
         let audioEngine = AVAudioEngine()
         self.audioEngine = audioEngine
@@ -62,12 +65,15 @@ class AudioRecorder {
     func getCurrentBuffer() -> [Float] {
         guard isRecording else { return [] }
 
+        // Thread-safe copy of buffer
+        let bufferCopy = bufferLock.withLock { audioBuffer }
+
         // Resample to 16kHz if needed
         let resampled: [Float]
         if abs(inputSampleRate - targetSampleRate) > 0.1 {
-            resampled = resampleToTarget(audioBuffer)
+            resampled = resampleToTarget(bufferCopy)
         } else {
-            resampled = audioBuffer
+            resampled = bufferCopy
         }
 
         // Normalize audio levels
@@ -84,14 +90,22 @@ class AudioRecorder {
             return Array(repeating: 0.0, count: bandCount)
         }
 
-        // Use smaller threshold - 512 samples ≈ 32ms at 16kHz
-        guard audioBuffer.count > 512 else {
+        // Thread-safe copy of recent samples
+        let recentSamples: [Float] = bufferLock.withLock {
+            // Use smaller threshold - 512 samples ≈ 32ms at 16kHz
+            guard audioBuffer.count > 512 else {
+                return []
+            }
+
+            // Get recent samples (copy while holding lock)
+            let sampleCount = min(1024, audioBuffer.count)
+            return Array(audioBuffer.suffix(sampleCount))
+        }
+
+        guard !recentSamples.isEmpty else {
             return Array(repeating: 0.0, count: bandCount)
         }
 
-        // Get recent samples
-        let sampleCount = min(1024, audioBuffer.count)
-        let recentSamples = Array(audioBuffer.suffix(sampleCount))
         let bandSize = recentSamples.count / bandCount
         var bands: [Float] = []
 
@@ -125,9 +139,16 @@ class AudioRecorder {
         audioEngine = nil
         isRecording = false
 
+        // Thread-safe copy of buffer and clear it
+        let bufferCopy = bufferLock.withLock {
+            let copy = audioBuffer
+            audioBuffer = []  // Clear for next recording
+            return copy
+        }
+
         // Calculate recording duration
         let duration = stopTime.timeIntervalSince(recordingStartTime ?? Date())
-        Logger.shared.info("🛑 Recording stopped: \(String(format: "%.2f", duration))s, \(audioBuffer.count) samples at \(Int(inputSampleRate)) Hz", category: .audio)
+        Logger.shared.info("🛑 Recording stopped: \(String(format: "%.2f", duration))s, \(bufferCopy.count) samples at \(Int(inputSampleRate)) Hz", category: .audio)
 
         // Warn if recording is too short
         if duration < minimumDuration {
@@ -140,10 +161,10 @@ class AudioRecorder {
         let resampled: [Float]
         if abs(inputSampleRate - targetSampleRate) > 0.1 {
             Logger.shared.debug("Resampling from \(Int(inputSampleRate)) Hz to \(Int(targetSampleRate)) Hz", category: .audio)
-            resampled = resampleToTarget(audioBuffer)
+            resampled = resampleToTarget(bufferCopy)
             Logger.shared.debug("Resampled to \(resampled.count) samples", category: .audio)
         } else {
-            resampled = audioBuffer
+            resampled = bufferCopy
         }
 
         // Normalize audio levels
@@ -163,7 +184,10 @@ class AudioRecorder {
         let frameCount = Int(buffer.frameLength)
         let channelCount = Int(buffer.format.channelCount)
 
-        // Convert to mono and collect samples
+        // Pre-allocate and convert to mono first
+        var samples = [Float]()
+        samples.reserveCapacity(frameCount)
+
         for frame in 0..<frameCount {
             var sample: Float = 0
 
@@ -172,8 +196,12 @@ class AudioRecorder {
                 sample += channelData[channel][frame]
             }
             sample /= Float(channelCount)
+            samples.append(sample)
+        }
 
-            audioBuffer.append(sample)
+        // Thread-safe append to buffer
+        bufferLock.withLock {
+            audioBuffer.append(contentsOf: samples)
         }
     }
 
