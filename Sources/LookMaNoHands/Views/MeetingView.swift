@@ -201,7 +201,7 @@ struct MeetingView: View {
             // Header: Meeting Title + Status Badge (no branding)
             headerView
                 .padding(.horizontal, 24)
-                .padding(.top, 16)
+                .padding(.top, 12)
                 .padding(.bottom, 12)
 
             Divider()
@@ -223,9 +223,12 @@ struct MeetingView: View {
             // Bottom Action Buttons
             bottomActionsView
                 .padding(.horizontal, 24)
-                .padding(.vertical, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
         }
-        .frame(minWidth: 600, minHeight: 450)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(minWidth: 600)
+        .animation(.easeInOut(duration: 0.3), value: showTranscript)
         .sheet(isPresented: $showPromptEditor) {
             promptEditorSheet
         }
@@ -492,6 +495,7 @@ struct MeetingView: View {
                         scrollProxy = proxy
                     }
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
     }

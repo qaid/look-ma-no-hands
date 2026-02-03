@@ -8,7 +8,7 @@ struct LaunchSplashView: View {
     var body: some View {
         VStack(spacing: 12) {
             // App Icon - using hands-up emoji to match app icon
-            Text("🙌")
+            Text("🙌🏾")
                 .font(.system(size: 56))
                 .accessibilityLabel("Look Ma No Hands app icon")
 
