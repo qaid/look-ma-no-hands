@@ -35,6 +35,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
+    private let launchSplash = LaunchSplashWindowController()
 
     // MARK: - Application Lifecycle
 
@@ -101,6 +102,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Request notification permission
         Task {
             _ = await NotificationService.shared.requestPermission()
+        }
+
+        // Show launch splash if enabled and not coming from onboarding
+        if Settings.shared.showLaunchConfirmation {
+            // Small delay to ensure app is fully initialized
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.launchSplash.show()
+            }
         }
     }
 

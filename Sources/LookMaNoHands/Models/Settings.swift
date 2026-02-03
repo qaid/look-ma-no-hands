@@ -50,6 +50,7 @@ enum WhisperModel: String, CaseIterable, Identifiable {
 
 /// Recording indicator position
 enum IndicatorPosition: String, CaseIterable, Identifiable {
+    case followCursor = "Follow Cursor"
     case top = "Top"
     case bottom = "Bottom"
 
@@ -218,6 +219,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Ollama integration reserved for future meeting transcription feature
         static let showIndicator = "showIndicator"
         static let indicatorPosition = "indicatorPosition"
+        static let showLaunchConfirmation = "showLaunchConfirmation"
     }
     
     // MARK: - Audio Device Manager
@@ -294,6 +296,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to show launch confirmation splash screen
+    @Published var showLaunchConfirmation: Bool {
+        didSet {
+            UserDefaults.standard.set(showLaunchConfirmation, forKey: Keys.showLaunchConfirmation)
+        }
+    }
+
     // MARK: - Initialization
     
     private init() {
@@ -335,7 +344,14 @@ Now produce the complete meeting notes following the format above. Ensure every 
            let position = IndicatorPosition(rawValue: savedPosition) {
             self.indicatorPosition = position
         } else {
-            self.indicatorPosition = .top
+            self.indicatorPosition = .followCursor  // Default to follow cursor
+        }
+
+        // Launch confirmation defaults to true (enabled by default)
+        if UserDefaults.standard.object(forKey: Keys.showLaunchConfirmation) != nil {
+            self.showLaunchConfirmation = UserDefaults.standard.bool(forKey: Keys.showLaunchConfirmation)
+        } else {
+            self.showLaunchConfirmation = true
         }
 
         // Onboarding completion defaults to false for new users
@@ -358,6 +374,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         ollamaModel = "qwen3:8b"
         meetingPrompt = Settings.defaultMeetingPrompt
         showIndicator = true
-        indicatorPosition = .top
+        indicatorPosition = .followCursor
+        showLaunchConfirmation = true
     }
 }
