@@ -103,9 +103,10 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
+            // Appearance Section
             Section {
                 Toggle("Show recording indicator", isOn: $settings.showIndicator)
-                    .help("Display a floating window while recording")
+                    .help("Display a floating waveform visualizer while recording")
 
                 if settings.showIndicator {
                     Picker("Position", selection: $settings.indicatorPosition) {
@@ -113,62 +114,78 @@ struct SettingsView: View {
                             Text(position.rawValue).tag(position)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.radioGroup)
                     .padding(.leading, 20)
-                    .help("Choose where the recording indicator appears on screen")
+                    .help("Choose where the waveform visualizer appears on screen")
                 }
-
-                Text("A floating indicator shows your transcription in real-time while recording")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             } header: {
-                Text("Recording Indicator")
+                Text("Appearance")
+                    .font(.headline)
+            } footer: {
+                if settings.showIndicator {
+                    Text(positionHelpText(for: settings.indicatorPosition))
+                        .font(.caption)
+                } else {
+                    Text("A floating waveform shows audio levels in real-time while recording")
+                        .font(.caption)
+                }
             }
 
+            // Startup Section
             Section {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                        .font(.body)
-                    Text("Automatic formatting enabled")
-                        .font(.body)
-                }
-
-                Text("Intelligently applies capitalization, punctuation, and spacing based on context")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Toggle("Show launch confirmation", isOn: $settings.showLaunchConfirmation)
+                    .help("Display a brief splash screen when the app launches")
             } header: {
-                Text("Text Formatting")
+                Text("Startup")
+                    .font(.headline)
+            } footer: {
+                Text("Brief splash screen appears for 2 seconds. Click or press any key to dismiss immediately.")
+                    .font(.caption)
             }
 
-            Section {
-                Button {
-                    showSetupWizardRestartConfirmation()
-                } label: {
-                    Label("Run Setup Wizard Again", systemImage: "arrow.clockwise")
-                }
-                .help("Re-run the initial onboarding experience")
+            // Advanced Section (collapsed by default)
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 16) {
+                    // Run Setup Wizard
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button {
+                            showSetupWizardRestartConfirmation()
+                        } label: {
+                            Label("Run Setup Wizard Again", systemImage: "arrow.clockwise")
+                        }
+                        .help("Re-run the initial onboarding experience")
 
-                Text("Reconfigure Whisper models, Ollama, and permissions from scratch")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } header: {
-                Text("Configuration")
+                        Text("Reconfigure Whisper models, Ollama, and permissions. Requires app restart.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Divider()
+
+                    // Reset Settings
+                    VStack(alignment: .leading, spacing: 8) {
+                        Button("Reset All Settings to Defaults", role: .destructive) {
+                            showResetConfirmation()
+                        }
+                        .help("Reset all preferences to factory defaults")
+
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text("This will reset all preferences but won't delete downloaded models or affect system permissions.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            } label: {
+                Text("Advanced")
+                    .font(.headline)
             }
 
             Spacer()
-                .frame(height: 20)
-
-            Divider()
-
-            HStack {
-                Spacer()
-                Button("Reset All Settings to Defaults", role: .destructive) {
-                    settings.resetToDefaults()
-                }
-                .help("Reset all preferences (does not affect downloaded models or permissions)")
-            }
-            .padding(.top, 8)
         }
     }
 
@@ -730,9 +747,21 @@ struct SettingsView: View {
         }
         .padding()
     }
-    
+
     // MARK: - Helper Views
-    
+
+    /// Returns help text based on the selected indicator position
+    private func positionHelpText(for position: IndicatorPosition) -> String {
+        switch position {
+        case .followCursor:
+            return "Indicator follows your cursor/text insertion point (default)"
+        case .top:
+            return "Indicator stays at the top center of the screen"
+        case .bottom:
+            return "Indicator stays at the bottom center of the screen"
+        }
+    }
+
     private func permissionRow(
         title: String,
         description: String,
@@ -990,6 +1019,22 @@ struct SettingsView: View {
                 // Restart the app
                 self.restartApp()
             }
+        }
+    }
+
+    /// Show confirmation dialog before resetting all settings
+    private func showResetConfirmation() {
+        let alert = NSAlert()
+        alert.messageText = "Reset All Settings?"
+        alert.informativeText = "This will restore all preferences to their default values. Downloaded models and system permissions will not be affected.\n\nThis action cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            settings.resetToDefaults()
         }
     }
 

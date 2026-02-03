@@ -259,7 +259,7 @@ class RecordingIndicatorWindowController {
         window.setFrameOrigin(origin)
     }
 
-    /// Update window position using fixed positioning (fallback)
+    /// Update window position using fixed positioning
     private func updatePositionFixed() {
         guard let window = window, let screen = NSScreen.main else { return }
 
@@ -275,6 +275,9 @@ class RecordingIndicatorWindowController {
             y = screenFrame.maxY - 60  // Near top with some padding
         case .bottom:
             y = screenFrame.minY + 60  // Near bottom with some padding
+        case .followCursor:
+            // Should not reach here, but fallback to top if it does
+            y = screenFrame.maxY - 60
         }
 
         window.setFrameOrigin(NSPoint(x: x, y: y))
@@ -284,16 +287,30 @@ class RecordingIndicatorWindowController {
     func show() {
         guard let window = window else { return }
 
-        // Try cursor positioning first, fallback to fixed positioning
-        if let cursorRect = CursorPositionService.shared.getCursorScreenPosition() {
-            updatePosition(for: cursorRect)
-            print("RecordingIndicator: Using cursor-based positioning")
+        // Get user's position preference
+        let position = Settings.shared.indicatorPosition
 
-            // Start periodic position updates (in case cursor moves)
-            startPositionUpdates()
-        } else {
+        // Position based on user preference
+        switch position {
+        case .followCursor:
+            // Use cursor-based positioning with fallback
+            if let cursorRect = CursorPositionService.shared.getCursorScreenPosition() {
+                updatePosition(for: cursorRect)
+                print("RecordingIndicator: Using cursor-based positioning")
+
+                // Start periodic position updates to follow cursor
+                startPositionUpdates()
+            } else {
+                // Fallback to top if cursor detection fails
+                updatePositionFixed()
+                print("RecordingIndicator: Cursor detection failed, falling back to fixed position")
+            }
+
+        case .top, .bottom:
+            // Use fixed positioning at top or bottom
             updatePositionFixed()
-            print("RecordingIndicator: Using fixed positioning (cursor detection failed)")
+            print("RecordingIndicator: Using fixed positioning at \(position.rawValue)")
+            // Don't start position updates for fixed positions
         }
 
         // Start audio level updates
