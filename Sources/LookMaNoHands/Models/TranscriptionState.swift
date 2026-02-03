@@ -96,6 +96,14 @@ class TranscriptionState {
         guard recordingState == .recording else { return }
         recordingState = .processing
     }
+
+    /// Cancel recording without processing (ESC key pressed)
+    func cancelRecording() {
+        guard recordingState == .recording else { return }
+        recordingState = .idle
+        rawTranscription = nil
+        formattedText = nil
+    }
     
     /// Set the raw transcription result
     func setTranscription(_ text: String) {

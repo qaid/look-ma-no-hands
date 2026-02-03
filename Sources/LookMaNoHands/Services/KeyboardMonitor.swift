@@ -11,11 +11,15 @@ class KeyboardMonitor {
     /// Callback type for when trigger key is pressed
     typealias TriggerCallback = () -> Void
 
+    /// Callback type for when ESC key is pressed (to cancel recording)
+    typealias CancellationCallback = () -> Void
+
     // MARK: - Properties
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var onTrigger: TriggerCallback?
+    private var onCancel: CancellationCallback?
 
     /// The hotkey configuration to listen for
     private var hotkey: Hotkey = .capsLock
@@ -45,6 +49,11 @@ class KeyboardMonitor {
         hotkeyLock.lock()
         defer { hotkeyLock.unlock() }
         return hotkey
+    }
+
+    /// Set the cancellation callback (called when ESC key is pressed during recording)
+    func setCancellationCallback(_ callback: @escaping CancellationCallback) {
+        self.onCancel = callback
     }
 
     /// Start monitoring for the trigger key
@@ -143,6 +152,19 @@ class KeyboardMonitor {
     // MARK: - Private Methods
 
     private func handleEvent(type: CGEventType, event: CGEvent) {
+        // Check for ESC key (keyCode 53) to cancel recording
+        // ESC is handled as a keyDown event
+        if type == .keyDown {
+            let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
+            if keyCode == 53 { // ESC key
+                NSLog("⎋ KeyboardMonitor: ESC key detected - triggering cancellation")
+                DispatchQueue.main.async { [weak self] in
+                    self?.onCancel?()
+                }
+                return // Don't process further
+            }
+        }
+
         let currentHotkey = getHotkey()
 
         if currentHotkey.isSingleModifierKey {
