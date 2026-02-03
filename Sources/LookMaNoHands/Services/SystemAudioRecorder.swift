@@ -1,6 +1,7 @@
 import Foundation
 import ScreenCaptureKit
 import AVFoundation
+import Accelerate
 
 /// Errors that can occur during system audio recording
 enum RecorderError: Error {
@@ -237,5 +238,53 @@ extension SystemAudioRecorder: SCStreamOutput {
         }
 
         return samples
+    }
+
+    // MARK: - Frequency Visualization
+
+    /// Get frequency band levels for waveform visualization
+    /// - Parameter bandCount: Number of frequency bands to analyze (default: 20)
+    /// - Returns: Array of normalized amplitude values (0-1 range) for each band
+    func getFrequencyBands(bandCount: Int = 20) -> [Float] {
+        guard isRecording else {
+            return Array(repeating: 0.0, count: bandCount)
+        }
+
+        // Thread-safe copy of recent samples
+        let recentSamples: [Float] = bufferLock.withLock {
+            // Use smaller threshold - 512 samples ≈ 32ms at 16kHz
+            guard audioBuffer.count > 512 else {
+                return []
+            }
+
+            // Get recent samples (copy while holding lock)
+            let sampleCount = min(1024, audioBuffer.count)
+            return Array(audioBuffer.suffix(sampleCount))
+        }
+
+        guard !recentSamples.isEmpty else {
+            return Array(repeating: 0.0, count: bandCount)
+        }
+
+        let bandSize = recentSamples.count / bandCount
+        var bands: [Float] = []
+
+        // Calculate RMS for each frequency band
+        for i in 0..<bandCount {
+            let start = i * bandSize
+            let end = min(start + bandSize, recentSamples.count)
+            let bandSamples = Array(recentSamples[start..<end])
+
+            var rms: Float = 0
+            bandSamples.withUnsafeBufferPointer { ptr in
+                vDSP_rmsqv(ptr.baseAddress!, 1, &rms, vDSP_Length(bandSamples.count))
+            }
+
+            // Amplification (50x) for good visibility
+            let amplified = min(rms * 50.0, 1.0)
+            bands.append(amplified)
+        }
+
+        return bands
     }
 }

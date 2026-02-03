@@ -177,8 +177,27 @@ class MixedAudioRecorder {
     // MARK: - Frequency Visualization
 
     /// Get frequency bands for waveform visualization
-    /// Delegates to microphone recorder since that's the primary audio source for visualization
+    /// Analyzes the mixed audio (system + microphone) to show all captured sound
+    /// This visualizes both remote participants and your own voice
     func getFrequencyBands(bandCount: Int) -> [Float] {
-        return microphoneRecorder.getFrequencyBands(bandCount: bandCount)
+        guard isRecording else {
+            return Array(repeating: 0.0, count: bandCount)
+        }
+
+        // Get current samples from both sources
+        let systemSamples = systemAudioRecorder.getFrequencyBands(bandCount: bandCount)
+        let micSamples = microphoneRecorder.getFrequencyBands(bandCount: bandCount)
+
+        // Mix the frequency bands (take the maximum of each band to show both sources)
+        var mixedBands: [Float] = []
+        for i in 0..<bandCount {
+            let systemLevel = i < systemSamples.count ? systemSamples[i] : 0.0
+            let micLevel = i < micSamples.count ? micSamples[i] : 0.0
+            // Use max to ensure both sources are visible, or sum with normalization
+            let mixed = min(systemLevel + micLevel, 1.0)
+            mixedBands.append(mixed)
+        }
+
+        return mixedBands
     }
 }
