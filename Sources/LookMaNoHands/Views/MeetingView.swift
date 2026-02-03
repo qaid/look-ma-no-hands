@@ -445,9 +445,15 @@ struct MeetingView: View {
                                     .frame(maxWidth: .infinity, alignment: .center)
                                     .padding(.vertical, 40)
                             } else {
-                                // Show segments with timestamps
+                                // Show segments with timestamps and session dividers
                                 ForEach(Array(meetingState.segments.enumerated()), id: \.offset) { index, segment in
                                     let isHighlighted = isSegmentInSelectedSession(index: index)
+
+                                    // Show session divider if this is the first segment of a new recording session
+                                    if isFirstSegmentOfSession(index: index) && index > 0 {
+                                        sessionDivider(for: index)
+                                            .padding(.vertical, 12)
+                                    }
 
                                     HStack(alignment: .top, spacing: 12) {
                                         // Timestamp
@@ -822,6 +828,64 @@ struct MeetingView: View {
         return session.segmentRange.contains(index)
     }
 
+    /// Check if a segment is the first segment of a recording session
+    private func isFirstSegmentOfSession(index: Int) -> Bool {
+        return meetingState.recordingSessions.contains { session in
+            session.segmentRange.lowerBound == index
+        }
+    }
+
+    /// Session divider view to visually separate recording segments
+    @ViewBuilder
+    private func sessionDivider(for index: Int) -> some View {
+        // Find which session this divider represents
+        if let sessionIndex = meetingState.recordingSessions.firstIndex(where: { $0.segmentRange.lowerBound == index }) {
+            let session = meetingState.recordingSessions[sessionIndex]
+
+            HStack(spacing: 8) {
+                // Left line
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.3))
+                    .frame(height: 1)
+
+                // Session marker
+                HStack(spacing: 6) {
+                    Image(systemName: "record.circle")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+
+                    Text("Recording \(sessionIndex + 1)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.secondary)
+
+                    if let endTime = session.endTime {
+                        Text("resumed at \(formatSessionTime(endTime))")
+                            .font(.system(size: 11))
+                            .foregroundColor(.meetingTertiary)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.1))
+                )
+
+                // Right line
+                Rectangle()
+                    .fill(Color.secondary.opacity(0.3))
+                    .frame(height: 1)
+            }
+        }
+    }
+
+    /// Format session time for display
+    private func formatSessionTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: date)
+    }
+
     private func startAudioLevelUpdates() {
         // Stop any existing timer first
         stopAudioLevelUpdates()
@@ -993,7 +1057,12 @@ struct MeetingView: View {
         meetingState.currentTranscript = ""
         meetingState.structuredNotes = nil
         meetingState.elapsedTime = 0
+        meetingState.recordingSessions.removeAll()
+        meetingState.sessionStartDate = nil
         meetingState.statusMessage = "Ready to start"
+
+        // Clear the continuous transcriber's segments as well
+        continuousTranscriber.clearSegments()
     }
 
     // MARK: - Structured Notes Generation

@@ -77,7 +77,7 @@ class ContinuousTranscriber {
         sessionStartTime = Date()
         totalSamplesProcessed = 0
         audioBuffer.removeAll()
-        segments.removeAll()
+        // Don't remove existing segments - preserve them to append new transcription
 
         print("ContinuousTranscriber: Started new session")
         onStatusUpdate?("Ready to transcribe")
@@ -135,17 +135,15 @@ class ContinuousTranscriber {
     /// Process the next chunk from the buffer
     private func processNextChunk() async {
         let chunkSamples = Int(chunkDuration * sampleRate)
-        let overlapSamples = Int(overlapDuration * sampleRate)
 
-        // Extract chunk with overlap consideration
+        // Extract chunk without overlap to prevent duplicate transcription
         let chunk = Array(audioBuffer.prefix(chunkSamples))
 
         // Process the chunk
         await processChunk(chunk, isFinal: false)
 
-        // Remove processed samples, keeping overlap for next chunk
-        let samplesToRemove = chunkSamples - overlapSamples
-        audioBuffer.removeFirst(min(samplesToRemove, audioBuffer.count))
+        // Remove all processed samples (no overlap needed - causes duplicates)
+        audioBuffer.removeFirst(min(chunkSamples, audioBuffer.count))
     }
 
     /// Process a chunk early if silence is detected
@@ -227,6 +225,13 @@ class ContinuousTranscriber {
     }
 
     // MARK: - Transcript Access
+
+    /// Clear all segments (for user-initiated transcript clearing)
+    func clearSegments() {
+        segments.removeAll()
+        totalSamplesProcessed = 0
+        print("ContinuousTranscriber: Cleared all segments")
+    }
 
     /// Get the full transcript from all segments
     func getFullTranscript() -> String {
