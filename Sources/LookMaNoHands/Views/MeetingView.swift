@@ -91,7 +91,7 @@ enum MeetingStatus: Equatable {
         case .missingModel, .missingPermissions: return .orange
         case .recording: return .red
         case .processing: return .blue
-        case .completed: return .green
+        case .completed: return .purple
         }
     }
 }
@@ -1060,6 +1060,7 @@ struct MeetingView: View {
         meetingState.recordingSessions.removeAll()
         meetingState.sessionStartDate = nil
         meetingState.statusMessage = "Ready to start"
+        meetingState.status = .ready
 
         // Clear the continuous transcriber's segments as well
         continuousTranscriber.clearSegments()
