@@ -1060,6 +1060,7 @@ struct MeetingView: View {
         meetingState.recordingSessions.removeAll()
         meetingState.sessionStartDate = nil
         meetingState.statusMessage = "Ready to start"
+        meetingState.status = .ready
 
         // Clear the continuous transcriber's segments as well
         continuousTranscriber.clearSegments()
