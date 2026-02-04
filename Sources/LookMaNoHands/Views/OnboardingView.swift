@@ -12,6 +12,7 @@ struct OnboardingView: View {
     let whisperService: WhisperService
     let ollamaService: OllamaService
     let onComplete: () -> Void
+    let bringToFront: (() -> Void)?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -40,7 +41,8 @@ struct OnboardingView: View {
                         .transition(.opacity)
                     } else if onboardingState.currentStep == .permissions {
                         PermissionsStepView(
-                            onboardingState: onboardingState
+                            onboardingState: onboardingState,
+                            bringToFront: bringToFront
                         )
                         .transition(.opacity)
                     } else if onboardingState.currentStep == .complete {
@@ -482,8 +484,11 @@ struct WhisperModelStepView: View {
 
 struct PermissionsStepView: View {
     @Bindable var onboardingState: OnboardingState
+    let bringToFront: (() -> Void)?
 
     @State private var permissionCheckTimer: Timer?
+    @State private var previousMicPermission: Bool = false
+    @State private var previousAccessibilityPermission: Bool = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -592,8 +597,23 @@ struct PermissionsStepView: View {
             let accessibilityGranted = AXIsProcessTrusted()
 
             await MainActor.run {
+                // Detect if permissions just changed from false to true
+                let micJustGranted = !previousMicPermission && micGranted
+                let accessibilityJustGranted = !previousAccessibilityPermission && accessibilityGranted
+
+                // Update state
                 onboardingState.hasMicrophonePermission = micGranted
                 onboardingState.hasAccessibilityPermission = accessibilityGranted
+
+                // If any permission was just granted, bring window to front
+                // (user just dismissed the system permission dialog)
+                if micJustGranted || accessibilityJustGranted {
+                    bringToFront?()
+                }
+
+                // Update previous values for next check
+                previousMicPermission = micGranted
+                previousAccessibilityPermission = accessibilityGranted
             }
         }
     }

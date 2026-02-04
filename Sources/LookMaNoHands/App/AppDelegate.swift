@@ -148,6 +148,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     // (won't show accessibility prompt since we just did onboarding)
                     self.completeInitialization()
                 }
+            },
+            bringToFront: { [weak self] in
+                // Bring onboarding window to front after system permission dialogs close
+                self?.onboardingWindow?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
             }
         )
         NSLog("   ✓ Created OnboardingView")
@@ -160,7 +165,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.styleMask = [.titled, .closable]
         window.center()
         window.isReleasedWhenClosed = false
-        window.level = .floating
+        window.level = .normal  // Use normal level so system permission dialogs appear above
         NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
