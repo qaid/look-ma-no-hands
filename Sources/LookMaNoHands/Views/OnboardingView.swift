@@ -19,7 +19,7 @@ struct OnboardingView: View {
             VStack(spacing: 0) {
                 // Spacer for progress indicator
                 Spacer()
-                    .frame(height: 80)
+                    .frame(height: 65)
 
                 // Content area - using ZStack instead of TabView to avoid page indicators
                 ZStack {
@@ -53,7 +53,7 @@ struct OnboardingView: View {
                 .animation(.easeInOut(duration: 0.2), value: onboardingState.currentStep)
 
                 Spacer()
-                    .frame(height: 20)
+                    .frame(height: 15)
 
                 // Navigation buttons
                 OnboardingNavigationView(
@@ -61,7 +61,7 @@ struct OnboardingView: View {
                     onComplete: completeOnboarding
                 )
                 .padding(.horizontal, 40)
-                .padding(.bottom, 30)
+                .padding(.bottom, 20)
             }
 
             // Progress indicator (floating on top)
@@ -69,7 +69,7 @@ struct OnboardingView: View {
                 .frame(maxWidth: .infinity)
                 .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(width: 700, height: 600)
+        .frame(width: 600, height: 520)
     }
 
     private func completeOnboarding() {
@@ -92,7 +92,7 @@ struct ProgressIndicatorView: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(OnboardingState.Step.allCases.enumerated()), id: \.element) { index, step in
-                VStack(spacing: 8) {
+                VStack(spacing: 6) {
                     // Step circle
                     ZStack {
                         Circle()
@@ -104,29 +104,29 @@ struct ProgressIndicatorView: View {
                                 Circle()
                                     .fill(step.rawValue <= currentStep.rawValue ? Color.accentColor : Color.clear)
                             )
-                            .frame(width: 32, height: 32)
+                            .frame(width: 28, height: 28)
 
                         if step.rawValue < currentStep.rawValue {
                             // Checkmark for completed steps
                             Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(size: 12, weight: .bold))
                                 .foregroundColor(.white)
                         } else if step.rawValue == currentStep.rawValue {
                             // Current step number
                             Text("\(step.rawValue + 1)")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(.white)
                         } else {
                             // Future step number
                             Text("\(step.rawValue + 1)")
-                                .font(.system(size: 14, weight: .medium))
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.gray.opacity(0.5))
                         }
                     }
 
                     // Step label
                     Text(stepTitles[index])
-                        .font(.system(size: 11, weight: step.rawValue == currentStep.rawValue ? .semibold : .regular))
+                        .font(.system(size: 10, weight: step.rawValue == currentStep.rawValue ? .semibold : .regular))
                         .foregroundColor(step.rawValue <= currentStep.rawValue ? .primary : .secondary.opacity(0.6))
                 }
                 .frame(maxWidth: .infinity)
@@ -136,14 +136,14 @@ struct ProgressIndicatorView: View {
                     Rectangle()
                         .fill(step.rawValue < currentStep.rawValue ? Color.accentColor : Color.gray.opacity(0.3))
                         .frame(height: 2)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 32) // Align with circles
+                        .padding(.horizontal, 6)
+                        .padding(.bottom, 28) // Align with circles
                 }
             }
         }
         .padding(.horizontal, 40)
-        .padding(.top, 20)
-        .padding(.bottom, 20)
+        .padding(.top, 15)
+        .padding(.bottom, 15)
         .animation(.easeInOut(duration: 0.3), value: currentStep)
     }
 }
@@ -154,22 +154,22 @@ struct WelcomeStepView: View {
     @Bindable var onboardingState: OnboardingState
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer()
 
             // App icon
             Image(systemName: "mic.circle.fill")
                 .resizable()
-                .frame(width: 90, height: 90)
+                .frame(width: 70, height: 70)
                 .foregroundColor(.accentColor)
 
             // Title
             Text("Welcome to Look Ma No Hands")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
                 .multilineTextAlignment(.center)
 
             // Description
-            VStack(spacing: 15) {
+            VStack(spacing: 12) {
                 Text("Fast, local voice dictation for macOS")
                     .font(.title3)
                     .foregroundColor(.secondary)
@@ -184,8 +184,8 @@ struct WelcomeStepView: View {
 
             Spacer()
         }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 15)
     }
 }
 
@@ -216,26 +216,26 @@ struct OllamaStepView: View {
     @State private var isChecking: Bool = true
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer()
 
             // Icon
             Image(systemName: "brain.head.profile")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 70, height: 70)
+                .frame(width: 60, height: 60)
                 .foregroundColor(.purple)
 
             // Title
             Text("Install Ollama (Optional)")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 22, weight: .bold))
 
             // Description
             Text("Ollama enables AI-powered meeting notes from transcripts.\nVoice dictation works without it.")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.body)
-                .padding(.horizontal, 50)
+                .padding(.horizontal, 40)
 
             // Status
             if isChecking {
@@ -285,8 +285,8 @@ struct OllamaStepView: View {
 
             Spacer()
         }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 15)
         .onAppear {
             checkOllama()
         }
@@ -332,18 +332,18 @@ struct WhisperModelStepView: View {
     @State private var isCheckingModel: Bool = true
 
     var body: some View {
-        VStack(spacing: 25) {
+        VStack(spacing: 18) {
             Spacer()
 
             // Icon
             Image(systemName: "waveform.circle.fill")
                 .resizable()
-                .frame(width: 80, height: 80)
+                .frame(width: 65, height: 65)
                 .foregroundColor(.blue)
 
             // Title
             Text("Download Whisper Model")
-                .font(.system(size: 28, weight: .bold))
+                .font(.system(size: 24, weight: .bold))
 
             // Description
             Text("Required for voice transcription.\nWe recommend the Tiny model for best speed.")
@@ -401,7 +401,8 @@ struct WhisperModelStepView: View {
 
             Spacer()
         }
-        .padding(40)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 15)
         .onAppear {
             checkExistingModel()
         }
@@ -485,19 +486,19 @@ struct PermissionsStepView: View {
     @State private var permissionCheckTimer: Timer?
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer()
 
             // Icon
             Image(systemName: "lock.shield.fill")
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 70, height: 70)
+                .frame(width: 60, height: 60)
                 .foregroundColor(.orange)
 
             // Title
             Text("Grant Permissions")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 22, weight: .bold))
 
             // Description
             Text("Look Ma No Hands needs permissions to work properly")
@@ -537,8 +538,8 @@ struct PermissionsStepView: View {
 
             Spacer()
         }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 15)
         .onAppear {
             startPermissionChecking()
         }
@@ -664,18 +665,18 @@ struct CompletionStepView: View {
     }
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Spacer()
 
             // Icon
             Image(systemName: needsRestart ? "arrow.clockwise.circle.fill" : "checkmark.circle.fill")
                 .resizable()
-                .frame(width: 70, height: 70)
+                .frame(width: 60, height: 60)
                 .foregroundColor(needsRestart ? .orange : .green)
 
             // Title
             Text(needsRestart ? "Setup Complete - Restart Required" : "You're All Set!")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 22, weight: .bold))
                 .multilineTextAlignment(.center)
 
             // Summary
@@ -731,8 +732,8 @@ struct CompletionStepView: View {
 
             Spacer()
         }
-        .padding(.horizontal, 50)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 40)
+        .padding(.vertical, 15)
     }
 }
 
