@@ -91,7 +91,7 @@ enum MeetingStatus: Equatable {
         case .missingModel, .missingPermissions: return .orange
         case .recording: return .red
         case .processing: return .blue
-        case .completed: return .green
+        case .completed: return .purple
         }
     }
 }
