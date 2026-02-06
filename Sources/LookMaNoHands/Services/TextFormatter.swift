@@ -18,6 +18,9 @@ class TextFormatter {
     /// Whether to trim excessive whitespace
     var trimWhitespace = true
 
+    /// Whether to apply custom vocabulary replacements
+    var applyVocabulary = true
+
     // MARK: - Public Methods
 
     /// Format transcribed text with rule-based processing
@@ -39,12 +42,17 @@ class TextFormatter {
             result = fixCommonTranscriptionErrors(result)
         }
 
-        // 3. Smart capitalization
+        // 3. Apply custom vocabulary replacements
+        if applyVocabulary {
+            result = applyVocabularyReplacements(result)
+        }
+
+        // 4. Smart capitalization
         if smartCapitalization {
             result = applySmartCapitalization(result)
         }
 
-        // 4. Add final punctuation if missing
+        // 5. Add final punctuation if missing
         if addFinalPunctuation {
             result = ensureFinalPunctuation(result)
         }
@@ -53,6 +61,25 @@ class TextFormatter {
     }
 
     // MARK: - Private Helpers
+
+    /// Apply custom vocabulary replacements from user settings
+    /// Only entries with a non-empty `phrase` get regex replacement
+    private func applyVocabularyReplacements(_ text: String) -> String {
+        let entries = Settings.shared.customVocabulary.filter { $0.enabled && !$0.phrase.isEmpty }
+        guard !entries.isEmpty else { return text }
+
+        var result = text
+        for entry in entries {
+            // Use word-boundary regex for the misheard phrase
+            let pattern = "\\b\(NSRegularExpression.escapedPattern(for: entry.phrase))\\b"
+            result = result.replacingOccurrences(
+                of: pattern,
+                with: entry.replacement,
+                options: [.regularExpression, .caseInsensitive]
+            )
+        }
+        return result
+    }
 
     /// Fix common transcription errors that Whisper makes
     private func fixCommonTranscriptionErrors(_ text: String) -> String {
