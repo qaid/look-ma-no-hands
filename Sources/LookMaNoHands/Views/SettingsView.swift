@@ -40,8 +40,8 @@ struct SettingsView: View {
     @State private var modelDownloadError: String?
     @State private var modelAvailability: [WhisperModel: Bool] = [:]
 
-    // Selected tab
-    @State private var selectedTab: SettingsTab = .general
+    // Selected tab (optional for NavigationSplitView)
+    @State private var selectedTab: SettingsTab? = .general
 
     // Hotkey change confirmation
     @State private var showingHotkeyConfirmation = false
@@ -50,45 +50,13 @@ struct SettingsView: View {
     @State private var permissionCheckTimer: Timer?
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            Picker("", selection: $selectedTab) {
-                ForEach(SettingsTab.allCases) { tab in
-                    Label(tab.rawValue, systemImage: tab.icon).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding()
-            .onChange(of: selectedTab) { oldValue, newValue in
-                handleTabChange(to: newValue)
-            }
-
-            Divider()
-
-            // Content area with scrolling
-            ScrollView {
-                Group {
-                    switch selectedTab {
-                    case .general:
-                        generalTab
-                    case .recording:
-                        recordingTab
-                    case .vocabulary:
-                        vocabularyTab
-                    case .models:
-                        modelsTab
-                    case .permissions:
-                        permissionsTab
-                    case .diagnostics:
-                        diagnosticsTab
-                    case .about:
-                        aboutTab
-                    }
-                }
-                .padding()
-            }
+        NavigationSplitView {
+            sidebarContent
+        } detail: {
+            detailContent
         }
-        .frame(minWidth: 550, minHeight: 450)
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 750, minHeight: 450)
         .onAppear {
             checkPermissions()
             checkOllamaStatus()
@@ -101,6 +69,65 @@ struct SettingsView: View {
         .onDisappear {
             stopPermissionPolling()
         }
+    }
+
+    // MARK: - Sidebar
+
+    private var sidebarContent: some View {
+        List(SettingsTab.allCases, selection: $selectedTab) { tab in
+            NavigationLink(value: tab) {
+                Label(tab.rawValue, systemImage: tab.icon)
+            }
+        }
+        .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 250)
+        .listStyle(.sidebar)
+        .navigationTitle("Settings")
+        .onChange(of: selectedTab) { oldValue, newValue in
+            if let newValue = newValue {
+                handleTabChange(to: newValue)
+            }
+        }
+    }
+
+    // MARK: - Detail Pane
+
+    private var detailContent: some View {
+        ScrollView {
+            Group {
+                if let selectedTab = selectedTab {
+                    contentForTab(selectedTab)
+                } else {
+                    emptyStateView
+                }
+            }
+            .padding()
+        }
+        .navigationTitle(selectedTab?.rawValue ?? "Settings")
+    }
+
+    @ViewBuilder
+    private func contentForTab(_ tab: SettingsTab) -> some View {
+        switch tab {
+        case .general: generalTab
+        case .recording: recordingTab
+        case .vocabulary: vocabularyTab
+        case .models: modelsTab
+        case .permissions: permissionsTab
+        case .diagnostics: diagnosticsTab
+        case .about: aboutTab
+        }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "gear")
+                .font(.system(size: 48))
+                .foregroundColor(.secondary)
+            Text("Select a category")
+                .font(.title3)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - General Tab
