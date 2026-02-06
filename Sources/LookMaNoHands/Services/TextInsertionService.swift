@@ -239,6 +239,86 @@ class TextInsertionService {
         pasteboard.setString(text, forType: .string)
     }
 
+    // MARK: - Context Detection (for Whisper prompting)
+
+    /// Get the name of the frontmost application
+    /// - Returns: Bundle identifier or app name, or nil if unavailable
+    func getFocusedAppName() -> String? {
+        let systemWide = AXUIElementCreateSystemWide()
+
+        var focusedApp: CFTypeRef?
+        let appResult = AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedApplicationAttribute as CFString,
+            &focusedApp
+        )
+
+        guard appResult == .success, let app = focusedApp else {
+            return nil
+        }
+
+        // Try to get the app title
+        var titleValue: CFTypeRef?
+        let titleResult = AXUIElementCopyAttributeValue(
+            app as! AXUIElement,
+            kAXTitleAttribute as CFString,
+            &titleValue
+        )
+
+        if titleResult == .success, let title = titleValue as? String {
+            return title
+        }
+
+        return nil
+    }
+
+    /// Read the last N characters from the currently focused text field
+    /// - Parameter maxLength: Maximum number of characters to read from before the cursor
+    /// - Returns: Text before the cursor, or nil if unavailable
+    func getExistingFieldText(maxLength: Int = 200) -> String? {
+        guard let focusedElement = getFocusedElement() else {
+            return nil
+        }
+
+        // Get current text content
+        var currentValue: CFTypeRef?
+        let valueResult = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXValueAttribute as CFString,
+            &currentValue
+        )
+
+        guard valueResult == .success, let currentText = currentValue as? String, !currentText.isEmpty else {
+            return nil
+        }
+
+        // Get cursor position via selection range
+        var selectedRange: CFTypeRef?
+        let rangeResult = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRange
+        )
+
+        var cursorPosition = currentText.count
+        if rangeResult == .success, let rangeValue = selectedRange {
+            var range = CFRange()
+            AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
+            cursorPosition = min(range.location, currentText.count)
+        }
+
+        // Get the last maxLength characters before cursor
+        let startOffset = max(0, cursorPosition - maxLength)
+
+        guard let startIndex = currentText.index(currentText.startIndex, offsetBy: startOffset, limitedBy: currentText.endIndex),
+              let endIndex = currentText.index(currentText.startIndex, offsetBy: cursorPosition, limitedBy: currentText.endIndex) else {
+            return nil
+        }
+
+        let beforeCursor = String(currentText[startIndex..<endIndex])
+        return beforeCursor.isEmpty ? nil : beforeCursor
+    }
+
     // MARK: - Basic Text Cleanup
 
     /// Apply basic cleanup to transcribed text without context

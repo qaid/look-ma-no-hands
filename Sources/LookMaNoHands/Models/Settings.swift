@@ -48,6 +48,24 @@ enum WhisperModel: String, CaseIterable, Identifiable {
     }
 }
 
+/// A custom vocabulary entry for biasing Whisper and post-transcription replacement
+struct VocabularyEntry: Codable, Identifiable, Hashable {
+    let id: UUID
+    /// What Whisper tends to produce (e.g. "swift ui"). Blank = prompt-bias only.
+    var phrase: String
+    /// Correct form (e.g. "SwiftUI"). Used for both prompt biasing and replacement.
+    var replacement: String
+    /// Whether this entry is active
+    var enabled: Bool
+
+    init(id: UUID = UUID(), phrase: String = "", replacement: String = "", enabled: Bool = true) {
+        self.id = id
+        self.phrase = phrase
+        self.replacement = replacement
+        self.enabled = enabled
+    }
+}
+
 /// Recording indicator position
 enum IndicatorPosition: String, CaseIterable, Identifiable {
     case followCursor = "Follow Cursor"
@@ -220,6 +238,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let showIndicator = "showIndicator"
         static let indicatorPosition = "indicatorPosition"
         static let showLaunchConfirmation = "showLaunchConfirmation"
+        static let customVocabulary = "customVocabulary"
     }
     
     // MARK: - Audio Device Manager
@@ -303,6 +322,15 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Custom vocabulary entries for Whisper prompt biasing and post-transcription replacement
+    @Published var customVocabulary: [VocabularyEntry] {
+        didSet {
+            if let data = try? JSONEncoder().encode(customVocabulary) {
+                UserDefaults.standard.set(data, forKey: Keys.customVocabulary)
+            }
+        }
+    }
+
     // MARK: - Initialization
     
     private init() {
@@ -354,6 +382,14 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.showLaunchConfirmation = true
         }
 
+        // Load custom vocabulary from JSON
+        if let vocabData = UserDefaults.standard.data(forKey: Keys.customVocabulary),
+           let vocab = try? JSONDecoder().decode([VocabularyEntry].self, from: vocabData) {
+            self.customVocabulary = vocab
+        } else {
+            self.customVocabulary = []
+        }
+
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
@@ -376,5 +412,6 @@ Now produce the complete meeting notes following the format above. Ensure every 
         showIndicator = true
         indicatorPosition = .followCursor
         showLaunchConfirmation = true
+        customVocabulary = []
     }
 }

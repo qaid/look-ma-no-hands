@@ -6,6 +6,7 @@ import ApplicationServices
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "General"
     case recording = "Recording"
+    case vocabulary = "Vocabulary"
     case models = "Models"
     case permissions = "Permissions"
     case diagnostics = "Diagnostics"
@@ -17,6 +18,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gear"
         case .recording: return "mic.circle"
+        case .vocabulary: return "text.book.closed"
         case .models: return "cpu"
         case .permissions: return "lock.shield"
         case .diagnostics: return "ant.circle"
@@ -71,6 +73,8 @@ struct SettingsView: View {
                         generalTab
                     case .recording:
                         recordingTab
+                    case .vocabulary:
+                        vocabularyTab
                     case .models:
                         modelsTab
                     case .permissions:
@@ -275,6 +279,108 @@ struct SettingsView: View {
         }
     }
     
+    // MARK: - Vocabulary Tab
+
+    private var vocabularyTab: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Header
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Custom Vocabulary")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                Text("Add words that dictation often gets wrong. Correct spellings are used to hint Whisper, and misheard forms are replaced after transcription.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Vocabulary list
+            if settings.customVocabulary.isEmpty {
+                VStack(spacing: 8) {
+                    Text("No custom vocabulary entries yet.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Click \"Add Word\" to get started.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else {
+                // Column headers
+                HStack(spacing: 8) {
+                    Text("Heard as")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 160, alignment: .leading)
+                    Text("Correct spelling")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 160, alignment: .leading)
+                    Spacer()
+                }
+                .padding(.horizontal, 4)
+
+                // Entries
+                ForEach(Array(settings.customVocabulary.enumerated()), id: \.element.id) { index, entry in
+                    HStack(spacing: 8) {
+                        TextField("e.g. swift ui", text: Binding(
+                            get: { settings.customVocabulary[index].phrase },
+                            set: { settings.customVocabulary[index].phrase = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+
+                        TextField("e.g. SwiftUI", text: Binding(
+                            get: { settings.customVocabulary[index].replacement },
+                            set: { settings.customVocabulary[index].replacement = $0 }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+
+                        Toggle("", isOn: Binding(
+                            get: { settings.customVocabulary[index].enabled },
+                            set: { settings.customVocabulary[index].enabled = $0 }
+                        ))
+                        .toggleStyle(.checkbox)
+                        .labelsHidden()
+
+                        Button(role: .destructive) {
+                            settings.customVocabulary.remove(at: index)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Remove this entry")
+                    }
+                }
+            }
+
+            // Add button
+            Button {
+                settings.customVocabulary.append(VocabularyEntry())
+            } label: {
+                Label("Add Word", systemImage: "plus")
+            }
+            .controlSize(.small)
+
+            // Tip
+            HStack(spacing: 6) {
+                Image(systemName: "lightbulb")
+                    .foregroundColor(.yellow)
+                    .font(.caption)
+                Text("Leave \"Heard as\" blank for words where you just want to hint the correct spelling to Whisper.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+
+            Spacer()
+        }
+        .padding()
+    }
+
     // MARK: - Models Tab
 
     private var modelsTab: some View {

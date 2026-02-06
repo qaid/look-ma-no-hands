@@ -648,6 +648,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateRecordingMenuItem(isRecording: transcriptionState.isRecording)
     }
 
+    // MARK: - Contextual Prompt Building
+
+    /// Build an initial_prompt for Whisper based on the active app and field context
+    /// Token budget: ~224 tokens (~890 chars) total
+    ///   ~50 tokens: app-context prompt
+    ///   ~50 tokens: existing field text
+    ///   ~124 tokens: custom vocabulary terms
+    private func buildInitialPrompt() -> String? {
+        var parts: [String] = []
+
+        // 1. App-context prompt (~200 chars / ~50 tokens)
+        let appName = textInsertionService.getFocusedAppName()
+        if let prompt = contextPrompt(forApp: appName) {
+            parts.append(prompt)
+        }
+
+        // 2. Custom vocabulary terms (~500 chars / ~124 tokens)
+        let vocabTerms = Settings.shared.customVocabulary
+            .filter { $0.enabled }
+            .map { $0.replacement }
+        if !vocabTerms.isEmpty {
+            parts.append("Technical terms: " + vocabTerms.joined(separator: ", "))
+        }
+
+        // 3. Existing field text for continuation context (~200 chars / ~50 tokens)
+        if let existingText = textInsertionService.getExistingFieldText(maxLength: 200) {
+            parts.append(existingText)
+        }
+
+        let prompt = parts.joined(separator: " ")
+        // Trim to ~890 chars to stay within 224 token limit
+        let trimmed = String(prompt.prefix(890))
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// Map frontmost app name to a contextual prompt style
+    private func contextPrompt(forApp appName: String?) -> String? {
+        guard let app = appName?.lowercased() else { return nil }
+
+        // Email apps
+        if ["mail", "outlook", "spark", "airmail"].contains(where: { app.contains($0) }) {
+            return "Hi Sarah, I wanted to follow up on our Q4 discussion. Please find the attached report. Best regards, John."
+        }
+
+        // Chat/messaging apps
+        if ["slack", "discord", "messages", "telegram", "whatsapp", "teams"].contains(where: { app.contains($0) }) {
+            return "hey can you send me that link you mentioned earlier? thanks!"
+        }
+
+        // IDEs and code editors
+        if ["xcode", "visual studio code", "sublime text", "nova", "bbedit", "textmate", "cursor"].contains(where: { app.contains($0) }) {
+            return "Define function processPayment with parameters amount and currency. The API returns a JSON response."
+        }
+
+        // Document editors
+        if ["pages", "word", "google docs", "notion", "craft"].contains(where: { app.contains($0) }) {
+            return "The quarterly results indicate a significant improvement in operational efficiency across all departments."
+        }
+
+        // No specific context for other apps
+        return nil
+    }
+
     // MARK: - Recording Workflow
 
     /// Handle Caps Lock key press - toggles recording
@@ -800,6 +863,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let pipelineStart = Date()
         Logger.shared.info("⏹️ Stop recording triggered", category: .transcription)
 
+        // Capture context BEFORE stopping recording (while the target app is still focused)
+        let initialPrompt = buildInitialPrompt()
+
         // Stop recording and get audio samples
         let audioSamples = audioRecorder.stopRecording()
 
@@ -815,12 +881,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Process the audio in background
         Task {
-            await processRecording(samples: audioSamples, pipelineStart: pipelineStart)
+            await processRecording(samples: audioSamples, pipelineStart: pipelineStart, initialPrompt: initialPrompt)
         }
     }
 
-    /// Process recorded audio: transcribe and format
-    private func processRecording(samples: [Float], pipelineStart: Date) async {
+    /// Process recorded audio: transcribe, format, and insert
+    private func processRecording(samples: [Float], pipelineStart: Date, initialPrompt: String? = nil) async {
         let audioLength = Double(samples.count) / 16000.0
         Logger.shared.info("⏱️ Starting processing for \(String(format: "%.1f", audioLength))s of audio", category: .transcription)
 
@@ -829,14 +895,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
 
             do {
-                // Step 1: Transcribe with Whisper
+                // Step 1: Transcribe with Whisper (with contextual prompt)
                 let transcribeStart = Date()
                 Logger.shared.info("🔄 Starting Whisper transcription...", category: .transcription)
 
-                let rawText = try await self.whisperService.transcribe(samples: samples)
+                let rawText = try await self.whisperService.transcribe(samples: samples, initialPrompt: initialPrompt)
                 let transcribeTime = Date().timeIntervalSince(transcribeStart)
 
                 Logger.shared.info("📝 Whisper complete: \"\(rawText)\" (took \(String(format: "%.3f", transcribeTime))s, ratio: \(String(format: "%.1f", transcribeTime / audioLength))x)", category: .transcription)
+
+                // Step 2: Apply text formatting (rule-based + vocabulary replacement)
+                let formatStart = Date()
+                let formattedText = self.textFormatter.format(rawText)
+                let formatTime = Date().timeIntervalSince(formatStart)
+
+                if formattedText != rawText {
+                    Logger.shared.info("✏️ Formatted: \"\(rawText)\" → \"\(formattedText)\" (\(String(format: "%.3f", formatTime))s)", category: .transcription)
+                }
 
                 let stateUpdateStart = Date()
                 await MainActor.run {
@@ -845,14 +920,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let stateUpdateTime = Date().timeIntervalSince(stateUpdateStart)
                 Logger.shared.info("💾 State updated in \(String(format: "%.3f", stateUpdateTime))s", category: .transcription)
 
-                // Step 2: Insert text with context-aware formatting
+                // Step 3: Insert formatted text
                 let insertStart = Date()
                 Logger.shared.info("⌨️ Starting text insertion...", category: .transcription)
 
                 await MainActor.run {
                     autoreleasepool {
-                        self.textInsertionService.insertText(rawText)
-                        self.transcriptionState.setFormattedText(rawText)
+                        self.textInsertionService.insertText(formattedText)
+                        self.transcriptionState.setFormattedText(formattedText)
                         self.transcriptionState.completeProcessing()
                     }
                 }
@@ -860,7 +935,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 Logger.shared.info("✅ Text inserted in \(String(format: "%.3f", insertTime))s", category: .transcription)
 
                 let totalTime = Date().timeIntervalSince(pipelineStart)
-                Logger.shared.info("🎉 TOTAL PIPELINE: \(String(format: "%.3f", totalTime))s (whisper: \(String(format: "%.3f", transcribeTime))s, state: \(String(format: "%.3f", stateUpdateTime))s, insert: \(String(format: "%.3f", insertTime))s)", category: .transcription)
+                Logger.shared.info("🎉 TOTAL PIPELINE: \(String(format: "%.3f", totalTime))s (whisper: \(String(format: "%.3f", transcribeTime))s, format: \(String(format: "%.3f", formatTime))s, state: \(String(format: "%.3f", stateUpdateTime))s, insert: \(String(format: "%.3f", insertTime))s)", category: .transcription)
 
             } catch {
                 let failTime = Date().timeIntervalSince(pipelineStart)

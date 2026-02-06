@@ -16,6 +16,9 @@ class WhisperService {
     /// Serial queue to ensure only one transcription happens at a time
     /// Using userInteractive for maximum priority - transcription is time-sensitive
     private let transcriptionQueue = DispatchQueue(label: "com.whisperdictation.transcription", qos: .userInteractive)
+
+    /// Persistent C string for initial_prompt (must stay alive during transcription)
+    private var initialPromptCString: UnsafeMutablePointer<CChar>?
     
     // MARK: - Initialization
     
@@ -62,24 +65,60 @@ class WhisperService {
             Logger.shared.warning("⚠️ Core ML model NOT found (expected at \(coreMLPath)) - will use CPU only (slower)", category: .whisper)
         }
 
-        // Load the model using SwiftWhisper
+        // Load the model using SwiftWhisper with optimized decoding parameters
         let modelURL = URL(fileURLWithPath: modelPath)
-        self.whisper = Whisper(fromFileURL: modelURL)
+        let params = WhisperParams(strategy: .beamSearch)
+
+        // Beam search with 5 beams explores multiple hypotheses for better accuracy
+        params.beam_search.beam_size = 5
+
+        // Short dictation clips benefit from single-segment mode (avoids boundary artifacts)
+        params.single_segment = true
+
+        // Explicit English avoids misdetection on noisy/short audio
+        params.language = .english
+
+        // Disabling suppress_blank prevents hallucinations like "Thank you for listening"
+        params.suppress_blank = false
+
+        Logger.shared.info("Whisper params: beam_size=5, single_segment=true, language=en, suppress_blank=false", category: .whisper)
+
+        self.whisper = Whisper(fromFileURL: modelURL, withParams: params)
 
         isModelLoaded = true
         Logger.shared.info("✅ Whisper model '\(modelName)' loaded successfully (Core ML: \(hasCoreML ? "YES" : "NO"))", category: .whisper)
     }
     
     /// Transcribe audio samples to text
-    /// - Parameter samples: Audio samples at 16kHz, mono, Float32
+    /// - Parameters:
+    ///   - samples: Audio samples at 16kHz, mono, Float32
+    ///   - initialPrompt: Optional context prompt to bias Whisper toward specific vocabulary/style
     /// - Returns: Transcribed text
-    func transcribe(samples: [Float]) async throws -> String {
+    func transcribe(samples: [Float], initialPrompt: String? = nil) async throws -> String {
         guard isModelLoaded, whisper != nil else {
             throw WhisperError.modelNotLoaded
         }
 
         guard !samples.isEmpty else {
             throw WhisperError.emptyAudio
+        }
+
+        // Set initial_prompt on the Whisper params before transcription
+        if let prompt = initialPrompt, let whisper = self.whisper {
+            // Free previous C string if any
+            if let prev = initialPromptCString {
+                free(prev)
+            }
+            initialPromptCString = strdup(prompt)
+            whisper.params.initial_prompt = UnsafePointer(initialPromptCString)
+            Logger.shared.info("📋 Initial prompt set (\(prompt.count) chars): \"\(prompt.prefix(100))...\"", category: .transcription)
+        } else if let whisper = self.whisper {
+            // Clear any previous prompt
+            if let prev = initialPromptCString {
+                free(prev)
+                initialPromptCString = nil
+            }
+            whisper.params.initial_prompt = nil
         }
 
         let startTime = Date()
@@ -129,6 +168,12 @@ class WhisperService {
                     }
                 }
             }
+        }
+    }
+
+    deinit {
+        if let ptr = initialPromptCString {
+            free(ptr)
         }
     }
     
