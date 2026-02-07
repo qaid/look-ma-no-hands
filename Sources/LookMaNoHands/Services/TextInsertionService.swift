@@ -412,6 +412,11 @@ class TextInsertionService {
             }
         }
 
+        // Add leading space if cursor is directly after a non-space character (e.g. after a period)
+        if context.needsLeadingSpace {
+            result = " " + result
+        }
+
         // Add trailing space if the next character is a non-space character
         if context.needsTrailingSpace {
             result += " "
@@ -424,6 +429,7 @@ class TextInsertionService {
     private struct InsertionContext {
         let shouldCapitalize: Bool
         let shouldAddPunctuation: Bool
+        let needsLeadingSpace: Bool
         let needsTrailingSpace: Bool
     }
 
@@ -434,7 +440,7 @@ class TextInsertionService {
             // If there's text after cursor, we're inserting before existing content
             let hasTextAfter = !existingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let firstCharIsNonSpace = existingText.first.map { !$0.isWhitespace } ?? false
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: !hasTextAfter, needsTrailingSpace: firstCharIsNonSpace)
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: !hasTextAfter, needsLeadingSpace: false, needsTrailingSpace: firstCharIsNonSpace)
         }
 
         // Safely clamp cursor position to valid range
@@ -449,7 +455,7 @@ class TextInsertionService {
         guard let contextStart = existingText.index(existingText.startIndex, offsetBy: startOffset, limitedBy: existingText.endIndex),
               let contextEnd = existingText.index(existingText.startIndex, offsetBy: safePosition, limitedBy: existingText.endIndex) else {
             // Index calculation failed - treat as beginning of text
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsTrailingSpace: false)
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsLeadingSpace: false, needsTrailingSpace: false)
         }
 
         let beforeCursor = String(existingText[contextStart..<contextEnd])
@@ -478,17 +484,20 @@ class TextInsertionService {
         // Check if the first character after cursor is a non-space character
         let needsTrailingSpace = afterCursor.first.map { !$0.isWhitespace && !$0.isNewline } ?? false
 
+        // Check if the last character before cursor is a non-space character (needs leading space)
+        let needsLeadingSpace = beforeCursor.last.map { !$0.isWhitespace && !$0.isNewline } ?? false
+
         // Trim whitespace to analyze the actual content
         let trimmedBefore = beforeCursor.trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Empty context = beginning of field
         guard !trimmedBefore.isEmpty else {
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsTrailingSpace: needsTrailingSpace)
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsLeadingSpace: false, needsTrailingSpace: needsTrailingSpace)
         }
 
         // Get the last non-whitespace character before cursor
         guard let lastChar = trimmedBefore.last else {
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsTrailingSpace: needsTrailingSpace)
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsLeadingSpace: false, needsTrailingSpace: needsTrailingSpace)
         }
 
         var shouldCapitalize = false
@@ -534,6 +543,7 @@ class TextInsertionService {
         return InsertionContext(
             shouldCapitalize: shouldCapitalize,
             shouldAddPunctuation: shouldAddPunctuation,
+            needsLeadingSpace: needsLeadingSpace,
             needsTrailingSpace: needsTrailingSpace
         )
     }
