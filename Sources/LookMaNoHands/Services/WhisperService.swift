@@ -210,7 +210,16 @@ class WhisperService {
         ]
     }
 
-    /// Download a model from Hugging Face (both .bin and Core ML if available)
+    /// Models known to have Core ML encoder versions on Hugging Face.
+    /// Only these models will attempt a Core ML download; others skip the network request entirely.
+    private static let coreMLAvailableModels: Set<String> = ["tiny", "base", "small"]
+
+    /// Download a model from Hugging Face (both .bin and Core ML if available).
+    ///
+    /// **NETWORK ACTIVITY**: This is the ONLY method in the entire app that makes outgoing
+    /// internet requests. It connects to `https://huggingface.co` to download Whisper model
+    /// files. It is only called when the user explicitly triggers a model download (button click
+    /// in Onboarding or Settings). No automatic/background downloads ever occur.
     static func downloadModel(named modelName: String, progress: @escaping (Double) -> Void) async throws {
         let modelFileName = "ggml-\(modelName).bin"
         let coreMLFileName = "ggml-\(modelName)-encoder.mlmodelc"
@@ -242,37 +251,40 @@ class WhisperService {
             progress(0.5)
         }
 
-        // Try to download Core ML model for acceleration (optional, may not exist for all models)
-        // Core ML models are compressed as .zip on Hugging Face
+        // Try to download Core ML model for acceleration (only for models known to have Core ML versions)
         if !FileManager.default.fileExists(atPath: coreMLPath.path) {
-            let coreMLZipURL = URL(string: "\(baseURL)/\(coreMLFileName).zip")!
-            print("Attempting to download Core ML model from \(coreMLZipURL)")
+            if coreMLAvailableModels.contains(modelName) {
+                let coreMLZipURL = URL(string: "\(baseURL)/\(coreMLFileName).zip")!
+                print("Downloading Core ML model from \(coreMLZipURL)")
 
-            do {
-                let session = URLSession.shared
-                let (tempURL, response) = try await session.download(from: coreMLZipURL, delegate: nil)
+                do {
+                    let session = URLSession.shared
+                    let (tempURL, response) = try await session.download(from: coreMLZipURL, delegate: nil)
 
-                if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                    // Unzip the Core ML model
-                    let tempZipPath = modelDir.appendingPathComponent("temp-coreml.zip")
-                    try FileManager.default.moveItem(at: tempURL, to: tempZipPath)
+                    if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                        // Unzip the Core ML model
+                        let tempZipPath = modelDir.appendingPathComponent("temp-coreml.zip")
+                        try FileManager.default.moveItem(at: tempURL, to: tempZipPath)
 
-                    // Use unzip command to extract
-                    let process = Process()
-                    process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-                    process.arguments = ["-o", tempZipPath.path, "-d", modelDir.path]
-                    try process.run()
-                    process.waitUntilExit()
+                        // Use unzip command to extract
+                        let process = Process()
+                        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+                        process.arguments = ["-o", tempZipPath.path, "-d", modelDir.path]
+                        try process.run()
+                        process.waitUntilExit()
 
-                    // Clean up zip file
-                    try? FileManager.default.removeItem(at: tempZipPath)
+                        // Clean up zip file
+                        try? FileManager.default.removeItem(at: tempZipPath)
 
-                    print("Core ML model downloaded and extracted successfully - will enable GPU acceleration!")
-                } else {
-                    print("Core ML model not available for \(modelName) - will use CPU only")
+                        print("Core ML model downloaded and extracted successfully - will enable GPU acceleration!")
+                    } else {
+                        print("Core ML model not available for \(modelName) - will use CPU only")
+                    }
+                } catch {
+                    print("Core ML model download failed (optional): \(error.localizedDescription)")
                 }
-            } catch {
-                print("Core ML model download optional and failed (expected for some models): \(error.localizedDescription)")
+            } else {
+                print("Core ML model not available for '\(modelName)' (only available for: \(coreMLAvailableModels.sorted().joined(separator: ", "))) - will use CPU only")
             }
         } else {
             print("Core ML model already exists")
