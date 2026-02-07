@@ -33,6 +33,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let ollamaService = OllamaService() // Optional - for advanced formatting
     private let textInsertionService = TextInsertionService()
     private let updateService = UpdateService()
+    private let mediaControlService = MediaControlService()
 
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
@@ -740,6 +741,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenuBarIcon(isRecording: false)
         recordingIndicator.hide()
 
+        // Resume system media if we paused it
+        if Settings.shared.pauseMediaDuringDictation {
+            mediaControlService.resumeMedia()
+        }
+
         NSLog("✅ Recording canceled - no text will be inserted")
     }
 
@@ -761,6 +767,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Show recording indicator
         recordingIndicator.show()
 
+        // Pause system media if enabled
+        if Settings.shared.pauseMediaDuringDictation {
+            mediaControlService.pauseMedia()
+        }
+
         // Start audio recording
         do {
             try audioRecorder.startRecording()
@@ -768,6 +779,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             transcriptionState.setError("Failed to start recording: \(error.localizedDescription)")
             updateMenuBarIcon(isRecording: false)
+
+            // Resume media if we paused it before the failed recording attempt
+            if Settings.shared.pauseMediaDuringDictation {
+                mediaControlService.resumeMedia()
+            }
 
             // Hide indicator with slight delay to ensure proper cleanup
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -869,6 +885,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Hide indicator immediately to avoid frozen waveform
         // (waveform stops animating when isRecording = false)
         recordingIndicator.hide()
+
+        // Resume system media if we paused it
+        if Settings.shared.pauseMediaDuringDictation {
+            mediaControlService.resumeMedia()
+        }
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
 
