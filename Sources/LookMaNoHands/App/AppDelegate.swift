@@ -32,6 +32,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let textFormatter = TextFormatter.with(preset: .standard)
     private let ollamaService = OllamaService() // Optional - for advanced formatting
     private let textInsertionService = TextInsertionService()
+    private let updateService = UpdateService()
 
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
@@ -190,6 +191,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupKeyboardMonitoring()
         NSLog("✅ AppDelegate: Keyboard monitoring setup complete")
 
+        // Check for updates if enabled (silent, non-blocking)
+        if Settings.shared.checkForUpdatesOnLaunch {
+            Task {
+                await checkForUpdatesOnLaunch()
+            }
+        }
+
         NSLog("🎉 Look Ma No Hands initialization complete")
     }
 
@@ -276,7 +284,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(openSettings),
             keyEquivalent: ","
         ))
-        
+
+        // Check for Updates
+        menu.addItem(NSMenuItem(
+            title: "Check for Updates...",
+            action: #selector(checkForUpdatesManually),
+            keyEquivalent: ""
+        ))
+
         menu.addItem(NSMenuItem.separator())
 
         // Developer Reset
@@ -1009,6 +1024,113 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             recordingMenuItem?.title = "Stop Recording (\(hotkeyName))"
         } else {
             recordingMenuItem?.title = "Start Recording (\(hotkeyName))"
+        }
+    }
+
+    // MARK: - Update Checking
+
+    /// Check for updates on app launch (silent, doesn't block UI)
+    private func checkForUpdatesOnLaunch() async {
+        // Throttle: only check once per day
+        if let lastCheck = Settings.shared.lastUpdateCheckDate,
+           Date().timeIntervalSince(lastCheck) < 86400 {
+            return
+        }
+
+        do {
+            if let updateInfo = try await updateService.checkForUpdates() {
+                Settings.shared.lastUpdateCheckDate = Date()
+                await NotificationService.shared.sendNotification(
+                    title: "Update Available",
+                    body: "Look Ma No Hands \(updateInfo.version) is available. Click \"Check for Updates\" in the menu bar to download."
+                )
+            } else {
+                Settings.shared.lastUpdateCheckDate = Date()
+            }
+        } catch {
+            Logger.shared.info("Update check failed: \(error.localizedDescription)", category: .app)
+        }
+    }
+
+    /// Manually check for updates (user-initiated from menu)
+    @objc private func checkForUpdatesManually() {
+        Task {
+            do {
+                if let updateInfo = try await updateService.checkForUpdates() {
+                    await MainActor.run {
+                        Settings.shared.lastUpdateCheckDate = Date()
+                        showUpdateDialog(updateInfo: updateInfo)
+                    }
+                } else {
+                    await MainActor.run {
+                        Settings.shared.lastUpdateCheckDate = Date()
+                        let alert = NSAlert()
+                        alert.messageText = "You're Up to Date"
+                        alert.informativeText = "Look Ma No Hands \(updateService.getCurrentVersion()) is the latest version."
+                        alert.alertStyle = .informational
+                        alert.addButton(withTitle: "OK")
+                        alert.runModal()
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    showAlert(title: "Update Check Failed", message: "Could not check for updates: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// Show dialog offering to download update
+    private func showUpdateDialog(updateInfo: UpdateService.UpdateInfo) {
+        let alert = NSAlert()
+        alert.messageText = "Update Available"
+
+        let notes = updateInfo.releaseNotes
+        let truncatedNotes = notes.count > 500 ? String(notes.prefix(500)) + "..." : notes
+
+        alert.informativeText = """
+        Look Ma No Hands \(updateInfo.version) is available (you have \(updateService.getCurrentVersion())).
+
+        Release Notes:
+        \(truncatedNotes)
+        """
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: "Download Update")
+        alert.addButton(withTitle: "View on GitHub")
+        alert.addButton(withTitle: "Later")
+
+        let response = alert.runModal()
+
+        if response == .alertFirstButtonReturn {
+            downloadAndOpenUpdate(from: updateInfo.downloadURL)
+        } else if response == .alertSecondButtonReturn {
+            if let url = URL(string: "https://github.com/qaid/look-ma-no-hands/releases/tag/v\(updateInfo.version)") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+
+    /// Download update DMG and open it
+    private func downloadAndOpenUpdate(from url: URL) {
+        Task {
+            do {
+                let localURL = try await updateService.downloadUpdate(from: url)
+
+                await MainActor.run {
+                    NSWorkspace.shared.open(localURL)
+
+                    let alert = NSAlert()
+                    alert.messageText = "Update Downloaded"
+                    alert.informativeText = "The update has been downloaded and opened. Drag the new app to your Applications folder to replace the current version, then restart."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                }
+            } catch {
+                await MainActor.run {
+                    showAlert(title: "Download Failed", message: "Could not download update: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
