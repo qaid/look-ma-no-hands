@@ -311,6 +311,15 @@ struct SettingsView: View {
                 Text("Audio Input")
             }
 
+            Section {
+                Toggle("Pause media during dictation", isOn: $settings.pauseMediaDuringDictation)
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text("Automatically pauses playing media when you start dictating and resumes it when you stop")
+                    .font(.caption)
+            }
+
             Spacer()
         }
     }
@@ -514,16 +523,6 @@ struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
 
-                Divider()
-                    .padding(.vertical, 4)
-
-                // Media pause toggle
-                Toggle("Pause media during dictation", isOn: $settings.pauseMediaDuringDictation)
-                    .font(.body)
-
-                Text("Automatically pauses playing media when you start dictating and resumes it when you stop")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
             }
             .padding(20)
 
