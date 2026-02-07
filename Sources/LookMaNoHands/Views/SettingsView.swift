@@ -49,6 +49,11 @@ struct SettingsView: View {
     // Permission polling timer
     @State private var permissionCheckTimer: Timer?
 
+    // Track permission changes for restart prompt
+    @State private var permissionsChanged = false
+    @State private var previousMicPermission: PermissionState = .unknown
+    @State private var previousAccessibilityPermission: PermissionState = .unknown
+
     var body: some View {
         NavigationSplitView {
             sidebarContent
@@ -585,6 +590,28 @@ struct SettingsView: View {
                 )
             }
 
+            if permissionsChanged {
+                Section {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Permissions Changed")
+                                .font(.headline)
+                            Text("Restart the app to apply the new permissions.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        Spacer()
+
+                        Button("Restart App") {
+                            restartApp()
+                        }
+                        .controlSize(.large)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
             Section("Additional Info") {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
@@ -938,21 +965,34 @@ struct SettingsView: View {
     
     private func checkPermissions() {
         // Check microphone permission
+        let newMicPermission: PermissionState
         let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         switch micStatus {
         case .authorized:
-            micPermission = .granted
+            newMicPermission = .granted
         case .denied, .restricted:
-            micPermission = .denied
+            newMicPermission = .denied
         case .notDetermined:
-            micPermission = .unknown
+            newMicPermission = .unknown
         @unknown default:
-            micPermission = .unknown
+            newMicPermission = .unknown
         }
 
         // Check accessibility permission
         let trusted = AXIsProcessTrusted()
-        accessibilityPermission = trusted ? .granted : .denied
+        let newAccessibilityPermission: PermissionState = trusted ? .granted : .denied
+
+        // Detect permission changes (only after initial check)
+        if previousMicPermission != .unknown || previousAccessibilityPermission != .unknown {
+            if newMicPermission != previousMicPermission || newAccessibilityPermission != previousAccessibilityPermission {
+                permissionsChanged = true
+            }
+        }
+
+        previousMicPermission = newMicPermission
+        previousAccessibilityPermission = newAccessibilityPermission
+        micPermission = newMicPermission
+        accessibilityPermission = newAccessibilityPermission
     }
     
     private func requestMicrophonePermission() {
