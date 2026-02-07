@@ -144,7 +144,7 @@ struct SettingsView: View {
 
     private var generalTab: some View {
         Form {
-            // Appearance Section
+            // Position Section
             Section {
                 Toggle("Show recording indicator", isOn: $settings.showIndicator)
                     .help("Display a floating waveform visualizer while recording")
@@ -160,7 +160,7 @@ struct SettingsView: View {
                     .help("Choose where the waveform visualizer appears on screen")
                 }
             } header: {
-                Text("Appearance")
+                Text("Position")
                     .font(.headline)
             } footer: {
                 if settings.showIndicator {
