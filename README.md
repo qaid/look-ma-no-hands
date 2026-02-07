@@ -167,13 +167,24 @@ See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
 
 ## 🛠️ Requirements
 
+### macOS Compatibility
+
+| macOS Version | Supported | Notes |
+|---------------|-----------|-------|
+| **macOS 15** (Sequoia) | ✅ Fully supported | |
+| **macOS 14** (Sonoma) | ✅ Fully supported | Minimum required version |
+| **macOS 13** (Ventura) | ❌ Not supported | Missing `@Observable` macro, new SwiftUI APIs |
+| **macOS 12** (Monterey) and earlier | ❌ Not supported | Missing Swift concurrency runtime, ScreenCaptureKit |
+
+**Why macOS 14?** The app uses the `@Observable` macro and SwiftUI's updated `onChange(of:)` API, both introduced in macOS 14 Sonoma.
+
 ### For Voice Dictation
 - **macOS 14+** (Sonoma or later)
 - **Apple Silicon** recommended (Intel Macs supported but slower)
 - **~200 MB disk space** for tiny model + Core ML
 
 ### For Meeting Transcription
-- **macOS 14+** (Sonoma or later) - for ScreenCaptureKit
+- **macOS 14+** (Sonoma or later)
 - **Ollama** installed and running locally
 - **Screen recording permission** (for system audio capture)
 - **Additional disk space** for Ollama model (~2-4 GB)
@@ -223,7 +234,7 @@ In the Meeting Transcription window:
 **Core ML not loading?**
 - Check console for `whisper_init_state: Core ML model loaded`
 - Ensure `.mlmodelc` file is in `~/.whisper/models/`
-- Requires macOS 12+ and Apple Silicon for best performance
+- Requires Apple Silicon for best performance
 
 **Text not inserting?**
 - Some apps restrict accessibility—Look Ma No Hands falls back to clipboard
@@ -304,7 +315,7 @@ Look Ma No Hands is 100% local:
 
 ### Meeting Transcription
 - System audio capture requires Screen Recording permission
-- ScreenCaptureKit requires macOS 14+ (Sonoma or later)
+- System audio capture requires macOS 14+ (Sonoma or later)
 - Speaker identification not yet implemented (all text appears as one speaker)
 - Ollama must be running locally for AI-powered note generation
 - Meeting notes are not automatically saved (copy/paste to save)
