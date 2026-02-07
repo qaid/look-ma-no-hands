@@ -960,11 +960,6 @@ struct SettingsView: View {
             Spacer()
         }
         .padding()
-        .onAppear {
-            if availableUpdate == nil && !isCheckingForUpdates {
-                performUpdateCheck()
-            }
-        }
     }
 
     // MARK: - Update Checking
