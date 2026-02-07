@@ -130,6 +130,8 @@ struct ProgressIndicatorView: View {
                     Text(stepTitles[index])
                         .font(.system(size: 10, weight: step.rawValue == currentStep.rawValue ? .semibold : .regular))
                         .foregroundColor(step.rawValue <= currentStep.rawValue ? .primary : .secondary.opacity(0.6))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
                 .frame(maxWidth: .infinity)
 

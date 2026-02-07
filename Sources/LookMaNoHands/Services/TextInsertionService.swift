@@ -2,12 +2,20 @@ import Foundation
 import AppKit
 import ApplicationServices
 
+/// Captured AX text field state to avoid multiple reads (race condition)
+private struct AXTextFieldState {
+    let element: AXUIElement
+    let text: String
+    let cursorLocation: Int  // UTF-16 offset
+    let selectionLength: Int // UTF-16 offset
+}
+
 /// Service for inserting text into the currently focused text field
 /// Uses multiple strategies to maximize compatibility across applications
 class TextInsertionService {
-    
+
     // MARK: - Public Methods
-    
+
     /// Insert text into the currently focused text field
     /// Tries multiple methods in order of preference
     /// - Parameter text: The text to insert (raw transcription)
@@ -17,13 +25,35 @@ class TextInsertionService {
         // First apply basic cleanup
         let cleanedText = basicCleanup(text)
 
-        // Then apply context-aware formatting before insertion
-        let formattedText = applyContextAwareFormatting(cleanedText)
+        // Read AX state once to avoid race conditions between formatting and insertion
+        let state = captureAXState()
+
+        // Apply context-aware formatting using the captured state
+        let formattedText = applyContextAwareFormatting(cleanedText, state: state)
 
         // Strategy 1: Try Accessibility API (cleanest method)
-        if insertViaAccessibility(formattedText) {
+        if let state = state, insertAtSelection(state, text: formattedText) {
             print("TextInsertionService: Inserted via Accessibility API")
             return true
+        }
+
+        // Strategy 1b: Try AX without captured state (element might not be a text field)
+        if state == nil, let element = getFocusedElement() {
+            var roleValue: CFTypeRef?
+            let roleResult = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
+            if roleResult == .success,
+               let role = roleValue as? String,
+               role == kAXTextFieldRole || role == kAXTextAreaRole {
+                let setResult = AXUIElementSetAttributeValue(
+                    element,
+                    kAXValueAttribute as CFString,
+                    formattedText as CFTypeRef
+                )
+                if setResult == .success {
+                    print("TextInsertionService: Inserted via Accessibility API (set value)")
+                    return true
+                }
+            }
         }
 
         // Strategy 2: Try clipboard + paste (most compatible)
@@ -41,11 +71,10 @@ class TextInsertionService {
     
     // MARK: - Strategy 1: Accessibility API
 
-    private func insertViaAccessibility(_ text: String) -> Bool {
-        // Get the focused UI element
+    /// Capture the current AX text field state in a single read
+    private func captureAXState() -> AXTextFieldState? {
         guard let focusedElement = getFocusedElement() else {
-            print("TextInsertionService: Could not get focused element")
-            return false
+            return nil
         }
 
         // Check if it's a text field/area
@@ -55,24 +84,47 @@ class TextInsertionService {
         guard roleResult == .success,
               let role = roleValue as? String,
               role == kAXTextFieldRole || role == kAXTextAreaRole else {
-            print("TextInsertionService: Focused element is not a text field")
-            return false
+            return nil
         }
 
-        // PRIORITY 1: Try inserting at selection (preserves existing text)
-        if insertAtSelection(focusedElement, text: text) {
-            return true
-        }
-
-        // PRIORITY 2: Fall back to setting value directly (replaces all text)
-        // This is a last resort for fields that don't support insertion
-        let setResult = AXUIElementSetAttributeValue(
+        // Get current value
+        var currentValue: CFTypeRef?
+        let valueResult = AXUIElementCopyAttributeValue(
             focusedElement,
             kAXValueAttribute as CFString,
-            text as CFTypeRef
+            &currentValue
         )
 
-        return setResult == .success
+        guard valueResult == .success,
+              let currentText = currentValue as? String else {
+            return nil
+        }
+
+        // Get selection range (UTF-16 offsets from AX API)
+        var selectedRange: CFTypeRef?
+        let rangeResult = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRange
+        )
+
+        let nsString = currentText as NSString
+        var cursorLocation = nsString.length
+        var selectionLength = 0
+
+        if rangeResult == .success, let rangeValue = selectedRange {
+            var range = CFRange()
+            AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
+            cursorLocation = min(range.location, nsString.length)
+            selectionLength = min(range.length, nsString.length - cursorLocation)
+        }
+
+        return AXTextFieldState(
+            element: focusedElement,
+            text: currentText,
+            cursorLocation: cursorLocation,
+            selectionLength: selectionLength
+        )
     }
     
     /// Get the currently focused accessibility element
@@ -109,51 +161,23 @@ class TextInsertionService {
         return (element as! AXUIElement)
     }
     
-    /// Insert text at the current selection point
-    private func insertAtSelection(_ element: AXUIElement, text: String) -> Bool {
-        // Get current value
-        var currentValue: CFTypeRef?
-        let valueResult = AXUIElementCopyAttributeValue(
-            element,
-            kAXValueAttribute as CFString,
-            &currentValue
-        )
-        
-        // Get selection range
-        var selectedRange: CFTypeRef?
-        let rangeResult = AXUIElementCopyAttributeValue(
-            element,
-            kAXSelectedTextRangeAttribute as CFString,
-            &selectedRange
-        )
-        
-        guard valueResult == .success,
-              rangeResult == .success,
-              let currentText = currentValue as? String else {
-            return false
-        }
-        
-        // Convert AXValue to CFRange
-        var range = CFRange()
-        if let rangeValue = selectedRange {
-            AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
-        } else {
-            // Append at end if no selection
-            range = CFRange(location: currentText.count, length: 0)
-        }
+    /// Insert text at the current selection point using captured AX state
+    /// Uses UTF-16 offsets (NSString convention) to match AX API behavior
+    private func insertAtSelection(_ state: AXTextFieldState, text: String) -> Bool {
+        let currentText = state.text
+        let nsString = currentText as NSString
 
-        // Clamp range to valid bounds
-        let safeLocation = min(range.location, currentText.count)
-        let maxLength = currentText.count - safeLocation
-        let safeLength = min(range.length, maxLength)
+        // AX API returns UTF-16 offsets — clamp to valid NSString bounds
+        let safeLocation = min(state.cursorLocation, nsString.length)
+        let safeLength = min(state.selectionLength, nsString.length - safeLocation)
+        let nsRange = NSRange(location: safeLocation, length: safeLength)
 
-        // Build new text with insertion using safe indices
-        guard let startIndex = currentText.index(currentText.startIndex, offsetBy: safeLocation, limitedBy: currentText.endIndex),
-              let endIndex = currentText.index(startIndex, offsetBy: safeLength, limitedBy: currentText.endIndex) else {
-            // Index calculation failed, fall back to appending
+        // Convert UTF-16 NSRange to Swift String.Index range
+        guard let swiftRange = Range(nsRange, in: currentText) else {
+            // Fallback: append at end
             let newText = currentText + text
             let setResult = AXUIElementSetAttributeValue(
-                element,
+                state.element,
                 kAXValueAttribute as CFString,
                 newText as CFTypeRef
             )
@@ -161,16 +185,29 @@ class TextInsertionService {
         }
 
         var newText = currentText
-        newText.replaceSubrange(startIndex..<endIndex, with: text)
-        
+        newText.replaceSubrange(swiftRange, with: text)
+
         // Set the new value
         let setResult = AXUIElementSetAttributeValue(
-            element,
+            state.element,
             kAXValueAttribute as CFString,
             newText as CFTypeRef
         )
-        
-        return setResult == .success
+
+        guard setResult == .success else { return false }
+
+        // Position cursor at end of inserted text (UTF-16 offset)
+        let newCursorLocation = safeLocation + (text as NSString).length
+        var newRange = CFRange(location: newCursorLocation, length: 0)
+        if let rangeValue = AXValueCreate(.cfRange, &newRange) {
+            AXUIElementSetAttributeValue(
+                state.element,
+                kAXSelectedTextRangeAttribute as CFString,
+                rangeValue
+            )
+        }
+
+        return true
     }
     
     // MARK: - Strategy 2: Clipboard + Paste
@@ -300,22 +337,21 @@ class TextInsertionService {
             &selectedRange
         )
 
-        var cursorPosition = currentText.count
+        let nsString = currentText as NSString
+        var cursorUTF16 = nsString.length
         if rangeResult == .success, let rangeValue = selectedRange {
             var range = CFRange()
             AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
-            cursorPosition = min(range.location, currentText.count)
+            cursorUTF16 = min(range.location, nsString.length)
         }
+
+        // Convert UTF-16 cursor position to Swift String.Index
+        let cursorIndex = String.Index(utf16Offset: cursorUTF16, in: currentText)
 
         // Get the last maxLength characters before cursor
-        let startOffset = max(0, cursorPosition - maxLength)
+        let startIndex = currentText.index(cursorIndex, offsetBy: -min(maxLength, currentText.distance(from: currentText.startIndex, to: cursorIndex)), limitedBy: currentText.startIndex) ?? currentText.startIndex
 
-        guard let startIndex = currentText.index(currentText.startIndex, offsetBy: startOffset, limitedBy: currentText.endIndex),
-              let endIndex = currentText.index(currentText.startIndex, offsetBy: cursorPosition, limitedBy: currentText.endIndex) else {
-            return nil
-        }
-
-        let beforeCursor = String(currentText[startIndex..<endIndex])
+        let beforeCursor = String(currentText[startIndex..<cursorIndex])
         return beforeCursor.isEmpty ? nil : beforeCursor
     }
 
@@ -342,50 +378,17 @@ class TextInsertionService {
 
     /// Apply context-aware formatting based on surrounding text
     /// Adjusts capitalization and punctuation based on what comes before the cursor
-    private func applyContextAwareFormatting(_ text: String) -> String {
+    /// Uses pre-captured AX state to avoid race conditions
+    private func applyContextAwareFormatting(_ text: String, state: AXTextFieldState?) -> String {
         guard !text.isEmpty else { return text }
 
-        // Get the focused element and its context
-        guard let focusedElement = getFocusedElement() else {
-            // Can't get context, return text as-is
-            return text
-        }
-
-        // Get current text content
-        var currentValue: CFTypeRef?
-        let valueResult = AXUIElementCopyAttributeValue(
-            focusedElement,
-            kAXValueAttribute as CFString,
-            &currentValue
-        )
-
-        // Get selection range to find cursor position
-        var selectedRange: CFTypeRef?
-        let rangeResult = AXUIElementCopyAttributeValue(
-            focusedElement,
-            kAXSelectedTextRangeAttribute as CFString,
-            &selectedRange
-        )
-
-        guard valueResult == .success,
-              rangeResult == .success,
-              let currentText = currentValue as? String,
-              !currentText.isEmpty else {
+        guard let state = state, !state.text.isEmpty else {
             // No existing text or can't read it - keep original capitalization
             return text
         }
 
-        // Get cursor position
-        var range = CFRange()
-        if let rangeValue = selectedRange {
-            AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
-        } else {
-            // No selection info, assume end of text
-            range = CFRange(location: currentText.count, length: 0)
-        }
-
-        // Analyze context before cursor
-        let context = analyzeContext(currentText, cursorPosition: range.location)
+        // Analyze context before cursor (using UTF-16 cursor location)
+        let context = analyzeContext(state.text, cursorPosition: state.cursorLocation)
 
         var result = text
 
@@ -434,46 +437,35 @@ class TextInsertionService {
     }
 
     /// Analyze the context to determine formatting needs
+    /// cursorPosition is a UTF-16 offset (from AX API)
     private func analyzeContext(_ existingText: String, cursorPosition: Int) -> InsertionContext {
         // If cursor is at the very beginning
         guard cursorPosition > 0 else {
-            // If there's text after cursor, we're inserting before existing content
             let hasTextAfter = !existingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             let firstCharIsNonSpace = existingText.first.map { !$0.isWhitespace } ?? false
             return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: !hasTextAfter, needsLeadingSpace: false, needsTrailingSpace: firstCharIsNonSpace)
         }
 
-        // Safely clamp cursor position to valid range
-        let safePosition = min(cursorPosition, existingText.count)
+        let nsString = existingText as NSString
+
+        // Clamp UTF-16 cursor position to valid range
+        let safePosition = min(cursorPosition, nsString.length)
 
         // Check if we're at the end of the text
-        let isAtEnd = safePosition >= existingText.count
+        let isAtEnd = safePosition >= nsString.length
+
+        // Convert UTF-16 cursor position to Swift String.Index
+        let cursorIndex = String.Index(utf16Offset: safePosition, in: existingText)
 
         // Get text before cursor (up to 10 characters for context)
-        let startOffset = max(0, safePosition - 10)
-
-        guard let contextStart = existingText.index(existingText.startIndex, offsetBy: startOffset, limitedBy: existingText.endIndex),
-              let contextEnd = existingText.index(existingText.startIndex, offsetBy: safePosition, limitedBy: existingText.endIndex) else {
-            // Index calculation failed - treat as beginning of text
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: isAtEnd, needsLeadingSpace: false, needsTrailingSpace: false)
-        }
-
-        let beforeCursor = String(existingText[contextStart..<contextEnd])
+        let beforeStart = existingText.index(cursorIndex, offsetBy: -min(10, existingText.distance(from: existingText.startIndex, to: cursorIndex)), limitedBy: existingText.startIndex) ?? existingText.startIndex
+        let beforeCursor = String(existingText[beforeStart..<cursorIndex])
 
         // Get text after cursor (up to 10 characters)
         var afterCursor = ""
-        if safePosition < existingText.count {
-            guard let afterStart = existingText.index(existingText.startIndex, offsetBy: safePosition, limitedBy: existingText.endIndex) else {
-                // Failed to get after start, skip after context
-                return analyzeBeforeContext(beforeCursor: beforeCursor, isAtEnd: isAtEnd, afterCursor: "")
-            }
-
-            let remainingLength = existingText.count - safePosition
-            let lengthToRead = min(10, remainingLength)
-
-            if let afterEnd = existingText.index(afterStart, offsetBy: lengthToRead, limitedBy: existingText.endIndex) {
-                afterCursor = String(existingText[afterStart..<afterEnd])
-            }
+        if cursorIndex < existingText.endIndex {
+            let afterEnd = existingText.index(cursorIndex, offsetBy: 10, limitedBy: existingText.endIndex) ?? existingText.endIndex
+            afterCursor = String(existingText[cursorIndex..<afterEnd])
         }
 
         return analyzeBeforeContext(beforeCursor: beforeCursor, isAtEnd: isAtEnd, afterCursor: afterCursor)

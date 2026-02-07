@@ -149,8 +149,10 @@ class WhisperService {
 
                         let transcribeElapsed = Date().timeIntervalSince(transcribeStart)
 
-                        // Combine all segments into a single string
+                        // Combine all segments into a single string, sorted by timestamp
+                        // Beam search may return segments slightly out of order
                         let transcription = segments
+                            .sorted(by: { $0.startTime < $1.startTime })
                             .map { $0.text }
                             .joined(separator: " ")
                             .trimmingCharacters(in: .whitespacesAndNewlines)
