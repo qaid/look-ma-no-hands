@@ -349,31 +349,22 @@ struct SettingsView: View {
                 .padding(.horizontal, 4)
 
                 // Entries
-                ForEach(Array(settings.customVocabulary.enumerated()), id: \.element.id) { index, entry in
+                ForEach($settings.customVocabulary) { $entry in
                     HStack(spacing: 8) {
-                        TextField("e.g. swift ui", text: Binding(
-                            get: { settings.customVocabulary[index].phrase },
-                            set: { settings.customVocabulary[index].phrase = $0 }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 160)
+                        TextField("e.g. swift ui", text: $entry.phrase)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 160)
 
-                        TextField("e.g. SwiftUI", text: Binding(
-                            get: { settings.customVocabulary[index].replacement },
-                            set: { settings.customVocabulary[index].replacement = $0 }
-                        ))
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 160)
+                        TextField("e.g. SwiftUI", text: $entry.replacement)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 160)
 
-                        Toggle("", isOn: Binding(
-                            get: { settings.customVocabulary[index].enabled },
-                            set: { settings.customVocabulary[index].enabled = $0 }
-                        ))
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
+                        Toggle("", isOn: $entry.enabled)
+                            .toggleStyle(.checkbox)
+                            .labelsHidden()
 
                         Button(role: .destructive) {
-                            settings.customVocabulary.remove(at: index)
+                            settings.customVocabulary.removeAll { $0.id == entry.id }
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
