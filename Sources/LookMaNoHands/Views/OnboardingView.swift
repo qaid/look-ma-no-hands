@@ -215,7 +215,8 @@ struct OllamaStepView: View {
     let ollamaService: OllamaService
 
     @State private var ollamaInstalled: Bool = false
-    @State private var isChecking: Bool = true
+    @State private var isChecking: Bool = false
+    @State private var hasChecked: Bool = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -273,11 +274,11 @@ struct OllamaStepView: View {
                             Label("Copy Commands", systemImage: "doc.on.doc")
                         }
 
-                        // Check again button
+                        // Check status button
                         Button(action: {
                             checkOllama()
                         }) {
-                            Label("Check Again", systemImage: "arrow.clockwise")
+                            Label(hasChecked ? "Check Again" : "Check Status", systemImage: "arrow.clockwise")
                         }
                         .buttonStyle(.bordered)
                     }
@@ -289,9 +290,6 @@ struct OllamaStepView: View {
         }
         .padding(.horizontal, 40)
         .padding(.vertical, 15)
-        .onAppear {
-            checkOllama()
-        }
     }
 
     private func checkOllama() {
@@ -301,6 +299,7 @@ struct OllamaStepView: View {
             await MainActor.run {
                 ollamaInstalled = available
                 isChecking = false
+                hasChecked = true
             }
         }
     }

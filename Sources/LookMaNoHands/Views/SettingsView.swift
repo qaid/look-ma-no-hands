@@ -59,7 +59,6 @@ struct SettingsView: View {
         .frame(minWidth: 750, minHeight: 450)
         .onAppear {
             checkPermissions()
-            checkOllamaStatus()
             checkWhisperModelStatus()
             // Start permission polling if on permissions tab
             if selectedTab == .permissions {
@@ -1229,10 +1228,10 @@ enum ConnectionState {
     case checking
     case connected
     case disconnected
-    
+
     var description: String {
         switch self {
-        case .unknown: return "Unknown"
+        case .unknown: return "Not checked"
         case .checking: return "Checking..."
         case .connected: return "Connected"
         case .disconnected: return "Not Running"

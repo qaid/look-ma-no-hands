@@ -457,28 +457,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    // MARK: - Ollama Check
-
-    private func checkOllamaStatus() {
-        Task {
-            let available = await ollamaService.isAvailable()
-            await MainActor.run {
-                transcriptionState.isOllamaAvailable = available
-                print("Ollama status: \(available ? "Available" : "Not available")")
-
-                // Update menu item
-                if let menu = statusItem?.menu {
-                    for item in menu.items {
-                        if item.title.starts(with: "Ollama:") {
-                            item.title = "Ollama: \(available ? "✓ Running" : "✗ Not running")"
-                            break
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Whisper Model Loading
 
     private func loadWhisperModel() {
