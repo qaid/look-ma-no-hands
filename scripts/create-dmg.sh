@@ -4,7 +4,7 @@ set -e
 APP_NAME="Look Ma No Hands"
 BUNDLE_ID="com.lookmanohands.app"
 VERSION="${1:-1.0}"
-DMG_NAME="LookMaNoHands-${VERSION}.dmg"
+DMG_NAME="Look Ma No Hands ${VERSION}.dmg"
 BUILD_DIR="build"
 APP_PATH="${BUILD_DIR}/${APP_NAME}.app"
 

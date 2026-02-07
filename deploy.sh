@@ -47,6 +47,10 @@ rm -rf ~/Library/Caches/com.apple.iconservices.store
 killall Dock 2>/dev/null || true
 killall Finder 2>/dev/null || true
 
+# Reset app settings so onboarding shows on launch
+echo "🧹 Clearing app defaults..."
+defaults delete com.lookmanohands.app 2>/dev/null || true
+
 echo "✅ Deployed! Launching app..."
 open "$APP_PATH"
 
