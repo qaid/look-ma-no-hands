@@ -911,7 +911,7 @@ struct SettingsView: View {
 
                 if let lastCheck = settings.lastUpdateCheckDate {
                     HStack {
-                        Text("Last checked: \(lastCheck, style: .relative) ago")
+                        Text("Last checked: \(formatElapsedTime(since: lastCheck))")
                             .font(.caption2)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -994,6 +994,51 @@ struct SettingsView: View {
     }
 
     // MARK: - Helper Views
+
+    /// Formats elapsed time since a given date according to specific rules
+    private func formatElapsedTime(since date: Date) -> String {
+        let now = Date()
+        let interval = now.timeIntervalSince(date)
+
+        // Less than 60 seconds: show seconds only
+        if interval < 60 {
+            let seconds = Int(interval)
+            return "\(seconds) \(seconds == 1 ? "second" : "seconds") ago"
+        }
+
+        // Less than 60 minutes: show minutes only
+        if interval < 3600 {
+            let minutes = Int(interval / 60)
+            return "\(minutes) \(minutes == 1 ? "minute" : "minutes") ago"
+        }
+
+        // Less than 24 hours: show hours only
+        if interval < 86400 {
+            let hours = Int(interval / 3600)
+            return "\(hours) \(hours == 1 ? "hour" : "hours") ago"
+        }
+
+        // Less than 30 days: show days and hours
+        if interval < 2592000 {
+            let days = Int(interval / 86400)
+            let hours = Int((interval.truncatingRemainder(dividingBy: 86400)) / 3600)
+            return "\(days) \(days == 1 ? "day" : "days"), \(hours) \(hours == 1 ? "hour" : "hours") ago"
+        }
+
+        // Less than 365 days: show months and days
+        if interval < 31536000 {
+            let months = Int(interval / 2592000)
+            let days = Int((interval.truncatingRemainder(dividingBy: 2592000)) / 86400)
+            return "\(months) \(months == 1 ? "month" : "months"), \(days) \(days == 1 ? "day" : "days") ago"
+        }
+
+        // 365+ days: show years, months, and days
+        let years = Int(interval / 31536000)
+        let remainingAfterYears = interval.truncatingRemainder(dividingBy: 31536000)
+        let months = Int(remainingAfterYears / 2592000)
+        let days = Int((remainingAfterYears.truncatingRemainder(dividingBy: 2592000)) / 86400)
+        return "\(years) \(years == 1 ? "year" : "years"), \(months) \(months == 1 ? "month" : "months"), \(days) \(days == 1 ? "day" : "days") ago"
+    }
 
     /// Returns help text based on the selected indicator position
     private func positionHelpText(for position: IndicatorPosition) -> String {
