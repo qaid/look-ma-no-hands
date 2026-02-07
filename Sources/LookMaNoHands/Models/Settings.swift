@@ -241,6 +241,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let customVocabulary = "customVocabulary"
         static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
         static let lastUpdateCheckDate = "lastUpdateCheckDate"
+        static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
     }
     
     // MARK: - Audio Device Manager
@@ -340,6 +341,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to automatically pause media playback when dictation starts
+    @Published var pauseMediaDuringDictation: Bool {
+        didSet {
+            UserDefaults.standard.set(pauseMediaDuringDictation, forKey: Keys.pauseMediaDuringDictation)
+        }
+    }
+
     /// Date of the last successful update check
     var lastUpdateCheckDate: Date? {
         get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
@@ -418,6 +426,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.checkForUpdatesOnLaunch = false
         }
 
+        // Pause media during dictation defaults to true (enabled by default)
+        if UserDefaults.standard.object(forKey: Keys.pauseMediaDuringDictation) != nil {
+            self.pauseMediaDuringDictation = UserDefaults.standard.bool(forKey: Keys.pauseMediaDuringDictation)
+        } else {
+            self.pauseMediaDuringDictation = true
+        }
+
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
@@ -443,5 +458,6 @@ Now produce the complete meeting notes following the format above. Ensure every 
         customVocabulary = []
         checkForUpdatesOnLaunch = false
         lastUpdateCheckDate = nil
+        pauseMediaDuringDictation = true
     }
 }

@@ -15,6 +15,7 @@ Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock
   - System-reserved hotkey protection
 - **Menu bar control**: Start/Stop Recording button
 - **Smart formatting**: Automatic capitalization, punctuation, context-aware insertion, and cleanup
+- **Auto-pause media**: Automatically pauses playing media (Apple Music, Spotify, Pocket Casts, etc.) when dictation starts and resumes when it stops. Toggle in Settings → General.
 
 ### Meeting Transcription 🆕
 - **System audio capture**: Record video calls from Zoom, Meet, Teams, etc.
@@ -266,7 +267,8 @@ LookMaNoHands/
 │   │   ├── MeetingAnalyzer.swift     # Ollama integration
 │   │   ├── TextFormatter.swift       # Rule-based text cleanup
 │   │   ├── TextInsertionService.swift # Accessibility API + context-aware formatting
-│   │   └── KeyboardMonitor.swift     # Custom hotkey detection and validation
+│   │   ├── KeyboardMonitor.swift     # Custom hotkey detection and validation
+│   │   └── MediaControlService.swift # Auto-pause/resume system media during dictation
 │   ├── Views/            # SwiftUI + AppKit UI
 │   │   ├── RecordingIndicator.swift  # Floating indicator with animated border
 │   │   ├── SettingsView.swift        # Settings window
