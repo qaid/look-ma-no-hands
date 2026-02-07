@@ -405,8 +405,12 @@ class TextInsertionService {
             if lastChar != nil && !".,!?;:".contains(lastChar!) {
                 result += "."
             }
+        } else {
+            // Inserting mid-text: strip trailing punctuation that was auto-added by TextFormatter
+            while let lastChar = result.last, ".?".contains(lastChar) {
+                result = String(result.dropLast())
+            }
         }
-        // If inserting mid-sentence, don't add punctuation
 
         return result
     }
@@ -419,9 +423,11 @@ class TextInsertionService {
 
     /// Analyze the context to determine formatting needs
     private func analyzeContext(_ existingText: String, cursorPosition: Int) -> InsertionContext {
-        // If cursor is at the very beginning, capitalize and add punctuation
+        // If cursor is at the very beginning
         guard cursorPosition > 0 else {
-            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: true)
+            // If there's text after cursor, we're inserting before existing content
+            let hasTextAfter = !existingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return InsertionContext(shouldCapitalize: true, shouldAddPunctuation: !hasTextAfter)
         }
 
         // Safely clamp cursor position to valid range
