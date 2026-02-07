@@ -49,6 +49,11 @@ struct SettingsView: View {
     // Permission polling timer
     @State private var permissionCheckTimer: Timer?
 
+    // Update checking state
+    @State private var availableUpdate: UpdateService.UpdateInfo?
+    @State private var isCheckingForUpdates = false
+    @State private var updateCheckError: String?
+
     // Track permission changes for restart prompt
     @State private var permissionsChanged = false
     @State private var previousMicPermission: PermissionState = .unknown
@@ -851,12 +856,81 @@ struct SettingsView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version 0.1.0")
+            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
                 .foregroundColor(.secondary)
 
             Text("Fast, local voice dictation for macOS")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
+
+            Divider()
+
+            // Update check section
+            VStack(spacing: 12) {
+                HStack {
+                    if isCheckingForUpdates {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Checking for updates...")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else if let error = updateCheckError {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else if let update = availableUpdate {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .foregroundColor(.green)
+                                Text("Update available: \(update.version)")
+                                    .font(.headline)
+                            }
+
+                            HStack(spacing: 12) {
+                                Button("Download Update") {
+                                    NSWorkspace.shared.open(update.downloadURL)
+                                }
+
+                                if let url = URL(string: "https://github.com/qaid/look-ma-no-hands/releases/tag/v\(update.version)") {
+                                    Button("View Release Notes") {
+                                        NSWorkspace.shared.open(url)
+                                    }
+                                    .controlSize(.small)
+                                }
+                            }
+                        }
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Up to date")
+                            .font(.caption)
+                    }
+
+                    Spacer()
+
+                    if !isCheckingForUpdates {
+                        Button("Check Now") {
+                            performUpdateCheck()
+                        }
+                        .controlSize(.small)
+                    }
+                }
+
+                if let lastCheck = settings.lastUpdateCheckDate {
+                    HStack {
+                        Text("Last checked: \(lastCheck, style: .relative) ago")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                }
+
+                Toggle("Automatically check for updates on launch", isOn: $settings.checkForUpdatesOnLaunch)
+                    .font(.caption)
+            }
 
             Divider()
 
@@ -896,6 +970,42 @@ struct SettingsView: View {
             Spacer()
         }
         .padding()
+        .onAppear {
+            if availableUpdate == nil && !isCheckingForUpdates {
+                performUpdateCheck()
+            }
+        }
+    }
+
+    // MARK: - Update Checking
+
+    private func performUpdateCheck() {
+        isCheckingForUpdates = true
+        updateCheckError = nil
+        availableUpdate = nil
+
+        Task {
+            do {
+                let service = UpdateService()
+                if let update = try await service.checkForUpdates() {
+                    await MainActor.run {
+                        self.availableUpdate = update
+                        settings.lastUpdateCheckDate = Date()
+                        self.isCheckingForUpdates = false
+                    }
+                } else {
+                    await MainActor.run {
+                        settings.lastUpdateCheckDate = Date()
+                        self.isCheckingForUpdates = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    self.updateCheckError = error.localizedDescription
+                    self.isCheckingForUpdates = false
+                }
+            }
+        }
     }
 
     // MARK: - Helper Views

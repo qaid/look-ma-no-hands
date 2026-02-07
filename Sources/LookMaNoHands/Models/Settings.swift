@@ -239,6 +239,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let indicatorPosition = "indicatorPosition"
         static let showLaunchConfirmation = "showLaunchConfirmation"
         static let customVocabulary = "customVocabulary"
+        static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
+        static let lastUpdateCheckDate = "lastUpdateCheckDate"
     }
     
     // MARK: - Audio Device Manager
@@ -331,6 +333,25 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to automatically check for updates on launch (opt-in, default off)
+    @Published var checkForUpdatesOnLaunch: Bool {
+        didSet {
+            UserDefaults.standard.set(checkForUpdatesOnLaunch, forKey: Keys.checkForUpdatesOnLaunch)
+        }
+    }
+
+    /// Date of the last successful update check
+    var lastUpdateCheckDate: Date? {
+        get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
+        set {
+            if let date = newValue {
+                UserDefaults.standard.set(date, forKey: Keys.lastUpdateCheckDate)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.lastUpdateCheckDate)
+            }
+        }
+    }
+
     // MARK: - Initialization
     
     private init() {
@@ -390,6 +411,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.customVocabulary = []
         }
 
+        // Auto-update check defaults to false (opt-in)
+        if UserDefaults.standard.object(forKey: Keys.checkForUpdatesOnLaunch) != nil {
+            self.checkForUpdatesOnLaunch = UserDefaults.standard.bool(forKey: Keys.checkForUpdatesOnLaunch)
+        } else {
+            self.checkForUpdatesOnLaunch = false
+        }
+
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
@@ -413,5 +441,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         indicatorPosition = .followCursor
         showLaunchConfirmation = true
         customVocabulary = []
+        checkForUpdatesOnLaunch = false
+        lastUpdateCheckDate = nil
     }
 }
