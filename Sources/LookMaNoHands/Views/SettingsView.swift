@@ -112,6 +112,7 @@ struct SettingsView: View {
                     emptyStateView
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
             .padding(.trailing, 12)
         }
