@@ -9,3 +9,6 @@ build/
 
 # Swift Package Manager
 Package.resolved
+
+# Conductor workspace context
+.context/
