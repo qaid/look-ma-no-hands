@@ -19,6 +19,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Track meeting recording state for close warning
     var isMeetingRecording = false
 
+    // Pre-captured initial prompt (captured at recording start, before any insertion)
+    private var capturedInitialPrompt: String?
+
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
 
@@ -667,9 +670,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 3. Existing field text for continuation context (~200 chars / ~50 tokens)
-        if let existingText = textInsertionService.getExistingFieldText(maxLength: 200) {
-            parts.append(existingText)
-        }
+        // DISABLED: Including existing text causes Whisper to echo/duplicate it in output (Issue #100)
+        // if let existingText = textInsertionService.getExistingFieldText(maxLength: 200) {
+        //     parts.append(existingText)
+        // }
 
         let prompt = parts.joined(separator: " ")
         // Trim to ~890 chars to stay within 224 token limit
@@ -756,6 +760,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             handleMissingAccessibilityPermission()
             return
         }
+
+        // Capture field context NOW, before any previous transcription could contaminate it
+        capturedInitialPrompt = buildInitialPrompt()
 
         // Update state
         transcriptionState.startRecording()
@@ -872,8 +879,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let pipelineStart = Date()
         Logger.shared.info("⏹️ Stop recording triggered", category: .transcription)
 
-        // Capture context BEFORE stopping recording (while the target app is still focused)
-        let initialPrompt = buildInitialPrompt()
+        // Use prompt captured at recording start (avoids feedback loop from just-inserted text)
+        let initialPrompt = capturedInitialPrompt
+        capturedInitialPrompt = nil
 
         // Stop recording and get audio samples
         let audioSamples = audioRecorder.stopRecording()
