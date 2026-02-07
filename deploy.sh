@@ -51,6 +51,9 @@ killall Finder 2>/dev/null || true
 echo "🧹 Clearing app defaults..."
 defaults delete com.lookmanohands.app 2>/dev/null || true
 
+# Set default trigger key to Fn (Double-tap) instead of Caps Lock
+defaults write com.lookmanohands.app triggerKey "Right Option"
+
 echo "✅ Deployed! Launching app..."
 open "$APP_PATH"
 

@@ -34,6 +34,7 @@ struct SettingsView: View {
     // Permission states (would be updated by checking actual permissions)
     @State private var micPermission: PermissionState = .unknown
     @State private var accessibilityPermission: PermissionState = .unknown
+    @State private var screenRecordingPermission: PermissionState = .unknown
     @State private var ollamaStatus: ConnectionState = .unknown
     @State private var isDownloadingModel = false
     @State private var modelDownloadProgress: Double = 0.0
@@ -65,6 +66,8 @@ struct SettingsView: View {
         } detail: {
             detailContent
         }
+        .toolbar(removing: .sidebarToggle)
+        .toolbar(.hidden)
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 450)
         .onAppear {
@@ -143,108 +146,117 @@ struct SettingsView: View {
     // MARK: - General Tab
 
     private var generalTab: some View {
-        Form {
-            // Position Section
-            Section {
-                Toggle("Show recording indicator", isOn: $settings.showIndicator)
-                    .help("Display a floating waveform visualizer while recording")
+        VStack(alignment: .leading, spacing: 24) {
+            // Recording Waveform Visualizer Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Recording Waveform Visualizer")
+                    .font(.headline)
+
+                Toggle("Show recording visualiser", isOn: $settings.showIndicator)
+                    .toggleStyle(.checkbox)
 
                 if settings.showIndicator {
-                    Picker("Position", selection: $settings.indicatorPosition) {
+                    HStack(spacing: 12) {
                         ForEach(IndicatorPosition.allCases) { position in
-                            Text(position.rawValue).tag(position)
+                            positionCard(position)
                         }
                     }
-                    .pickerStyle(.radioGroup)
-                    .padding(.leading, 20)
-                    .help("Choose where the waveform visualizer appears on screen")
-                }
-            } header: {
-                Text("Position")
-                    .font(.headline)
-            } footer: {
-                if settings.showIndicator {
-                    Text(positionHelpText(for: settings.indicatorPosition))
-                        .font(.caption)
-                } else {
-                    Text("A floating waveform shows audio levels in real-time while recording")
-                        .font(.caption)
+                    .padding(.top, 4)
                 }
             }
 
-            // Startup Section
-            Section {
-                Toggle("Show launch confirmation", isOn: $settings.showLaunchConfirmation)
-                    .help("Display a brief splash screen when the app launches")
-            } header: {
-                Text("Startup")
+            // Splash Screen at startup Section
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Splash Screen at startup")
                     .font(.headline)
-            } footer: {
-                Text("Brief splash screen appears for 2 seconds. Click or press any key to dismiss immediately.")
-                    .font(.caption)
-            }
 
-            // Advanced Section (collapsed by default)
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Run Setup Wizard
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button {
-                            showSetupWizardRestartConfirmation()
-                        } label: {
-                            Label("Run Setup Wizard Again", systemImage: "arrow.clockwise")
-                        }
-                        .help("Re-run the initial onboarding experience")
-
-                        Text("Reconfigure Whisper models, Ollama, and permissions. Requires app restart.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Divider()
-
-                    // Reset Settings
-                    VStack(alignment: .leading, spacing: 8) {
-                        Button("Reset All Settings to Defaults", role: .destructive) {
-                            showResetConfirmation()
-                        }
-                        .help("Reset all preferences to factory defaults")
-
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.orange)
-                                .font(.caption)
-                            Text("This will reset all preferences but won't delete downloaded models or affect system permissions.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                }
-                .padding(.top, 8)
-            } label: {
-                Text("Advanced")
-                    .font(.headline)
+                Toggle("Show launch splash screen", isOn: $settings.showLaunchConfirmation)
+                    .toggleStyle(.checkbox)
             }
 
             Spacer()
         }
     }
 
+    /// Visual position card for the indicator position picker
+    private func positionCard(_ position: IndicatorPosition) -> some View {
+        let isSelected = settings.indicatorPosition == position
+
+        return Button {
+            settings.indicatorPosition = position
+        } label: {
+            VStack(spacing: 6) {
+                Text(position == .followCursor ? "Follows Cursor" : position.rawValue)
+                    .font(.caption2)
+                    .foregroundColor(.primary)
+
+                // Mini screen preview
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(white: 0.15))
+                        .frame(width: 80, height: 50)
+
+                    // Waveform bar indicator at the appropriate position
+                    VStack {
+                        if position == .top {
+                            waveformBarPreview
+                            Spacer()
+                        } else if position == .bottom {
+                            Spacer()
+                            waveformBarPreview
+                        } else {
+                            // Follow cursor - show in middle
+                            Spacer()
+                            waveformBarPreview
+                            Spacer()
+                        }
+                    }
+                    .padding(4)
+                    .frame(width: 80, height: 50)
+                }
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color(white: 0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Small waveform bar preview for position cards
+    private var waveformBarPreview: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(Color.accentColor.opacity(0.8))
+            .frame(width: 40, height: 4)
+    }
+
     // MARK: - Recording Tab
 
     private var recordingTab: some View {
-        Form {
-            Section {
-                Picker("Trigger Key", selection: $settings.triggerKey) {
-                    ForEach(TriggerKey.allCases) { key in
-                        Text(key.rawValue).tag(key)
+        VStack(alignment: .leading, spacing: 24) {
+            // Dictation Trigger Key Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Dictation Trigger Key")
+                    .font(.headline)
+
+                HStack {
+                    Picker("", selection: $settings.triggerKey) {
+                        ForEach(TriggerKey.allCases) { key in
+                            Text(key.rawValue).tag(key)
+                        }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    Spacer()
                 }
                 .onChange(of: settings.triggerKey) { _, newValue in
-                    // Post notification when trigger key changes
                     NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
-
-                    // Show brief feedback that change was applied
                     showHotkeyChangeConfirmation()
                 }
 
@@ -252,12 +264,9 @@ struct SettingsView: View {
                 if settings.triggerKey == .custom {
                     HStack {
                         Text("Custom Hotkey")
-                        Spacer()
                         HotkeyRecorderView(hotkey: $settings.customHotkey)
                             .onChange(of: settings.customHotkey) { _, _ in
                                 NotificationCenter.default.post(name: .hotkeyConfigurationChanged, object: nil)
-
-                                // Show brief feedback that change was applied
                                 showHotkeyChangeConfirmation()
                             }
                     }
@@ -266,65 +275,50 @@ struct SettingsView: View {
                 Text("Press this key to start and stop recording")
                     .font(.caption)
                     .foregroundColor(.secondary)
-
-                // Show confirmation message when hotkey changes
-                if showingHotkeyConfirmation {
-                    HStack(spacing: 6) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                        Text("Trigger key updated (no restart needed)")
-                            .font(.caption)
-                            .foregroundColor(.green)
-                    }
-                    .padding(.top, 4)
-                }
-            } header: {
-                Text("Trigger Key")
             }
 
-            Section {
-                Picker("Microphone", selection: Binding(
-                    get: { settings.audioDeviceManager.selectedDevice },
-                    set: { settings.audioDeviceManager.selectDevice($0) }
-                )) {
-                    ForEach(settings.audioDeviceManager.availableDevices) { device in
-                        Text(device.name).tag(device)
-                    }
-                }
+            // Microphone Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Microphone")
+                    .font(.headline)
 
                 HStack {
-                    Text("Select which microphone to use for dictation and meeting transcription")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-
-                    Spacer()
-
-                    Button {
-                        settings.audioDeviceManager.refreshDevices()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.caption)
+                    Picker("", selection: Binding(
+                        get: { settings.audioDeviceManager.selectedDevice },
+                        set: { settings.audioDeviceManager.selectDevice($0) }
+                    )) {
+                        ForEach(settings.audioDeviceManager.availableDevices) { device in
+                            Text(device.name).tag(device)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .help("Refresh device list")
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    Spacer()
                 }
-            } header: {
-                Text("Audio Input")
+
+                Text("Select which microphone to use for dictation and meeting transcription")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
-            Section {
+            // Dictation Pauses Media Playback Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Dictation Pauses Media Playback")
+                    .font(.headline)
+
                 Toggle("Pause media during dictation", isOn: $settings.pauseMediaDuringDictation)
-            } header: {
-                Text("Playback")
-            } footer: {
+                    .toggleStyle(.checkbox)
+
                 Text("Automatically pauses playing media when you start dictating and resumes it when you stop")
                     .font(.caption)
+                    .foregroundColor(.secondary)
             }
 
             Spacer()
         }
     }
-    
+
     // MARK: - Vocabulary Tab
 
     private var vocabularyTab: some View {
@@ -589,70 +583,54 @@ struct SettingsView: View {
     // MARK: - Permissions Tab
 
     private var permissionsTab: some View {
-        Form {
-            Section("Required for Dictation") {
-                permissionRow(
-                    title: "Microphone",
-                    description: "Required to capture your voice for dictation",
-                    state: micPermission,
-                    action: requestMicrophonePermission
-                )
+        VStack(alignment: .leading, spacing: 20) {
+            // Microphone
+            permissionRow(
+                title: "Microphone",
+                description: "Required to capture your voice for dictation",
+                state: micPermission,
+                action: requestMicrophonePermission
+            )
 
-                permissionRow(
-                    title: "Accessibility",
-                    description: "Required to insert transcribed text into applications",
-                    state: accessibilityPermission,
-                    action: openAccessibilityPreferences
-                )
-            }
+            // Accessibility
+            permissionRow(
+                title: "Accessibility",
+                description: "Required to insert transcribed text into applications",
+                state: accessibilityPermission,
+                action: openAccessibilityPreferences
+            )
 
-            if permissionsChanged {
-                Section {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Permissions Changed")
-                                .font(.headline)
-                            Text("Restart the app to apply the new permissions.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-
-                        Spacer()
-
-                        Button("Restart App") {
-                            restartApp()
-                        }
-                        .controlSize(.large)
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-
-            Section("Additional Info") {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "info.circle")
-                            .foregroundColor(.blue)
-                        Text("Meeting transcription requires Screen Recording permission")
+            // Screen Recording
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Screen Recording")
+                            .font(.headline)
+                        Text("This permission is requested automatically when you start a meeting recording.")
                             .font(.caption)
+                            .foregroundColor(.secondary)
                     }
 
-                    Text("This permission is requested automatically when you start a meeting recording.")
+                    Spacer()
+
+                    permissionStatusBadge(screenRecordingPermission)
+
+                    if screenRecordingPermission != .granted {
+                        Button("Grant") {
+                            requestScreenRecordingPermission()
+                        }
+                    }
+                }
+
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle")
+                        .foregroundColor(.blue)
+                        .font(.caption)
+                    Text("Meeting transcription requires Screen Recording permission")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-
-                Divider()
-                    .padding(.vertical, 4)
-
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-                    Text("Permission status updates automatically")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
+                .padding(.top, 2)
             }
 
             Spacer()
@@ -1040,7 +1018,7 @@ struct SettingsView: View {
         action: @escaping () -> Void
     ) -> some View {
         HStack {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.headline)
                 Text(description)
@@ -1056,10 +1034,8 @@ struct SettingsView: View {
                 Button(title == "Accessibility" ? "Open Settings" : "Grant") {
                     action()
                 }
-                .help(title == "Accessibility" ? "Opens System Settings where you can grant permission" : "Request \(title.lowercased()) permission")
             }
         }
-        .padding(.vertical, 4)
     }
     
     private func permissionStatusBadge(_ state: PermissionState) -> some View {
@@ -1103,6 +1079,10 @@ struct SettingsView: View {
         let trusted = AXIsProcessTrusted()
         let newAccessibilityPermission: PermissionState = trusted ? .granted : .denied
 
+        // Check screen recording permission
+        let hasScreenRecording = CGPreflightScreenCaptureAccess()
+        screenRecordingPermission = hasScreenRecording ? .granted : .denied
+
         // Detect permission changes (only after initial check)
         if previousMicPermission != .unknown || previousAccessibilityPermission != .unknown {
             if newMicPermission != previousMicPermission || newAccessibilityPermission != previousAccessibilityPermission {
@@ -1132,6 +1112,10 @@ struct SettingsView: View {
         // Also open System Settings to the Accessibility pane
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    private func requestScreenRecordingPermission() {
+        CGRequestScreenCaptureAccess()
     }
 
     // MARK: - Permission Polling
