@@ -110,6 +110,7 @@ struct SettingsView: View {
                 }
             }
             .padding()
+            .padding(.trailing, 12)
         }
         .navigationTitle(selectedTab?.rawValue ?? "Settings")
     }
