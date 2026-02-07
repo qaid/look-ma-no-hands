@@ -21,8 +21,15 @@ jobs:
       - name: Build DMG
         run: ./scripts/create-dmg.sh "${{ steps.version.outputs.VERSION }}"
 
+      - name: Create ZIP archive
+        run: |
+          cd build
+          zip -r "LookMaNoHands-${{ steps.version.outputs.VERSION }}.zip" "Look Ma No Hands.app"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
+          files: |
+            build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg
+            build/LookMaNoHands-${{ steps.version.outputs.VERSION }}.zip
           generate_release_notes: true
