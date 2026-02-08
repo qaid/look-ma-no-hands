@@ -49,8 +49,21 @@ class MixedAudioRecorder {
         micSamplesProcessed = 0
 
         // Start both recorders
-        try await systemAudioRecorder.startRecording()
-        try microphoneRecorder.startRecording()
+        // Note: microphoneRecorder.startRecording() will activate the audio session
+        // systemAudioRecorder uses ScreenCaptureKit and doesn't need session management
+        do {
+            try await systemAudioRecorder.startRecording()
+            try microphoneRecorder.startRecording()
+        } catch {
+            // Clean up if either fails
+            if systemAudioRecorder.isRecording {
+                _ = await systemAudioRecorder.stopRecording()
+            }
+            if microphoneRecorder.isRecording {
+                _ = microphoneRecorder.stopRecording()
+            }
+            throw error
+        }
 
         isRecording = true
 
