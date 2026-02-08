@@ -12,7 +12,7 @@ echo "Building ${APP_NAME} v${VERSION}..."
 swift build -c release
 
 echo "Creating app bundle..."
-rm -rf "${APP_PATH}"
+[ -d "${APP_PATH}" ] && rm -rf "${APP_PATH}"
 mkdir -p "${APP_PATH}/Contents/MacOS"
 mkdir -p "${APP_PATH}/Contents/Resources"
 
@@ -32,11 +32,11 @@ fi
 codesign --force --sign - "${APP_PATH}"
 
 echo "Creating DMG..."
-rm -f "${BUILD_DIR}/${DMG_NAME}"
+[ -f "${BUILD_DIR}/${DMG_NAME}" ] && rm -f "${BUILD_DIR}/${DMG_NAME}"
 
 # Create temporary DMG directory
 DMG_TEMP="${BUILD_DIR}/dmg-temp"
-rm -rf "${DMG_TEMP}"
+[ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 mkdir -p "${DMG_TEMP}"
 cp -R "${APP_PATH}" "${DMG_TEMP}/"
 ln -s /Applications "${DMG_TEMP}/Applications"
@@ -48,6 +48,6 @@ hdiutil create -volname "${APP_NAME}" \
     "${BUILD_DIR}/${DMG_NAME}"
 
 # Clean up
-rm -rf "${DMG_TEMP}"
+[ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 
 echo "DMG created: ${BUILD_DIR}/${DMG_NAME}"

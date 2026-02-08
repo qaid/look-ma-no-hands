@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+# Parse command-line flags
+RESET_DEFAULTS=false
+if [[ "$1" == "--reset-defaults" ]]; then
+    RESET_DEFAULTS=true
+    echo "🧹 Will reset app defaults (--reset-defaults flag provided)"
+fi
+
 echo "🔨 Building Look Ma No Hands..."
 swift build -c release
 
@@ -58,18 +65,26 @@ echo "🔄 Updating Launch Services database..."
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
     -f "$APP_PATH"
 
-# Clear icon cache to show new icon
-echo "🔄 Clearing icon cache..."
-rm -rf ~/Library/Caches/com.apple.iconservices.store
-killall Dock 2>/dev/null || true
-killall Finder 2>/dev/null || true
+# Clear icon cache to show new icon (safe system cache operation)
+echo ""
+echo "=== Icon Cache & App Defaults ==="
+if [ -d ~/Library/Caches/com.apple.iconservices.store ]; then
+    echo "🔄 Clearing icon cache..."
+    rm -rf ~/Library/Caches/com.apple.iconservices.store
+    killall Dock 2>/dev/null || true
+    killall Finder 2>/dev/null || true
+fi
 
-# Reset app settings so onboarding shows on launch
-echo "🧹 Clearing app defaults..."
-defaults delete com.lookmanohands.app 2>/dev/null || true
-
-# Set default trigger key to Fn (Double-tap) instead of Caps Lock
-defaults write com.lookmanohands.app triggerKey "Right Option"
+# App defaults (conditional based on flag)
+if [ "$RESET_DEFAULTS" = true ]; then
+    echo "🧹 Resetting app defaults..."
+    defaults delete com.lookmanohands.app 2>/dev/null || true
+    defaults write com.lookmanohands.app triggerKey "Right Option"
+    echo "   ✅ App defaults reset to factory settings"
+else
+    echo "ℹ️  Preserving existing app defaults"
+    echo "   (use './deploy.sh --reset-defaults' to reset)"
+fi
 
 echo "✅ Deployed! Launching app..."
 open "$APP_PATH"
