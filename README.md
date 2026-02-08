@@ -3,7 +3,9 @@
 Fast, local voice dictation and meeting transcription for macOS. Use custom keyboard shortcuts for instant dictation, or record video calls with AI-powered meeting notes.
 
 <p align="center">
-  <img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">
+  <img width="2976" height="1550" alt="image" src="https://github.com/user-attachments/assets/6397ab5a-ea21-43cd-9128-e118d572e089" />
+
+  <!--<img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">-->
 </p>
 
 ## ✨ Features
