@@ -13,4 +13,5 @@ Package.resolved
 # Workspace context
 .context/
 docs/sketchpad.md
+docs/security-audit-report.md
 

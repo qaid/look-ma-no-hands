@@ -3,7 +3,8 @@ import SwiftWhisper
 
 /// Service for transcribing audio using the local Whisper model
 /// Uses whisper.cpp under the hood via SwiftWhisper
-class WhisperService {
+/// Thread safety is manually managed via serial DispatchQueue
+class WhisperService: @unchecked Sendable {
 
     // MARK: - Properties
 
