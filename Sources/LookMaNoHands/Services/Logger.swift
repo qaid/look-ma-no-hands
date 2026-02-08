@@ -20,6 +20,7 @@ final class Logger {
     private lazy var keyboardLogger = OSLog(subsystem: subsystem, category: "Keyboard")
     private lazy var memoryLogger = OSLog(subsystem: subsystem, category: "Memory")
     private lazy var crashLogger = OSLog(subsystem: subsystem, category: "Crash")
+    private lazy var updateLogger = OSLog(subsystem: subsystem, category: "Update")
 
     /// Log file URL
     private let logDirectory: URL
@@ -45,6 +46,7 @@ final class Logger {
         case keyboard = "Keyboard"
         case memory = "Memory"
         case crash = "Crash"
+        case update = "Update"
     }
 
     private init() {
@@ -171,6 +173,7 @@ final class Logger {
         case .keyboard: return keyboardLogger
         case .memory: return memoryLogger
         case .crash: return crashLogger
+        case .update: return updateLogger
         }
     }
 

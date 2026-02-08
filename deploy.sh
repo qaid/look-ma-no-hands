@@ -5,9 +5,26 @@ echo "🔨 Building Look Ma No Hands..."
 swift build -c release
 
 echo "📦 Deploying to ~/Applications..."
-killall LookMaNoHands 2>/dev/null || true
-killall "Look Ma No Hands" 2>/dev/null || true
-sleep 1
+
+# Graceful shutdown instead of killall (Security Fix: BUILD-002)
+echo "🛑 Attempting graceful app shutdown..."
+APP_PID=$(pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null || true)
+if [ -n "$APP_PID" ]; then
+    echo "   Found running instance (PID: $APP_PID), requesting quit..."
+    osascript -e 'tell application "Look Ma No Hands" to quit' 2>/dev/null || true
+    sleep 2
+
+    # Check if app is still running
+    if kill -0 "$APP_PID" 2>/dev/null; then
+        echo "   ⚠️  App still running, force terminating..."
+        kill -9 "$APP_PID" 2>/dev/null || true
+        sleep 1
+    else
+        echo "   ✅ App quit gracefully"
+    fi
+else
+    echo "   ℹ️  App not currently running"
+fi
 
 # Remove old app bundle if it exists
 if [ -d ~/Applications/LookMaNoHands.app ]; then
