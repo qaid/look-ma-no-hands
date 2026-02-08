@@ -24,6 +24,9 @@ class UpdateService {
         case noCompatibleAsset
         case downloadFailed(String)
         case networkError(String)
+        case invalidSignature
+        case downloadTooLarge
+        case invalidContentType
 
         var errorDescription: String? {
             switch self {
@@ -37,6 +40,12 @@ class UpdateService {
                 return "Download failed: \(reason)"
             case .networkError(let reason):
                 return "Network error: \(reason)"
+            case .invalidSignature:
+                return "Update file signature verification failed"
+            case .downloadTooLarge:
+                return "Download exceeds maximum size limit"
+            case .invalidContentType:
+                return "Downloaded file is not a valid disk image"
             }
         }
     }
@@ -164,16 +173,30 @@ class UpdateService {
 
     /// Download a DMG update to ~/Downloads and return the local file URL
     func downloadUpdate(from url: URL) async throws -> URL {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 300  // 5 minute timeout for large downloads
+
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await session.data(from: url)
+            (data, response) = try await session.data(for: request)
         } catch {
             throw UpdateError.downloadFailed(error.localizedDescription)
         }
 
         if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
             throw UpdateError.downloadFailed("HTTP \(httpResponse.statusCode)")
+        }
+
+        // Security: Validate download size (max 500MB)
+        let maxSize = 500 * 1024 * 1024
+        guard data.count <= maxSize else {
+            throw UpdateError.downloadTooLarge
+        }
+
+        // Security: Validate content type
+        if let mimeType = response.mimeType, mimeType != "application/x-apple-diskimage" {
+            Logger.shared.warning("Unexpected content type: \(mimeType)", category: .update)
         }
 
         let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
@@ -189,6 +212,34 @@ class UpdateService {
             throw UpdateError.downloadFailed("Could not save file: \(error.localizedDescription)")
         }
 
+        // Security: Verify code signature before returning
+        try await verifyDMGSignature(destinationURL)
+
         return destinationURL
+    }
+
+    // MARK: - Private Methods
+
+    /// Verify the code signature of a downloaded DMG file
+    private func verifyDMGSignature(_ fileURL: URL) async throws {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        task.arguments = ["--verify", "--deep", "--strict", fileURL.path]
+
+        let pipe = Pipe()
+        task.standardError = pipe
+        task.standardOutput = pipe
+
+        try task.run()
+        task.waitUntilExit()
+
+        guard task.terminationStatus == 0 else {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? "unknown error"
+            Logger.shared.error("codesign verification failed: \(output)", category: .update)
+            throw UpdateError.invalidSignature
+        }
+
+        Logger.shared.info("✅ Update signature verified successfully", category: .update)
     }
 }
