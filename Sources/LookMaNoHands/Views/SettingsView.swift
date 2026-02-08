@@ -36,6 +36,7 @@ struct SettingsView: View {
     @State private var accessibilityPermission: PermissionState = .unknown
     @State private var screenRecordingPermission: PermissionState = .unknown
     @State private var ollamaStatus: ConnectionState = .unknown
+    @State private var availableOllamaModels: [String] = []
     @State private var isDownloadingModel = false
     @State private var modelDownloadProgress: Double = 0.0
     @State private var modelDownloadError: String?
@@ -189,12 +190,17 @@ struct SettingsView: View {
             VStack(spacing: 6) {
                 Text(position == .followCursor ? "Follows Cursor" : position.rawValue)
                     .font(.caption2)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.secondary)
 
                 // Mini screen preview
                 ZStack {
+                    // Dark background representing the screen
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(white: 0.15))
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(0.3))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                        )
                         .frame(width: 80, height: 50)
 
                     // Waveform bar indicator at the appropriate position
@@ -219,11 +225,14 @@ struct SettingsView: View {
             .padding(8)
             .background(
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color(white: 0.1))
+                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color(nsColor: .controlBackgroundColor))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
+                        lineWidth: isSelected ? 2 : 1
+                    )
             )
         }
         .buttonStyle(.plain)
@@ -540,28 +549,51 @@ struct SettingsView: View {
                 }
                 .padding(.bottom, 8)
 
-                // Model name
+                // Model picker
                 HStack {
                     Text("Model")
                         .frame(width: 80, alignment: .trailing)
 
-                    TextField("", text: $settings.ollamaModel)
-                        .textFieldStyle(.roundedBorder)
+                    if availableOllamaModels.isEmpty && ollamaStatus != .connected {
+                        TextField("", text: $settings.ollamaModel)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 220)
+                            .disabled(true)
+                    } else {
+                        Picker("", selection: $settings.ollamaModel) {
+                            // Include current model so it's always selectable
+                            if !availableOllamaModels.contains(settings.ollamaModel) {
+                                Text(settings.ollamaModel).tag(settings.ollamaModel)
+                            }
+                            ForEach(availableOllamaModels, id: \.self) { model in
+                                Text(model).tag(model)
+                            }
+                        }
+                        .labelsHidden()
                         .frame(width: 220)
-                        .disabled(true)
-                        .help("Ollama model configuration (currently fixed to qwen3:8b)")
+                    }
 
                     connectionStatusView(ollamaStatus, label: "")
                         .frame(width: 100, alignment: .leading)
                 }
 
-                // Help text explaining why it's disabled
+                // Help text
                 HStack {
                     Spacer()
                         .frame(width: 80)
-                    Text("Model selection will be customizable in a future update")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if ollamaStatus == .disconnected {
+                        Text("Start Ollama to see available models")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else if availableOllamaModels.isEmpty && ollamaStatus == .connected {
+                        Text("No models installed \u{2014} run \"ollama pull <model>\" to install one")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Select from locally installed Ollama models")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 // Connection check button
@@ -569,8 +601,8 @@ struct SettingsView: View {
                     Spacer()
                         .frame(width: 80)
 
-                    Button("Check Connection") {
-                        checkOllamaStatus()
+                    Button("Refresh Models") {
+                        fetchOllamaModels()
                     }
                     .controlSize(.small)
                 }
@@ -578,6 +610,11 @@ struct SettingsView: View {
             .padding(20)
 
             Spacer()
+        }
+        .onAppear {
+            if availableOllamaModels.isEmpty {
+                fetchOllamaModels()
+            }
         }
     }
 
@@ -1191,14 +1228,25 @@ struct SettingsView: View {
     }
 
     private func checkOllamaStatus() {
+        fetchOllamaModels()
+    }
+
+    private func fetchOllamaModels() {
         ollamaStatus = .checking
 
         Task {
             let ollamaService = OllamaService()
-            let isAvailable = await ollamaService.isAvailable()
-
-            await MainActor.run {
-                self.ollamaStatus = isAvailable ? .connected : .disconnected
+            do {
+                let models = try await ollamaService.listModels()
+                await MainActor.run {
+                    self.availableOllamaModels = models
+                    self.ollamaStatus = .connected
+                }
+            } catch {
+                await MainActor.run {
+                    self.availableOllamaModels = []
+                    self.ollamaStatus = .disconnected
+                }
             }
         }
     }

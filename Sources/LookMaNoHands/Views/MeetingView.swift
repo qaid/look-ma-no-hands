@@ -172,6 +172,7 @@ struct MeetingView: View {
     @State private var analysisTask: Task<Void, Never>?
     @State private var showTranscript = true
     @State private var showSettings = false
+    @State private var availableOllamaModels: [String] = []
     @State private var showExportMenu = false
     @State private var scrollProxy: ScrollViewProxy?
 
@@ -620,20 +621,63 @@ struct MeetingView: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.secondary)
 
-                TextField("Model name", text: Binding(
-                    get: { Settings.shared.ollamaModel },
-                    set: { Settings.shared.ollamaModel = $0 }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 220)
+                if availableOllamaModels.isEmpty {
+                    TextField("Model name", text: Binding(
+                        get: { Settings.shared.ollamaModel },
+                        set: { Settings.shared.ollamaModel = $0 }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 220)
+                } else {
+                    Picker("", selection: Binding(
+                        get: { Settings.shared.ollamaModel },
+                        set: { Settings.shared.ollamaModel = $0 }
+                    )) {
+                        if !availableOllamaModels.contains(Settings.shared.ollamaModel) {
+                            Text(Settings.shared.ollamaModel).tag(Settings.shared.ollamaModel)
+                        }
+                        ForEach(availableOllamaModels, id: \.self) { model in
+                            Text(model).tag(model)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(width: 220)
+                }
 
-                Text("e.g., llama2, mistral, qwen")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                if availableOllamaModels.isEmpty {
+                    Text("Start Ollama to select from installed models")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Select from locally installed models")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .onAppear {
+                fetchOllamaModels()
             }
         }
         .padding(16)
         .frame(width: 260)
+    }
+
+    // MARK: - Ollama Models
+
+    private func fetchOllamaModels() {
+        Task {
+            let ollamaService = OllamaService()
+            do {
+                let models = try await ollamaService.listModels()
+                await MainActor.run {
+                    self.availableOllamaModels = models
+                }
+            } catch {
+                await MainActor.run {
+                    self.availableOllamaModels = []
+                }
+            }
+        }
     }
 
     // MARK: - Export Popover
