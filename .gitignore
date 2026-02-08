@@ -10,5 +10,7 @@ build/
 # Swift Package Manager
 Package.resolved
 
-# Conductor workspace context
+# Workspace context
 .context/
+docs/sketchpad.md
+

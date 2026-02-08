@@ -2,6 +2,10 @@
 
 Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock for instant dictation, or record video calls with AI-powered meeting notes.
 
+<p align="center">
+  <img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">
+</p>
+
 ## ✨ Features
 
 ### Voice Dictation
@@ -41,6 +45,10 @@ Fast, local voice dictation and meeting transcription for macOS. Press Caps Lock
 - **Automatic model management**: Download and switch between Whisper models from the UI
 
 ## 🚀 Quick Start
+
+<p align="center">
+  <img src="app-screenshots/onboarding-welcome.png" alt="Onboarding welcome screen" width="500">
+</p>
 
 ### 1. Install Dependencies
 
@@ -101,6 +109,10 @@ On first launch, grant:
 2. **Accessibility access**: To insert text and monitor Caps Lock key
 3. **Screen recording** (optional): Required for system audio capture in meeting transcription
 
+<p align="center">
+  <img src="app-screenshots/settings-permissions.png" alt="Settings - Permissions tab" width="600">
+</p>
+
 **Note**: After granting accessibility permission, you may need to restart the app. Look Ma No Hands will prompt you to restart automatically.
 
 ## 🎯 Usage
@@ -151,6 +163,10 @@ Access via menu bar → **Settings** to:
   - Check Ollama connection status
 - **Permissions Tab**: Check and grant microphone, accessibility, and screen recording permissions
 - **About Tab**: View app version and information
+
+| General | Recording | Models | Vocabulary |
+|:---:|:---:|:---:|:---:|
+| ![Settings - General](app-screenshots/settings-general.png) | ![Settings - Recording](app-screenshots/settings-recording.png) | ![Settings - Models](app-screenshots/settings-models.png) | ![Settings - Vocabulary](app-screenshots/settings-vocabulary.png) |
 
 ## ⚡ Performance
 
