@@ -747,7 +747,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            mediaControlService.resumeMedia()
+            // Only resume music players that were actually playing before we paused them
+            // Do NOT send blanket hardware play event - it would resume ALL media including
+            // browser videos that the user manually paused before recording
+            MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
         }
 
         NSLog("✅ Recording canceled - no text will be inserted")
@@ -774,22 +777,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Show recording indicator
         recordingIndicator.show()
 
-        // Pause system media if enabled
-        if Settings.shared.pauseMediaDuringDictation {
-            mediaControlService.pauseMedia()
-        }
-
-        // Start audio recording
+        // Start audio recording FIRST
         do {
             try audioRecorder.startRecording()
             print("Recording started")
+
+            // CRITICAL: Pause media AFTER starting AVAudioEngine (not before)
+            // This ensures we re-pause even if AVAudioEngine.start() triggers a system event that resumes media
+            if Settings.shared.pauseMediaDuringDictation {
+                // Small delay to let AVAudioEngine fully initialize
+                Thread.sleep(forTimeInterval: 0.1)
+
+                // Use AppleScript to explicitly pause music players (Spotify, Apple Music)
+                MusicPlayerController.shared.pauseAllPlayers()
+
+                // Send hardware pause event for browsers and other media sources
+                // This is sent multiple times (with delays) to ensure it sticks
+                mediaControlService.pauseMedia()
+            }
         } catch {
-            transcriptionState.setError("Failed to start recording: \(error.localizedDescription)")
+            // More detailed error message for audio session failures
+            let errorMessage: String
+            if (error as NSError).domain == NSOSStatusErrorDomain {
+                errorMessage = "Failed to configure audio: \(error.localizedDescription)"
+            } else {
+                errorMessage = "Failed to start recording: \(error.localizedDescription)"
+            }
+
+            transcriptionState.setError(errorMessage)
             updateMenuBarIcon(isRecording: false)
 
             // Resume media if we paused it before the failed recording attempt
             if Settings.shared.pauseMediaDuringDictation {
-                mediaControlService.resumeMedia()
+                // Only resume music players that were actually playing before we paused them
+                // Do NOT send blanket hardware play event - it would resume ALL media including
+                // browser videos that the user manually paused before recording
+                MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
             }
 
             // Hide indicator with slight delay to ensure proper cleanup
@@ -896,7 +919,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            mediaControlService.resumeMedia()
+            // Only resume music players that were actually playing before we paused them
+            // Do NOT send blanket hardware play event - it would resume ALL media including
+            // browser videos that the user manually paused before recording
+            MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
         }
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)

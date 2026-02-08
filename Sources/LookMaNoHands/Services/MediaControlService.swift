@@ -9,10 +9,22 @@ class MediaControlService {
     private var didPauseMedia = false
 
     /// Pause system media playback before dictation recording begins.
+    /// Sends pause command multiple times to ensure it sticks (especially for browsers).
     func pauseMedia() {
         NSLog("⏸️ MediaControlService: pausing media")
-        sendMediaKey(down: true)
-        sendMediaKey(down: false)
+
+        // Send pause event multiple times to ensure browsers and other media players receive it
+        // Some apps (especially browsers) may need the event sent multiple times
+        for i in 0..<3 {
+            sendMediaKey(down: true)
+            sendMediaKey(down: false)
+
+            // Small delay between attempts (50ms)
+            if i < 2 {
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+        }
+
         didPauseMedia = true
     }
 
