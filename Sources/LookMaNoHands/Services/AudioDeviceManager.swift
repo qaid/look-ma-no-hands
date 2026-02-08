@@ -103,13 +103,12 @@ class AudioDeviceManager: ObservableObject {
 
         // For specific device selection, we need to set the input device
         // This requires stopping and reconfiguring the audio engine
-        let inputNode = audioEngine.inputNode
-
         // Note: AVAudioEngine doesn't directly support device selection in the same way
         // as lower-level Core Audio. For a complete implementation, you'd need to:
         // 1. Create an AudioUnit with the specific device
         // 2. Attach it to the audio engine
         // For now, we'll use the system default and rely on users setting it in System Preferences
+        _ = audioEngine.inputNode  // Reference to ensure engine is configured
 
         print("AudioDeviceManager: Configured audio engine (device selection via system default)")
     }
@@ -179,17 +178,23 @@ class AudioDeviceManager: ObservableObject {
         )
 
         var dataSize: UInt32 = UInt32(MemoryLayout<CFString>.size)
-        var name: CFString = "" as CFString
+        var cfStringRef: CFString?
 
-        let result = AudioObjectGetPropertyData(
-            deviceID,
-            &propertyAddress,
-            0,
-            nil,
-            &dataSize,
-            &name
-        )
+        let result = withUnsafeMutablePointer(to: &cfStringRef) { pointer in
+            AudioObjectGetPropertyData(
+                deviceID,
+                &propertyAddress,
+                0,
+                nil,
+                &dataSize,
+                UnsafeMutableRawPointer(pointer)
+            )
+        }
 
-        return result == kAudioHardwareNoError ? (name as String) : nil
+        guard result == kAudioHardwareNoError, let name = cfStringRef as String? else {
+            return nil
+        }
+
+        return name
     }
 }
