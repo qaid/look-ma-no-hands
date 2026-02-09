@@ -1042,8 +1042,9 @@ struct MeetingView: View {
         let finalSegments = await continuousTranscriber.endSession()
 
         // Create recording session
-        let sessionStartIndex = meetingState.segments.count
-        let sessionEndIndex = finalSegments.count
+        // Calculate correct indices: segments are already added via callback
+        let sessionStartIndex = meetingState.segments.count - finalSegments.count
+        let sessionEndIndex = meetingState.segments.count
 
         // Only create session if we have new segments
         if sessionEndIndex > sessionStartIndex {
@@ -1055,12 +1056,12 @@ struct MeetingView: View {
             meetingState.recordingSessions.append(newSession)
         }
 
-        // Update with all segments
-        meetingState.segments = finalSegments
+        // Segments are already in meetingState.segments via real-time callback
+        // (no need to overwrite - that would lose previous sessions' segments)
 
         meetingState.isRecording = false
         meetingState.status = .completed
-        meetingState.statusMessage = "Recording stopped - \(finalSegments.count) segments"
+        meetingState.statusMessage = "Recording stopped - \(meetingState.segments.count) segments total"
 
         // Notify AppDelegate that recording stopped
         appDelegate?.isMeetingRecording = false
