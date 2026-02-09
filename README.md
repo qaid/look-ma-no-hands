@@ -315,13 +315,33 @@ LookMaNoHands/
 └── PERFORMANCE.md        # Optimization guide
 ```
 
-## 🔒 Privacy
+## 🔒 Privacy & Security
 
-Look Ma No Hands is 100% local:
-- ✅ Audio never sent to cloud
-- ✅ No telemetry or analytics
-- ✅ No internet required (after model download)
-- ✅ Open source—verify for yourself
+Look Ma No Hands is built on a strict **local-only** architecture. Your voice, transcriptions, and meeting notes never leave your Mac.
+
+| Guarantee | Detail |
+|-----------|--------|
+| **No cloud processing** | All speech-to-text and AI analysis runs on-device |
+| **No telemetry or analytics** | Zero tracking, zero data collection |
+| **No accounts or sign-in** | Nothing to create, nothing to leak |
+| **No internet required** | After the initial model download, the app works fully offline |
+| **Open source** | Every line of code is auditable |
+
+The only outbound network requests are model downloads (Hugging Face) and update checks (GitHub), both user-initiated.
+
+### Security Hardening
+
+A comprehensive security audit was completed and all critical, medium, and low-priority findings have been addressed:
+
+- **Verified model downloads** — SHA-256 checksums and size validation before any Whisper model is used
+- **Verified app updates** — cryptographic signature verification before installation
+- **Safe archive extraction** — path-traversal and zip-bomb protection
+- **Pinned dependencies** — exact Git revision pinning with CI integrity checks
+- **Automated scanning** — Dependabot monitors dependencies; CI verifies `Package.resolved` on every PR
+- **Release provenance** — every release includes SHA-256 checksums and a Software Bill of Materials (SBOM)
+- **Privacy-safe crash reports** — transcription content is fully redacted with no metadata leakage
+
+For the full audit summary, resolved findings, and current security posture, see **[docs/SECURITY.md](docs/SECURITY.md)**.
 
 ## 🚧 Known Limitations
 
