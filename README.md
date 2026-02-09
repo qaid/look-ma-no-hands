@@ -8,11 +8,18 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
   <!--<img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">-->
 </p>
 
----
-
-**[Features](#-features)** · **[Quick Start](#-quick-start)** · **[Usage](#-usage)** · **[Performance](#-performance)** · **[Requirements](#-requirements)** · **[How It Works](#-how-it-works)** · **[Configuration](#-configuration)** · **[Troubleshooting](#-troubleshooting)** · **[Privacy & Security](#-privacy--security)** · **[Contributing](#-contributing)**
-
----
+| | Section | |
+|:--|:--|:--|
+| ✨ | **[Features](#-features)** | Voice dictation, meeting transcription, and core capabilities |
+| 🚀 | **[Quick Start](#-quick-start)** | Install, download a model, and run in under 5 minutes |
+| 🎯 | **[Usage](#-usage)** | Hotkey dictation, menu bar control, meeting recording, and settings |
+| ⚡ | **[Performance](#-performance)** | Model comparison and Core ML acceleration benchmarks |
+| 🛠️ | **[Requirements](#-requirements)** | macOS compatibility, hardware, and disk space |
+| 📝 | **[How It Works](#-how-it-works)** | Audio capture, transcription, formatting, and text insertion pipeline |
+| 🔧 | **[Configuration](#-configuration)** | Whisper model selection and meeting note prompt customization |
+| 🐛 | **[Troubleshooting](#-troubleshooting)** | Fixes for permissions, Core ML, Ollama, and audio capture issues |
+| 🔒 | **[Privacy & Security](#-privacy--security)** | Local-only guarantees, security audit summary, and hardening details |
+| 👥 | **[Contributing](#-contributing)** | How to get involved |
 
 ## ✨ Features
 
