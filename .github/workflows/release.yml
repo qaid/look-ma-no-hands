@@ -26,10 +26,28 @@ jobs:
           cd build
           zip -r "LookMaNoHands-${{ steps.version.outputs.VERSION }}.zip" "Look Ma No Hands.app"
 
+      - name: Generate SHA256 Checksums
+        run: |
+          cd build
+          echo "Generating checksums for release artifacts..."
+          shasum -a 256 "Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg" > checksums.txt
+          shasum -a 256 "LookMaNoHands-${{ steps.version.outputs.VERSION }}.zip" >> checksums.txt
+          echo ""
+          echo "=== Checksums ==="
+          cat checksums.txt
+
+      - name: Generate SBOM (Software Bill of Materials)
+        run: |
+          echo "Generating SBOM..."
+          swift package show-dependencies --format json > build/sbom.json
+          echo "✅ SBOM generated"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg
             build/LookMaNoHands-${{ steps.version.outputs.VERSION }}.zip
+            build/checksums.txt
+            build/sbom.json
           generate_release_notes: true
