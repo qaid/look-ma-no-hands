@@ -789,11 +789,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 Thread.sleep(forTimeInterval: 0.1)
 
                 // Use AppleScript to explicitly pause music players (Spotify, Apple Music)
+                // Note: We intentionally do NOT send hardware media key events (NX_KEYTYPE_PLAY)
+                // because macOS will launch Apple Music as the default handler if no media app
+                // is running, which is the opposite of what we want. (#128)
                 MusicPlayerController.shared.pauseAllPlayers()
-
-                // Send hardware pause event for browsers and other media sources
-                // This is sent multiple times (with delays) to ensure it sticks
-                mediaControlService.pauseMedia()
             }
         } catch {
             // More detailed error message for audio session failures
