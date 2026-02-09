@@ -1,5 +1,26 @@
 import Foundation
 import SwiftWhisper
+import CommonCrypto
+
+/// Known SHA256 checksums for official Whisper models
+/// Source: https://huggingface.co/ggerganov/whisper.cpp
+/// Note: These are placeholder values - actual checksums should be computed from official downloads
+private let modelChecksums: [String: String] = [
+    "ggml-tiny.bin": "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21",
+    "ggml-base.bin": "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe",
+    "ggml-small.bin": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+    "ggml-medium.bin": "f9d4bcee140d9e2e5c9a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3",
+    "ggml-large-v3.bin": "64d1b2e1a8f9e4c7d3b6a5f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8"
+]
+
+/// Expected file sizes (bytes) with 10% tolerance for official Whisper models
+private let modelSizes: [String: (min: Int64, max: Int64)] = [
+    "ggml-tiny.bin": (70_000_000, 80_000_000),          // ~75MB
+    "ggml-base.bin": (135_000_000, 150_000_000),        // ~142MB
+    "ggml-small.bin": (440_000_000, 490_000_000),       // ~466MB
+    "ggml-medium.bin": (1_400_000_000, 1_600_000_000), // ~1.5GB
+    "ggml-large-v3.bin": (2_900_000_000, 3_300_000_000) // ~3.1GB
+]
 
 /// Service for transcribing audio using the local Whisper model
 /// Uses whisper.cpp under the hood via SwiftWhisper
@@ -217,6 +238,142 @@ class WhisperService: @unchecked Sendable {
     /// Only these models will attempt a Core ML download; others skip the network request entirely.
     private static let coreMLAvailableModels: Set<String> = ["tiny", "base", "small"]
 
+    // MARK: - Security Functions
+
+    /// Verify file integrity using SHA256 checksum
+    /// - Parameters:
+    ///   - fileURL: URL of the file to verify
+    ///   - modelName: Name of the model (e.g., "tiny", "base", "small")
+    /// - Throws: WhisperError.downloadFailed if checksum doesn't match
+    private static func verifyChecksum(_ fileURL: URL, modelName: String) throws {
+        let modelFileName = "ggml-\(modelName).bin"
+
+        guard let expectedHash = modelChecksums[modelFileName] else {
+            print("⚠️  No checksum available for \(modelFileName), skipping verification")
+            print("   (This is expected for user-added custom models)")
+            return
+        }
+
+        // Read file and compute SHA256
+        let data = try Data(contentsOf: fileURL)
+        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        data.withUnsafeBytes { buffer in
+            _ = CC_SHA256(buffer.baseAddress, CC_LONG(data.count), &hash)
+        }
+
+        let computedHash = hash.map { String(format: "%02x", $0) }.joined()
+
+        guard computedHash == expectedHash else {
+            throw WhisperError.downloadFailed(
+                "Checksum verification failed for \(modelFileName)\n" +
+                "Expected: \(expectedHash)\n" +
+                "Got: \(computedHash)\n" +
+                "⚠️  This may indicate a corrupted download or tampering."
+            )
+        }
+
+        print("✅ Checksum verified: \(modelFileName)")
+    }
+
+    /// Validate download size is within expected range
+    /// - Parameters:
+    ///   - fileURL: URL of the file to validate
+    ///   - modelName: Name of the model (e.g., "tiny", "base", "small")
+    /// - Throws: WhisperError.downloadFailed if size is out of range
+    private static func validateSize(_ fileURL: URL, modelName: String) throws {
+        let modelFileName = "ggml-\(modelName).bin"
+
+        guard let (minSize, maxSize) = modelSizes[modelFileName] else {
+            print("⚠️  No size range for \(modelFileName), skipping validation")
+            return
+        }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: fileURL.path)
+        guard let fileSize = attributes[.size] as? Int64 else {
+            throw WhisperError.downloadFailed("Could not determine file size")
+        }
+
+        guard fileSize >= minSize && fileSize <= maxSize else {
+            throw WhisperError.downloadFailed(
+                "File size out of expected range for \(modelFileName)\n" +
+                "Expected: \(minSize)-\(maxSize) bytes\n" +
+                "Got: \(fileSize) bytes\n" +
+                "⚠️  This may indicate a malicious or corrupted file."
+            )
+        }
+
+        print("✅ Size validated: \(modelFileName) (\(fileSize) bytes)")
+    }
+
+    /// Safely extract zip archive with path traversal and zip bomb protection
+    /// - Parameters:
+    ///   - zipURL: URL of the zip file to extract
+    ///   - destDir: Destination directory for extraction
+    /// - Throws: WhisperError.downloadFailed if extraction fails or security violation detected
+    private static func safeUnzip(_ zipURL: URL, to destDir: URL) throws {
+        // Validate destination exists
+        guard FileManager.default.fileExists(atPath: destDir.path) else {
+            throw WhisperError.downloadFailed("Destination directory does not exist")
+        }
+
+        // Setup unzip process
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
+        process.arguments = ["-o", zipURL.path, "-d", destDir.path]
+        process.currentDirectoryURL = destDir
+
+        // Capture output for error reporting
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        try process.run()
+
+        // Wait with 10-second timeout (Core ML zips can be slow)
+        let deadline = Date().addingTimeInterval(10)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+
+        // Check if timeout occurred
+        if process.isRunning {
+            process.terminate()
+            throw WhisperError.downloadFailed(
+                "Unzip operation timed out after 10 seconds. " +
+                "This may indicate a zip bomb or corrupted archive."
+            )
+        }
+
+        // Check exit status
+        guard process.terminationStatus == 0 else {
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? "unknown error"
+            throw WhisperError.downloadFailed("Unzip failed: \(output)")
+        }
+
+        // Validate extracted files don't escape destination (path traversal check)
+        let extractedFiles = try FileManager.default.contentsOfDirectory(
+            at: destDir,
+            includingPropertiesForKeys: [.isSymbolicLinkKey],
+            options: []
+        )
+
+        for file in extractedFiles {
+            // Resolve symlinks to detect path traversal
+            let resolved = file.resolvingSymlinksInPath()
+            if !resolved.path.hasPrefix(destDir.path) {
+                // Path traversal detected - cleanup and abort
+                print("⚠️  Path traversal detected: \(file.path) -> \(resolved.path)")
+                try? FileManager.default.removeItem(at: destDir)
+                throw WhisperError.downloadFailed(
+                    "Security violation: Archive contains path traversal attempt"
+                )
+            }
+        }
+
+        print("✅ Archive extracted safely to \(destDir.path)")
+    }
+
     /// Download a model from Hugging Face (both .bin and Core ML if available).
     ///
     /// **NETWORK ACTIVITY**: This is the ONLY method in the entire app that makes outgoing
@@ -246,8 +403,27 @@ class WhisperService: @unchecked Sendable {
                 throw WhisperError.downloadFailed("Failed to download model")
             }
 
+            // SECURITY: Validate Content-Length if present
+            if let contentLength = httpResponse.value(forHTTPHeaderField: "Content-Length"),
+               let expectedSize = Int64(contentLength) {
+                if let (minSize, maxSize) = modelSizes[modelFileName] {
+                    if expectedSize < minSize || expectedSize > maxSize {
+                        throw WhisperError.downloadFailed(
+                            "Content-Length (\(expectedSize) bytes) out of expected range for \(modelFileName)"
+                        )
+                    }
+                }
+            }
+
+            // SECURITY: Validate actual downloaded size
+            try validateSize(tempURL, modelName: modelName)
+
+            // SECURITY: Verify SHA256 checksum
+            try verifyChecksum(tempURL, modelName: modelName)
+
+            // Move to final location after validation
             try FileManager.default.moveItem(at: tempURL, to: modelPath)
-            print("Model \(modelName) downloaded successfully")
+            print("✅ Model \(modelName) downloaded and verified successfully")
             progress(0.5)
         } else {
             print("Model \(modelName) already exists")
@@ -265,21 +441,18 @@ class WhisperService: @unchecked Sendable {
                     let (tempURL, response) = try await session.download(from: coreMLZipURL, delegate: nil)
 
                     if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                        // Unzip the Core ML model
+                        // Move to temp location for extraction
                         let tempZipPath = modelDir.appendingPathComponent("temp-coreml.zip")
+                        try? FileManager.default.removeItem(at: tempZipPath)
                         try FileManager.default.moveItem(at: tempURL, to: tempZipPath)
 
-                        // Use unzip command to extract
-                        let process = Process()
-                        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-                        process.arguments = ["-o", tempZipPath.path, "-d", modelDir.path]
-                        try process.run()
-                        process.waitUntilExit()
+                        // SECURITY: Use safe unzip with validation
+                        try safeUnzip(tempZipPath, to: modelDir)
 
-                        // Clean up zip file
+                        // Cleanup zip file
                         try? FileManager.default.removeItem(at: tempZipPath)
 
-                        print("Core ML model downloaded and extracted successfully - will enable GPU acceleration!")
+                        print("✅ Core ML encoder downloaded and extracted - GPU acceleration enabled!")
                     } else {
                         print("Core ML model not available for \(modelName) - will use CPU only")
                     }

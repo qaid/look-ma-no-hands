@@ -15,7 +15,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/exPHAT/SwiftWhisper.git", from: "1.0.0")
+        .package(url: "https://github.com/exPHAT/SwiftWhisper.git",
+                 revision: "a192004db08de7c6eaa169eede77f1625e7d23fb")
     ],
     targets: [
         .executableTarget(

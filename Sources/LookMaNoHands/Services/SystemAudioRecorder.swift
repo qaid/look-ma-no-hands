@@ -40,14 +40,9 @@ class SystemAudioRecorder: NSObject {
 
     /// Check if screen recording permission is granted
     static func hasPermission() -> Bool {
-        // On macOS 13+, we need to check screen recording permission
-        // ScreenCaptureKit requires this even for audio-only capture
-        if #available(macOS 14.0, *) {
-            return true // Permission check simplified in macOS 14+
-        } else {
-            // For macOS 13, we'll rely on runtime permission prompts
-            return true
-        }
+        // Use CGPreflightScreenCaptureAccess to check actual permission state
+        // This returns true if permission is already granted, false otherwise
+        return CGPreflightScreenCaptureAccess()
     }
 
     /// Request screen recording permission
