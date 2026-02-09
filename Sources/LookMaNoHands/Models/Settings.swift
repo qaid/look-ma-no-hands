@@ -75,6 +75,15 @@ enum IndicatorPosition: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// Appearance theme for the recording indicator
+enum AppearanceTheme: String, CaseIterable, Identifiable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+
+    var id: String { rawValue }
+}
+
 /// User preferences and settings
 /// Persisted to UserDefaults
 class Settings: ObservableObject {
@@ -237,6 +246,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Ollama integration reserved for future meeting transcription feature
         static let showIndicator = "showIndicator"
         static let indicatorPosition = "indicatorPosition"
+        static let appearanceTheme = "appearanceTheme"
         static let showLaunchConfirmation = "showLaunchConfirmation"
         static let customVocabulary = "customVocabulary"
         static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
@@ -308,6 +318,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
     @Published var indicatorPosition: IndicatorPosition {
         didSet {
             UserDefaults.standard.set(indicatorPosition.rawValue, forKey: Keys.indicatorPosition)
+        }
+    }
+
+    /// Appearance theme for the recording indicator
+    @Published var appearanceTheme: AppearanceTheme {
+        didSet {
+            UserDefaults.standard.set(appearanceTheme.rawValue, forKey: Keys.appearanceTheme)
         }
     }
 
@@ -404,6 +421,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.indicatorPosition = .followCursor  // Default to follow cursor
         }
 
+        if let savedTheme = UserDefaults.standard.string(forKey: Keys.appearanceTheme),
+           let theme = AppearanceTheme(rawValue: savedTheme) {
+            self.appearanceTheme = theme
+        } else {
+            self.appearanceTheme = .system  // Default to system theme
+        }
+
         // Launch confirmation defaults to true (enabled by default)
         if UserDefaults.standard.object(forKey: Keys.showLaunchConfirmation) != nil {
             self.showLaunchConfirmation = UserDefaults.standard.bool(forKey: Keys.showLaunchConfirmation)
@@ -454,6 +478,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         meetingPrompt = Settings.defaultMeetingPrompt
         showIndicator = true
         indicatorPosition = .followCursor
+        appearanceTheme = .system
         showLaunchConfirmation = true
         customVocabulary = []
         checkForUpdatesOnLaunch = false

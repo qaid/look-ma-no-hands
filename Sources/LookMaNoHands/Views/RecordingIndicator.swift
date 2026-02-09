@@ -102,18 +102,37 @@ struct WaveformLineView: View {
             fillPath.addLine(to: CGPoint(x: 0, y: size.height))
             fillPath.closeSubpath()
 
-            // Gradient: red near left edge transitioning to blue
-            let gradient = Gradient(stops: [
-                .init(color: Color(red: 1.0, green: 0.25, blue: 0.2).opacity(0.6), location: 0),
-                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.8), location: 0.35),
-                .init(color: Color(red: 0.4, green: 0.25, blue: 0.85).opacity(0.7), location: 1.0),
-            ])
+            // Gradient colors that adapt to color scheme
+            let gradient: Gradient
+            let fillGradient: Gradient
+
+            if colorScheme == .dark {
+                // Dark mode: original vibrant colors
+                gradient = Gradient(stops: [
+                    .init(color: Color(red: 1.0, green: 0.25, blue: 0.2).opacity(0.6), location: 0),
+                    .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.8), location: 0.35),
+                    .init(color: Color(red: 0.4, green: 0.25, blue: 0.85).opacity(0.7), location: 1.0),
+                ])
+
+                fillGradient = Gradient(stops: [
+                    .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.15), location: 0),
+                    .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.0), location: 1.0),
+                ])
+            } else {
+                // Light mode: deeper, more saturated colors for better visibility
+                gradient = Gradient(stops: [
+                    .init(color: Color(red: 0.9, green: 0.15, blue: 0.1).opacity(0.8), location: 0),
+                    .init(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.9), location: 0.35),
+                    .init(color: Color(red: 0.3, green: 0.15, blue: 0.7).opacity(0.85), location: 1.0),
+                ])
+
+                fillGradient = Gradient(stops: [
+                    .init(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.2), location: 0),
+                    .init(color: Color(red: 0.1, green: 0.3, blue: 0.8).opacity(0.0), location: 1.0),
+                ])
+            }
 
             // Draw fill
-            let fillGradient = Gradient(stops: [
-                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.15), location: 0),
-                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.0), location: 1.0),
-            ])
             context.fill(
                 fillPath,
                 with: .linearGradient(fillGradient, startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: size.height))
@@ -136,7 +155,20 @@ struct WaveformLineView: View {
 struct RecordingIndicator: View {
 
     @ObservedObject var state: RecordingIndicatorState
+    @ObservedObject private var settings = Settings.shared
     @Environment(\.colorScheme) var colorScheme
+
+    /// Compute the effective color scheme based on user's theme preference
+    private var effectiveColorScheme: ColorScheme? {
+        switch settings.appearanceTheme {
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        case .system:
+            return nil  // Use system default
+        }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -166,6 +198,7 @@ struct RecordingIndicator: View {
                     lineWidth: 1.5
                 )
         )
+        .preferredColorScheme(effectiveColorScheme)
     }
 }
 

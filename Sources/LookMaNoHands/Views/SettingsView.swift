@@ -164,6 +164,20 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.top, 4)
+
+                    // Theme picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Appearance")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 12) {
+                            ForEach(AppearanceTheme.allCases) { theme in
+                                themeCard(theme)
+                            }
+                        }
+                    }
+                    .padding(.top, 12)
                 }
             }
 
@@ -243,6 +257,69 @@ struct SettingsView: View {
         RoundedRectangle(cornerRadius: 2)
             .fill(Color.accentColor.opacity(0.8))
             .frame(width: 40, height: 4)
+    }
+
+    /// Visual theme card for the appearance theme picker
+    private func themeCard(_ theme: AppearanceTheme) -> some View {
+        let isSelected = settings.appearanceTheme == theme
+
+        return Button {
+            settings.appearanceTheme = theme
+        } label: {
+            VStack(spacing: 6) {
+                Text(theme.rawValue)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+
+                // Theme icon preview
+                ZStack {
+                    // Background
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color(nsColor: .windowBackgroundColor).opacity(0.3))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4)
+                                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1)
+                        )
+                        .frame(width: 80, height: 50)
+
+                    // Theme symbol
+                    Image(systemName: themeIcon(for: theme))
+                        .font(.system(size: 24))
+                        .foregroundColor(themeIconColor(for: theme))
+                }
+            }
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? Color.accentColor.opacity(0.2) : Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(
+                        isSelected ? Color.accentColor : Color(nsColor: .separatorColor),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Get the appropriate SF Symbol for a theme
+    private func themeIcon(for theme: AppearanceTheme) -> String {
+        switch theme {
+        case .light: return "sun.max.fill"
+        case .dark: return "moon.fill"
+        case .system: return "circle.lefthalf.filled"
+        }
+    }
+
+    /// Get the icon color for a theme
+    private func themeIconColor(for theme: AppearanceTheme) -> Color {
+        switch theme {
+        case .light: return .orange
+        case .dark: return .purple
+        case .system: return .blue
+        }
     }
 
     // MARK: - Recording Tab
