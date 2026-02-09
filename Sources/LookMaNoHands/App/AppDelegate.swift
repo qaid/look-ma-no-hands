@@ -747,10 +747,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            // Only resume music players that were actually playing before we paused them
-            // Do NOT send blanket hardware play event - it would resume ALL media including
-            // browser videos that the user manually paused before recording
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+            mediaControlService.resumeMedia()
         }
 
         NSLog("✅ Recording canceled - no text will be inserted")
@@ -791,8 +789,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Use AppleScript to explicitly pause music players (Spotify, Apple Music)
                 MusicPlayerController.shared.pauseAllPlayers()
 
-                // Send hardware pause event for browsers and other media sources
-                // This is sent multiple times (with delays) to ensure it sticks
+                // Send explicit pause command (not toggle) for browsers and other media sources
+                // Uses MediaRemote framework's MRMediaRemoteSendCommand(kMRPause) which is safe:
+                // - If media is playing: pauses it
+                // - If nothing is playing: no-op (won't launch Music app) (#128)
                 mediaControlService.pauseMedia()
             }
         } catch {
@@ -809,10 +809,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Resume media if we paused it before the failed recording attempt
             if Settings.shared.pauseMediaDuringDictation {
-                // Only resume music players that were actually playing before we paused them
-                // Do NOT send blanket hardware play event - it would resume ALL media including
-                // browser videos that the user manually paused before recording
                 MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+                mediaControlService.resumeMedia()
             }
 
             // Hide indicator with slight delay to ensure proper cleanup
@@ -919,10 +917,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            // Only resume music players that were actually playing before we paused them
-            // Do NOT send blanket hardware play event - it would resume ALL media including
-            // browser videos that the user manually paused before recording
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+            mediaControlService.resumeMedia()
         }
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)

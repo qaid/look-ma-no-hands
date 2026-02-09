@@ -96,9 +96,15 @@ class KeyboardMonitor {
             guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
 
             let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
-            monitor.handleEvent(type: type, event: event)
+            let shouldConsume = monitor.handleEvent(type: type, event: event)
 
-            return Unmanaged.passUnretained(event)
+            // If handleEvent returned true, consume the event (return nil) to prevent system handling
+            // This fixes the issue where Caps Lock would trigger Music app and other system shortcuts
+            if shouldConsume {
+                return nil // Consume event - prevent propagation
+            }
+
+            return Unmanaged.passUnretained(event) // Pass through event
         }
 
         // Create the event tap
@@ -151,7 +157,8 @@ class KeyboardMonitor {
 
     // MARK: - Private Methods
 
-    private func handleEvent(type: CGEventType, event: CGEvent) {
+    /// Handle keyboard event and return whether it was consumed (should be blocked from propagating)
+    private func handleEvent(type: CGEventType, event: CGEvent) -> Bool {
         // Check for ESC key (keyCode 53) to cancel recording
         // ESC is handled as a keyDown event
         if type == .keyDown {
@@ -161,7 +168,7 @@ class KeyboardMonitor {
                 DispatchQueue.main.async { [weak self] in
                     self?.onCancel?()
                 }
-                return // Don't process further
+                return false // Don't consume ESC - let it propagate
             }
         }
 
@@ -169,13 +176,13 @@ class KeyboardMonitor {
 
         if currentHotkey.isSingleModifierKey {
             // Handle single modifier keys (Caps Lock, Right Option, Fn, etc.)
-            guard type == .flagsChanged else { return }
+            guard type == .flagsChanged else { return false }
 
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
             let eventFlags = event.flags
 
             // Only trigger if this is the correct key
-            guard keyCode == Int64(currentHotkey.keyCode) else { return }
+            guard keyCode == Int64(currentHotkey.keyCode) else { return false }
 
             // Determine the relevant flag for this modifier key
             let relevantFlag: CGEventFlags
@@ -187,7 +194,7 @@ class KeyboardMonitor {
             case 63: // Fn
                 relevantFlag = .maskSecondaryFn
             default:
-                return
+                return false
             }
 
             // Check if the modifier state changed
@@ -209,20 +216,31 @@ class KeyboardMonitor {
             }
 
             if shouldTrigger {
-                NSLog("🔔 KeyboardMonitor: %@ detected (toggle/press)", currentHotkey.displayString)
+                NSLog("🔔 KeyboardMonitor: %@ detected (toggle/press) - consuming event", currentHotkey.displayString)
                 DispatchQueue.main.async { [weak self] in
                     self?.onTrigger?()
                 }
+                return true // Consume the event to prevent system handling (e.g., Music app)
             }
+
+            // For Caps Lock, always consume the key event to prevent system interference
+            // even during state transitions (e.g., toggle off after recording)
+            // This prevents Music app launch and other system shortcuts from triggering
+            if currentHotkey.keyCode == 57 { // Caps Lock
+                return true
+            }
+
+            // For other modifier keys, only consume when we trigger
+            return false
         } else {
             // Handle key+modifier combinations
             // Only process keyDown events for key+modifier combinations
-            guard type == .keyDown else { return }
+            guard type == .keyDown else { return false }
 
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
 
             // Check if keycode matches
-            guard keyCode == Int64(currentHotkey.keyCode) else { return }
+            guard keyCode == Int64(currentHotkey.keyCode) else { return false }
 
             // Key matches! Now check modifiers
             let eventFlags = event.flags
@@ -240,12 +258,14 @@ class KeyboardMonitor {
 
             // Check if modifiers match exactly
             if eventModifiers == expectedFlags {
-                NSLog("🔔 KeyboardMonitor: %@ detected - MATCH!", currentHotkey.displayString)
+                NSLog("🔔 KeyboardMonitor: %@ detected - MATCH! Consuming event", currentHotkey.displayString)
                 DispatchQueue.main.async { [weak self] in
                     self?.onTrigger?()
                 }
+                return true // Consume the event to prevent system handling
             } else {
                 NSLog("❌ Modifier mismatch - expected 0x%lx, got 0x%lx", expectedFlags.rawValue, eventModifiers.rawValue)
+                return false // Don't consume non-matching events
             }
         }
     }
