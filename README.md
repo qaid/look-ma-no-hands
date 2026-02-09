@@ -8,6 +8,19 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
   <!--<img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">-->
 </p>
 
+| |  | |
+|:--|:--|:--|
+| ✨ | **[Features](#-features)** | Voice dictation, meeting transcription, and core capabilities |
+| 🚀 | **[Quick Start](#-quick-start)** | Install, download a model, and run in under 5 minutes |
+| 🎯 | **[Usage](#-usage)** | Hotkey dictation, menu bar control, meeting recording, and settings |
+| ⚡ | **[Performance](#-performance)** | Model comparison and Core ML acceleration benchmarks |
+| 🛠️ | **[Requirements](#-requirements)** | macOS compatibility, hardware, and disk space |
+| 📝 | **[How It Works](#-how-it-works)** | Audio capture, transcription, formatting, and text insertion pipeline |
+| 🔧 | **[Configuration](#-configuration)** | Whisper model selection and meeting note prompt customization |
+| 🐛 | **[Troubleshooting](#-troubleshooting)** | Fixes for permissions, Core ML, Ollama, and audio capture issues |
+| 🔒 | **[Privacy & Security](#-privacy--security)** | Local-only guarantees, security audit summary, and hardening details |
+| 👥 | **[Contributing](#-contributing)** | How to get involved |
+
 ## ✨ Features
 
 ### Voice Dictation
@@ -315,13 +328,33 @@ LookMaNoHands/
 └── PERFORMANCE.md        # Optimization guide
 ```
 
-## 🔒 Privacy
+## 🔒 Privacy & Security
 
-Look Ma No Hands is 100% local:
-- ✅ Audio never sent to cloud
-- ✅ No telemetry or analytics
-- ✅ No internet required (after model download)
-- ✅ Open source—verify for yourself
+Look Ma No Hands is built on a strict **local-only** architecture. Your voice, transcriptions, and meeting notes never leave your Mac.
+
+| Guarantee | Detail |
+|-----------|--------|
+| **No cloud processing** | All speech-to-text and AI analysis runs on-device |
+| **No telemetry or analytics** | Zero tracking, zero data collection |
+| **No accounts or sign-in** | Nothing to create, nothing to leak |
+| **No internet required** | After the initial model download, the app works fully offline |
+| **Open source** | Every line of code is auditable |
+
+The only outbound network requests are model downloads (Hugging Face) and update checks (GitHub), both user-initiated.
+
+### Security Hardening
+
+A comprehensive security audit was completed and all critical, medium, and low-priority findings have been addressed:
+
+- **Verified model downloads** — SHA-256 checksums and size validation before any Whisper model is used
+- **Verified app updates** — cryptographic signature verification before installation
+- **Safe archive extraction** — path-traversal and zip-bomb protection
+- **Pinned dependencies** — exact Git revision pinning with CI integrity checks
+- **Automated scanning** — Dependabot monitors dependencies; CI verifies `Package.resolved` on every PR
+- **Release provenance** — every release includes SHA-256 checksums and a Software Bill of Materials (SBOM)
+- **Privacy-safe crash reports** — transcription content is fully redacted with no metadata leakage
+
+For the full audit summary, resolved findings, and current security posture, see **[docs/SECURITY.md](docs/SECURITY.md)**.
 
 ## 🚧 Known Limitations
 
