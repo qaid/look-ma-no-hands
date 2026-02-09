@@ -8,7 +8,7 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
   <!--<img src="app-screenshots/splash-screen-ready.png" alt="Look Ma No Hands - Ready to dictate" width="400">-->
 </p>
 
-| | Section | |
+| |  | |
 |:--|:--|:--|
 | ✨ | **[Features](#-features)** | Voice dictation, meeting transcription, and core capabilities |
 | 🚀 | **[Quick Start](#-quick-start)** | Install, download a model, and run in under 5 minutes |
