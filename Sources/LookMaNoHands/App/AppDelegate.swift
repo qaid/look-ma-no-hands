@@ -747,10 +747,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            // Only resume music players that were actually playing before we paused them
-            // Do NOT send blanket hardware play event - it would resume ALL media including
-            // browser videos that the user manually paused before recording
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+            mediaControlService.resumeMedia()
         }
 
         NSLog("✅ Recording canceled - no text will be inserted")
@@ -811,10 +809,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Resume media if we paused it before the failed recording attempt
             if Settings.shared.pauseMediaDuringDictation {
-                // Only resume music players that were actually playing before we paused them
-                // Do NOT send blanket hardware play event - it would resume ALL media including
-                // browser videos that the user manually paused before recording
                 MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+                mediaControlService.resumeMedia()
             }
 
             // Hide indicator with slight delay to ensure proper cleanup
@@ -921,10 +917,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
-            // Only resume music players that were actually playing before we paused them
-            // Do NOT send blanket hardware play event - it would resume ALL media including
-            // browser videos that the user manually paused before recording
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
+            mediaControlService.resumeMedia()
         }
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
