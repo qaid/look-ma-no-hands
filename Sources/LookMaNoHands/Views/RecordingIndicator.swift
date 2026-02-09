@@ -54,8 +54,84 @@ struct WaveformBarsView: View {
     }
 }
 
+/// Waveform visualization using a smooth bezier curve line
+struct WaveformLineView: View {
+    @Binding var frequencyBands: [Float]
+    @Environment(\.colorScheme) var colorScheme
+    var width: CGFloat = 260
+    var height: CGFloat = 34
+
+    var body: some View {
+        Canvas { context, size in
+            let count = frequencyBands.count
+            guard count > 1 else { return }
+
+            // Build sample points from frequency data
+            var points: [CGPoint] = []
+            let midY = size.height / 2
+            for i in 0..<count {
+                let x = (CGFloat(i) / CGFloat(count - 1)) * size.width
+                let level = CGFloat(frequencyBands[i])
+                // Compress with power curve, same as bars view
+                let normalized = pow(level, 2.0)
+                let amplitude = normalized * (size.height * 0.45)
+                // Alternate above/below center for waveform shape
+                let sign: CGFloat = i % 2 == 0 ? -1 : 1
+                let y = midY + sign * amplitude
+                points.append(CGPoint(x: x, y: y))
+            }
+
+            // Build smooth bezier path through points
+            guard let first = points.first else { return }
+            var path = Path()
+            path.move(to: first)
+            for i in 1..<points.count {
+                let prev = points[i - 1]
+                let cur = points[i]
+                let cpx = (prev.x + cur.x) / 2
+                path.addCurve(
+                    to: cur,
+                    control1: CGPoint(x: cpx, y: prev.y),
+                    control2: CGPoint(x: cpx, y: cur.y)
+                )
+            }
+
+            // Build fill path (close at bottom)
+            var fillPath = path
+            fillPath.addLine(to: CGPoint(x: size.width, y: size.height))
+            fillPath.addLine(to: CGPoint(x: 0, y: size.height))
+            fillPath.closeSubpath()
+
+            // Gradient: red near left edge transitioning to blue
+            let gradient = Gradient(stops: [
+                .init(color: Color(red: 1.0, green: 0.25, blue: 0.2).opacity(0.6), location: 0),
+                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.8), location: 0.35),
+                .init(color: Color(red: 0.4, green: 0.25, blue: 0.85).opacity(0.7), location: 1.0),
+            ])
+
+            // Draw fill
+            let fillGradient = Gradient(stops: [
+                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.15), location: 0),
+                .init(color: Color(red: 0.3, green: 0.5, blue: 1.0).opacity(0.0), location: 1.0),
+            ])
+            context.fill(
+                fillPath,
+                with: .linearGradient(fillGradient, startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: size.height))
+            )
+
+            // Draw stroke
+            context.stroke(
+                path,
+                with: .linearGradient(gradient, startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: size.width, y: 0)),
+                lineWidth: 2.5
+            )
+        }
+        .frame(width: width, height: height)
+    }
+}
+
 /// Floating window that appears during recording to show the user that audio is being captured
-/// Shows animated waveform visualization at the cursor position (Apple-style)
+/// Shows a recording dot + smooth waveform line at the cursor position
 /// IMPORTANT: Only shown in dictation mode, NOT in meeting transcription mode
 struct RecordingIndicator: View {
 
@@ -63,25 +139,32 @@ struct RecordingIndicator: View {
     @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
-        // Just the waveform visualization
-        WaveformBarsView(frequencyBands: $state.frequencyBands, fixedWidth: 300)
-        .padding(.horizontal, 12)
+        HStack(spacing: 10) {
+            // Static recording dot (no pulsing)
+            Circle()
+                .fill(Color(red: 1.0, green: 0.23, blue: 0.19))
+                .frame(width: 10, height: 10)
+                .shadow(color: Color(red: 1.0, green: 0.23, blue: 0.19).opacity(0.4), radius: 4, x: 0, y: 0)
+
+            // Smooth waveform line
+            WaveformLineView(frequencyBands: $state.frequencyBands, width: 260, height: 34)
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 12)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.15), radius: 5, x: 0, y: 2)
+                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.25 : 0.15), radius: 6, x: 0, y: 2)
         )
         .overlay(
-            // IMPROVED: Border color adapts to light/dark mode
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .strokeBorder(
                     colorScheme == .dark
-                        ? Color(red: 0.3, green: 0.6, blue: 1.0)  // Light blue for dark mode
-                        : Color(red: 0.1, green: 0.4, blue: 0.8), // Deeper blue for light mode
-                    lineWidth: 2
+                        ? Color(red: 0.3, green: 0.6, blue: 1.0).opacity(0.5)
+                        : Color(red: 0.1, green: 0.4, blue: 0.8).opacity(0.4),
+                    lineWidth: 1.5
                 )
-                .opacity(0.8)
         )
     }
 }
