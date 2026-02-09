@@ -7,10 +7,12 @@ class TextFormatter {
     // MARK: - Configuration
 
     /// Whether to enable smart capitalization
-    var smartCapitalization = true
+    /// NOTE: This should stay FALSE for dictation - TextInsertionService handles capitalization context-aware
+    var smartCapitalization = false
 
     /// Whether to add punctuation at the end if missing
-    var addFinalPunctuation = true
+    /// NOTE: This should stay FALSE for dictation - TextInsertionService handles punctuation context-aware
+    var addFinalPunctuation = false
 
     /// Whether to fix common transcription errors
     var fixCommonErrors = true
@@ -209,14 +211,14 @@ extension TextFormatter {
                 formatter.trimWhitespace = true
 
             case .standard:
-                formatter.smartCapitalization = true
-                formatter.addFinalPunctuation = true
+                formatter.smartCapitalization = false  // Context-aware in TextInsertionService
+                formatter.addFinalPunctuation = false  // Context-aware in TextInsertionService
                 formatter.fixCommonErrors = true
                 formatter.trimWhitespace = true
 
             case .maximum:
-                formatter.smartCapitalization = true
-                formatter.addFinalPunctuation = true
+                formatter.smartCapitalization = false  // Context-aware in TextInsertionService
+                formatter.addFinalPunctuation = false  // Context-aware in TextInsertionService
                 formatter.fixCommonErrors = true
                 formatter.trimWhitespace = true
             }

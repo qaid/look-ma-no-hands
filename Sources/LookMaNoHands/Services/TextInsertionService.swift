@@ -17,7 +17,7 @@ class TextInsertionService {
     // MARK: - Public Methods
 
     /// Insert text into the currently focused text field
-    /// Tries multiple methods in order of preference
+    /// Uses AX API to read context, then clipboard paste to insert (preserves cursor position)
     /// - Parameter text: The text to insert (raw transcription)
     /// - Returns: True if insertion was successful
     @discardableResult
@@ -25,40 +25,22 @@ class TextInsertionService {
         // First apply basic cleanup
         let cleanedText = basicCleanup(text)
 
-        // Read AX state once to avoid race conditions between formatting and insertion
+        // Read AX state for context-aware formatting (read-only, does not modify the field)
         let state = captureAXState()
 
         // Apply context-aware formatting using the captured state
         let formattedText = applyContextAwareFormatting(cleanedText, state: state)
 
-        // Strategy 1: Try Accessibility API (cleanest method)
-        if let state = state, insertAtSelection(state, text: formattedText) {
-            print("TextInsertionService: Inserted via Accessibility API")
+        // Strategy 1: Clipboard + paste (preserves cursor position natively)
+        // Cmd+V inserts at cursor and leaves cursor at end of pasted text
+        if insertViaClipboard(formattedText) {
+            print("TextInsertionService: Inserted via clipboard paste")
             return true
         }
 
-        // Strategy 1b: Try AX without captured state (element might not be a text field)
-        if state == nil, let element = getFocusedElement() {
-            var roleValue: CFTypeRef?
-            let roleResult = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &roleValue)
-            if roleResult == .success,
-               let role = roleValue as? String,
-               role == kAXTextFieldRole || role == kAXTextAreaRole {
-                let setResult = AXUIElementSetAttributeValue(
-                    element,
-                    kAXValueAttribute as CFString,
-                    formattedText as CFTypeRef
-                )
-                if setResult == .success {
-                    print("TextInsertionService: Inserted via Accessibility API (set value)")
-                    return true
-                }
-            }
-        }
-
-        // Strategy 2: Try clipboard + paste (most compatible)
-        if insertViaClipboard(formattedText) {
-            print("TextInsertionService: Inserted via clipboard paste")
+        // Strategy 2: Fallback to AX API (cursor may not be positioned correctly)
+        if let state = state, insertAtSelection(state, text: formattedText) {
+            print("TextInsertionService: Inserted via Accessibility API (fallback)")
             return true
         }
 
@@ -181,33 +163,67 @@ class TextInsertionService {
                 kAXValueAttribute as CFString,
                 newText as CFTypeRef
             )
+            if setResult == .success {
+                print("TextInsertionService: Appended to end via kAXValueAttribute")
+            }
             return setResult == .success
         }
 
         var newText = currentText
         newText.replaceSubrange(swiftRange, with: text)
 
-        // Set the new value
+        // Set the new value (this will reset cursor position in most apps)
         let setResult = AXUIElementSetAttributeValue(
             state.element,
             kAXValueAttribute as CFString,
             newText as CFTypeRef
         )
 
-        guard setResult == .success else { return false }
+        guard setResult == .success else {
+            print("TextInsertionService: kAXValueAttribute failed (\(setResult))")
+            return false
+        }
+
+        print("TextInsertionService: Text set via kAXValueAttribute, now positioning cursor at end of insertion...")
 
         // Position cursor at end of inserted text (UTF-16 offset)
         let newCursorLocation = safeLocation + (text as NSString).length
-        var newRange = CFRange(location: newCursorLocation, length: 0)
-        if let rangeValue = AXValueCreate(.cfRange, &newRange) {
-            AXUIElementSetAttributeValue(
-                state.element,
-                kAXSelectedTextRangeAttribute as CFString,
-                rangeValue
-            )
-        }
+
+        // Set cursor position with multiple attempts and progressive delays
+        // Some apps need time after setValue before cursor can be repositioned
+        setCursorPosition(element: state.element, location: newCursorLocation)
 
         return true
+    }
+
+    /// Helper to set cursor position with retry logic
+    private func setCursorPosition(element: AXUIElement, location: Int, attempt: Int = 1) {
+        var newRange = CFRange(location: location, length: 0)
+
+        guard let rangeValue = AXValueCreate(.cfRange, &newRange) else {
+            print("TextInsertionService: Failed to create CFRange for cursor")
+            return
+        }
+
+        let result = AXUIElementSetAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            rangeValue
+        )
+
+        if result == .success {
+            print("TextInsertionService: ✅ Cursor positioned at \(location) (attempt \(attempt))")
+        } else if attempt < 5 {
+            // Progressive backoff: 10ms, 30ms, 60ms, 100ms
+            let delay = Double(attempt * attempt) * 0.01
+            print("TextInsertionService: Cursor positioning failed (attempt \(attempt)), retrying in \(Int(delay * 1000))ms...")
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                self.setCursorPosition(element: element, location: location, attempt: attempt + 1)
+            }
+        } else {
+            print("TextInsertionService: ❌ Cursor positioning failed after \(attempt) attempts")
+        }
     }
     
     // MARK: - Strategy 2: Clipboard + Paste
@@ -403,13 +419,14 @@ class TextInsertionService {
 
         // Adjust punctuation based on context
         if context.shouldAddPunctuation {
-            // Add period at end if no punctuation present
+            // Add period at end if no punctuation present (only when at end of text field)
             let lastChar = result.last
             if lastChar != nil && !".,!?;:".contains(lastChar!) {
                 result += "."
             }
         } else {
-            // Inserting mid-text: strip trailing punctuation that was auto-added by TextFormatter
+            // Inserting mid-text: Whisper sometimes adds periods, strip them
+            // Note: We're conservative - only strip periods and question marks that Whisper might add
             while let lastChar = result.last, ".?".contains(lastChar) {
                 result = String(result.dropLast())
             }
