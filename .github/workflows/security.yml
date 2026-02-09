@@ -1,0 +1,59 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [ main, security-* ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-dependencies:
+    name: Verify Package.resolved Integrity
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Resolve dependencies
+        run: swift package resolve
+
+      - name: Check for unexpected changes
+        run: |
+          if ! git diff --exit-code Package.resolved; then
+            echo "❌ Package.resolved changed after resolve!"
+            echo "This may indicate dependency tampering."
+            exit 1
+          fi
+          echo "✅ Package.resolved integrity verified"
+
+      - name: Verify SwiftWhisper revision
+        run: |
+          EXPECTED_REV="a192004db08de7c6eaa169eede77f1625e7d23fb"
+          ACTUAL_REV=$(grep -A 5 '"identity" : "swiftwhisper"' Package.resolved | grep '"revision"' | cut -d'"' -f4)
+
+          if [ "$ACTUAL_REV" != "$EXPECTED_REV" ]; then
+            echo "❌ SwiftWhisper revision mismatch!"
+            echo "Expected: $EXPECTED_REV"
+            echo "Actual: $ACTUAL_REV"
+            exit 1
+          fi
+          echo "✅ SwiftWhisper revision verified: $ACTUAL_REV"
+
+  build-verification:
+    name: Verify Clean Build
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build release
+        run: swift build -c release
+
+      - name: Run basic functionality test
+        run: |
+          # Verify binary was created
+          test -f .build/release/LookMaNoHands
+          echo "✅ Release binary built successfully"
