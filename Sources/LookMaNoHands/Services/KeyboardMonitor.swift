@@ -161,9 +161,6 @@ class KeyboardMonitor {
 
     /// Enable or disable the event tap without teardown (efficient toggle)
     func setEnabled(_ enabled: Bool) {
-        hotkeyLock.lock()
-        defer { hotkeyLock.unlock() }
-
         guard isMonitoring else {
             NSLog("⚠️ KeyboardMonitor: Cannot enable/disable - not monitoring")
             return
@@ -172,8 +169,11 @@ class KeyboardMonitor {
         guard isEnabled != enabled else { return }
 
         if let tap = eventTap {
+            // Call CGEvent.tapEnable without holding locks to avoid deadlock with event callback thread
+            // The event callback thread may be holding hotkeyLock when calling getHotkey()
             CGEvent.tapEnable(tap: tap, enable: enabled)
             isEnabled = enabled
+
             NSLog("🔄 KeyboardMonitor: %@ for %@",
                   enabled ? "Enabled" : "Disabled",
                   getHotkey().displayString)
