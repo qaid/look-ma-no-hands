@@ -43,6 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
     private let launchSplash = LaunchSplashWindowController()
+    private let hotkeyToggleSplash = HotkeyToggleSplashWindowController()
 
     // MARK: - Application Lifecycle
 
@@ -367,11 +368,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Toggle state - notification handler will update UI and show splash
         let newState = !Settings.shared.hotkeyEnabled
         Settings.shared.hotkeyEnabled = newState
-
-        hotkeyToggleMenuItem?.state = newState ? .on : .off
-        updateMenuBarIconForHotkeyState(enabled: newState)
 
         NSLog("🔀 Hotkey monitoring %@", newState ? "enabled" : "disabled")
     }
@@ -699,6 +698,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         keyboardMonitor.setEnabled(enabled)
         hotkeyToggleMenuItem?.state = enabled ? .on : .off
         updateMenuBarIconForHotkeyState(enabled: enabled)
+
+        // Show splash screen feedback for all toggle sources
+        hotkeyToggleSplash.show(isEnabled: enabled)
     }
 
     // MARK: - Contextual Prompt Building
