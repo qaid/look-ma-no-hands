@@ -2,12 +2,13 @@ import Foundation
 import AppKit
 
 /// Monitors for a global keyboard shortcut to toggle hotkey enabled/disabled state
-/// Uses NSEvent local monitor for key combinations (e.g., Cmd+Shift+D)
+/// Uses both local and global NSEvent monitors to work from any app
 class HotkeyToggleMonitor {
 
     // MARK: - Properties
 
-    private var eventMonitor: Any?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
     private var onToggle: (() -> Void)?
     private var isMonitoring = false
 
@@ -42,9 +43,14 @@ class HotkeyToggleMonitor {
     func stopMonitoring() {
         guard isMonitoring else { return }
 
-        if let monitor = eventMonitor {
+        if let monitor = localEventMonitor {
             NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
+            localEventMonitor = nil
+        }
+
+        if let monitor = globalEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEventMonitor = nil
         }
 
         NotificationCenter.default.removeObserver(self)
@@ -56,22 +62,27 @@ class HotkeyToggleMonitor {
 
     // MARK: - Private Methods
 
-    /// Set up or recreate the event monitor
+    /// Set up or recreate the event monitors (both local and global)
     private func setupEventMonitor() {
-        // Remove existing monitor if any
-        if let monitor = eventMonitor {
+        // Remove existing monitors if any
+        if let monitor = localEventMonitor {
             NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
+            localEventMonitor = nil
         }
 
-        // Create new monitor for keyDown events
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        if let monitor = globalEventMonitor {
+            NSEvent.removeMonitor(monitor)
+            globalEventMonitor = nil
+        }
+
+        // Create local monitor for keyDown events when app is in focus
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self else { return event }
             guard let toggleShortcut = Settings.shared.toggleHotkeyShortcut else { return event }
 
             // Check if this event matches the toggle shortcut
             if self.matchesToggleShortcut(event: event, hotkey: toggleShortcut) {
-                NSLog("🔔 HotkeyToggleMonitor: Toggle shortcut detected - consuming event")
+                NSLog("🔔 HotkeyToggleMonitor (local): Toggle shortcut detected")
 
                 // Trigger the callback on main queue
                 DispatchQueue.main.async {
@@ -85,6 +96,25 @@ class HotkeyToggleMonitor {
             // Pass through non-matching events
             return event
         }
+
+        // Create global monitor for keyDown events when other apps are in focus
+        // Note: Global monitors can only observe events, not modify/consume them
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self = self else { return }
+            guard let toggleShortcut = Settings.shared.toggleHotkeyShortcut else { return }
+
+            // Check if this event matches the toggle shortcut
+            if self.matchesToggleShortcut(event: event, hotkey: toggleShortcut) {
+                NSLog("🔔 HotkeyToggleMonitor (global): Toggle shortcut detected from other app")
+
+                // Trigger the callback on main queue
+                DispatchQueue.main.async {
+                    self.onToggle?()
+                }
+            }
+        }
+
+        NSLog("⌨️ HotkeyToggleMonitor: Set up local + global event monitors")
     }
 
     /// Check if the event matches the toggle shortcut
