@@ -474,10 +474,6 @@ struct MeetingView: View {
                                     }
                                     .padding(.vertical, 4)
                                     .padding(.horizontal, 8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(isHighlighted ? Color.blue.opacity(0.1) : Color.clear)
-                                    )
                                     .id(index)
                                     .accessibilityElement(children: .combine)
                                 }
@@ -886,48 +882,93 @@ struct MeetingView: View {
         if let sessionIndex = meetingState.recordingSessions.firstIndex(where: { $0.segmentRange.lowerBound == index }) {
             let session = meetingState.recordingSessions[sessionIndex]
 
-            HStack(spacing: 8) {
-                // Left line
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(height: 1)
+            VStack(spacing: 4) {
+                // Main divider line with session info
+                HStack(spacing: 8) {
+                    // Left line - more prominent
+                    Rectangle()
+                        .fill(Color.blue.opacity(0.5))
+                        .frame(height: 2)
 
-                // Session marker
-                HStack(spacing: 6) {
-                    Image(systemName: "record.circle")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                    // Session badge - high contrast
+                    sessionBadge(session: session, sessionIndex: sessionIndex)
 
-                    Text("Recording \(sessionIndex + 1)")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-
-                    if let endTime = session.endTime {
-                        Text("resumed at \(formatSessionTime(endTime))")
-                            .font(.system(size: 11))
-                            .foregroundColor(.meetingTertiary)
-                    }
+                    // Right line
+                    Rectangle()
+                        .fill(Color.blue.opacity(0.5))
+                        .frame(height: 2)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(
-                    Capsule()
-                        .fill(Color.secondary.opacity(0.1))
-                )
 
-                // Right line
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.3))
-                    .frame(height: 1)
+                // Gap indicator (if applicable)
+                if sessionIndex > 0 {
+                    gapIndicator(currentSession: session, sessionIndex: sessionIndex)
+                }
             }
         }
     }
 
-    /// Format session time for display
-    private func formatSessionTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
+    /// Creates the prominent session badge with session info
+    private func sessionBadge(session: RecordingSession, sessionIndex: Int) -> some View {
+        HStack(spacing: 8) {
+            // Record icon
+            Image(systemName: "record.circle.fill")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
+
+            // Session number
+            Text("Recording \(sessionIndex + 1)")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(.white)
+
+            // Separator dot
+            Circle()
+                .fill(Color.white.opacity(0.5))
+                .frame(width: 3, height: 3)
+
+            // Duration
+            Text(formatTime(session.duration))
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white)
+
+            // Separator dot
+            Circle()
+                .fill(Color.white.opacity(0.5))
+                .frame(width: 3, height: 3)
+
+            // Segment count
+            Text("\(session.segmentRange.count) segments")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundColor(.white.opacity(0.9))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.blue)
+        )
+    }
+
+    /// Shows gap duration between recording sessions
+    @ViewBuilder
+    private func gapIndicator(currentSession: RecordingSession, sessionIndex: Int) -> some View {
+        if sessionIndex > 0,
+           sessionIndex - 1 < meetingState.recordingSessions.count,
+           let gap = calculateGapDuration(
+               currentSession: currentSession,
+               previousSession: meetingState.recordingSessions[sessionIndex - 1]
+           ),
+           gap > 1.0 { // Only show if gap > 1 second
+            HStack(spacing: 4) {
+                Image(systemName: "clock")
+                    .font(.system(size: 10))
+                    .foregroundColor(.meetingTertiary)
+
+                Text("Gap: \(formatTime(gap)) since last session")
+                    .font(.system(size: 11))
+                    .foregroundColor(.meetingTertiary)
+            }
+            .padding(.top, 4)
+        }
     }
 
     private func startAudioLevelUpdates() {
@@ -1617,5 +1658,12 @@ When these terms appear, preserve their exact formatting and context. If they're
         let minutes = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return String(format: "%02d:%02d", minutes, secs)
+    }
+
+    /// Calculates the time gap between two recording sessions
+    private func calculateGapDuration(currentSession: RecordingSession, previousSession: RecordingSession) -> TimeInterval? {
+        guard let previousEnd = previousSession.endTime else { return nil }
+        let gap = currentSession.startTime.timeIntervalSince(previousEnd)
+        return gap > 0 ? gap : nil
     }
 }
