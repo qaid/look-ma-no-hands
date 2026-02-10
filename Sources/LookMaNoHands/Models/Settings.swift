@@ -234,7 +234,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
 """
 
     // MARK: - Keys
-    
+
     private enum Keys {
         static let triggerKey = "triggerKey"
         static let customHotkey = "customHotkey"
@@ -248,10 +248,28 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let indicatorPosition = "indicatorPosition"
         static let appearanceTheme = "appearanceTheme"
         static let showLaunchConfirmation = "showLaunchConfirmation"
-        static let customVocabulary = "customVocabulary"
+        static let customVocabulary = "customVocabulary" // Legacy UserDefaults key (for migration)
         static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
         static let lastUpdateCheckDate = "lastUpdateCheckDate"
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
+    }
+
+    // MARK: - File Paths
+
+    /// Get the Application Support directory for persistent storage
+    private static func getApplicationSupportDirectory() -> URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appDir = appSupport.appendingPathComponent("LookMaNoHands")
+
+        // Create directory if it doesn't exist
+        try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+
+        return appDir
+    }
+
+    /// Path to the vocabulary JSON file in Application Support
+    private static var vocabularyFileURL: URL {
+        getApplicationSupportDirectory().appendingPathComponent("vocabulary.json")
     }
     
     // MARK: - Audio Device Manager
@@ -343,11 +361,10 @@ Now produce the complete meeting notes following the format above. Ensure every 
     }
 
     /// Custom vocabulary entries for Whisper prompt biasing and post-transcription replacement
+    /// Stored in Application Support for persistence across reinstalls
     @Published var customVocabulary: [VocabularyEntry] {
         didSet {
-            if let data = try? JSONEncoder().encode(customVocabulary) {
-                UserDefaults.standard.set(data, forKey: Keys.customVocabulary)
-            }
+            saveVocabularyToFile()
         }
     }
 
@@ -435,13 +452,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.showLaunchConfirmation = true
         }
 
-        // Load custom vocabulary from JSON
-        if let vocabData = UserDefaults.standard.data(forKey: Keys.customVocabulary),
-           let vocab = try? JSONDecoder().decode([VocabularyEntry].self, from: vocabData) {
-            self.customVocabulary = vocab
-        } else {
-            self.customVocabulary = []
-        }
+        // Load custom vocabulary from file (with migration from UserDefaults if needed)
+        self.customVocabulary = Self.loadVocabularyFromFile()
 
         // Auto-update check defaults to false (opt-in)
         if UserDefaults.standard.object(forKey: Keys.checkForUpdatesOnLaunch) != nil {
@@ -468,7 +480,58 @@ Now produce the complete meeting notes following the format above. Ensure every 
     }
     
     // MARK: - Methods
-    
+
+    /// Load custom vocabulary from Application Support directory
+    /// Migrates from UserDefaults if file doesn't exist yet
+    private static func loadVocabularyFromFile() -> [VocabularyEntry] {
+        let fileURL = vocabularyFileURL
+
+        // Try loading from file first
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            do {
+                let data = try Data(contentsOf: fileURL)
+                let vocabulary = try JSONDecoder().decode([VocabularyEntry].self, from: data)
+                NSLog("📚 Loaded \(vocabulary.count) vocabulary entries from \(fileURL.path)")
+                return vocabulary
+            } catch {
+                NSLog("⚠️ Failed to load vocabulary from file: \(error.localizedDescription)")
+            }
+        }
+
+        // Migration: Check UserDefaults for legacy data
+        if let vocabData = UserDefaults.standard.data(forKey: Keys.customVocabulary),
+           let vocab = try? JSONDecoder().decode([VocabularyEntry].self, from: vocabData) {
+            NSLog("🔄 Migrating \(vocab.count) vocabulary entries from UserDefaults to file")
+
+            // Save to file
+            if let data = try? JSONEncoder().encode(vocab) {
+                try? data.write(to: fileURL, options: .atomic)
+                NSLog("✅ Migration complete: vocabulary saved to \(fileURL.path)")
+            }
+
+            // Remove from UserDefaults after successful migration
+            UserDefaults.standard.removeObject(forKey: Keys.customVocabulary)
+
+            return vocab
+        }
+
+        NSLog("📚 No existing vocabulary found, starting with empty list")
+        return []
+    }
+
+    /// Save custom vocabulary to Application Support directory
+    private func saveVocabularyToFile() {
+        let fileURL = Self.vocabularyFileURL
+
+        do {
+            let data = try JSONEncoder().encode(customVocabulary)
+            try data.write(to: fileURL, options: .atomic)
+            NSLog("💾 Saved \(customVocabulary.count) vocabulary entries to \(fileURL.path)")
+        } catch {
+            NSLog("❌ Failed to save vocabulary to file: \(error.localizedDescription)")
+        }
+    }
+
     /// Reset all settings to defaults
     func resetToDefaults() {
         triggerKey = .capsLock
