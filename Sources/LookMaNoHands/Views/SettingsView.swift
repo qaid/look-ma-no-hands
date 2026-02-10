@@ -60,6 +60,7 @@ struct SettingsView: View {
     @State private var permissionsChanged = false
     @State private var previousMicPermission: PermissionState = .unknown
     @State private var previousAccessibilityPermission: PermissionState = .unknown
+    @State private var shouldShowAccessibilityRestartBanner = false
 
     var body: some View {
         NavigationSplitView {
@@ -699,6 +700,11 @@ struct SettingsView: View {
 
     private var permissionsTab: some View {
         VStack(alignment: .leading, spacing: 20) {
+            // Restart banner when accessibility permission is granted
+            if shouldShowAccessibilityRestartBanner {
+                restartBanner
+            }
+
             // Microphone
             permissionRow(
                 title: "Microphone",
@@ -1202,6 +1208,48 @@ struct SettingsView: View {
                 .font(.caption)
         }
     }
+
+    /// Restart banner shown when accessibility permission is granted
+    private var restartBanner: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title2)
+                    .foregroundColor(.green)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Accessibility Permission Granted")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+
+                    Text("The app needs to restart to recognize the new permission and enable dictation.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                Button {
+                    restartApp()
+                } label: {
+                    Text("Restart to Enable Dictation")
+                        .fontWeight(.medium)
+                }
+                .controlSize(.large)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.accentColor.opacity(0.1))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.accentColor.opacity(0.3), lineWidth: 1)
+            )
+        }
+    }
     
     private func connectionStatusView(_ state: ConnectionState, label: String) -> some View {
         HStack(spacing: 4) {
@@ -1242,6 +1290,11 @@ struct SettingsView: View {
         if previousMicPermission != .unknown || previousAccessibilityPermission != .unknown {
             if newMicPermission != previousMicPermission || newAccessibilityPermission != previousAccessibilityPermission {
                 permissionsChanged = true
+            }
+
+            // Specifically track when accessibility permission changes from not-granted to granted
+            if previousAccessibilityPermission != .granted && newAccessibilityPermission == .granted {
+                shouldShowAccessibilityRestartBanner = true
             }
         }
 
