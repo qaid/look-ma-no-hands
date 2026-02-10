@@ -30,6 +30,9 @@ class KeyboardMonitor {
     /// Whether the monitor is currently active
     private(set) var isMonitoring = false
 
+    /// Whether the event tap is enabled (can be toggled without teardown)
+    private var isEnabled = true
+
     /// Track modifier key state to avoid double-triggering
     private var lastModifierFlags: CGEventFlags = []
 
@@ -130,6 +133,7 @@ class KeyboardMonitor {
         CGEvent.tapEnable(tap: tap, enable: true)
 
         isMonitoring = true
+        isEnabled = Settings.shared.hotkeyEnabled
         NSLog("⌨️ KeyboardMonitor: Started monitoring for %@", hotkey.displayString)
 
         return true
@@ -155,10 +159,41 @@ class KeyboardMonitor {
         print("KeyboardMonitor: Stopped monitoring")
     }
 
+    /// Enable or disable the event tap without teardown (efficient toggle)
+    func setEnabled(_ enabled: Bool) {
+        guard isMonitoring else {
+            NSLog("⚠️ KeyboardMonitor: Cannot enable/disable - not monitoring")
+            return
+        }
+
+        guard isEnabled != enabled else { return }
+
+        if let tap = eventTap {
+            // Call CGEvent.tapEnable without holding locks to avoid deadlock with event callback thread
+            // The event callback thread may be holding hotkeyLock when calling getHotkey()
+            CGEvent.tapEnable(tap: tap, enable: enabled)
+            isEnabled = enabled
+
+            NSLog("🔄 KeyboardMonitor: %@ for %@",
+                  enabled ? "Enabled" : "Disabled",
+                  getHotkey().displayString)
+        }
+    }
+
+    /// Get current enabled state
+    func getIsEnabled() -> Bool {
+        hotkeyLock.lock()
+        defer { hotkeyLock.unlock() }
+        return isEnabled
+    }
+
     // MARK: - Private Methods
 
     /// Handle keyboard event and return whether it was consumed (should be blocked from propagating)
     private func handleEvent(type: CGEventType, event: CGEvent) -> Bool {
+        // Early return if hotkey monitoring is disabled
+        guard isEnabled else { return false }
+
         // Check for ESC key (keyCode 53) to cancel recording
         // ESC is handled as a keyDown event
         if type == .keyDown {

@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Menu bar status item
     private var statusItem: NSStatusItem?
     private var recordingMenuItem: NSMenuItem?
+    private var hotkeyToggleMenuItem: NSMenuItem?
     private var settingsWindow: NSWindow?
     private var meetingWindow: NSWindow?
     private var onboardingWindow: NSWindow?
@@ -30,6 +31,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Services
     private let keyboardMonitor = KeyboardMonitor()
+    private let hotkeyToggleMonitor = HotkeyToggleMonitor()
     private let audioRecorder = AudioRecorder()
     private let whisperService = WhisperService()
     private let textFormatter = TextFormatter.with(preset: .standard)
@@ -41,6 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
     private let launchSplash = LaunchSplashWindowController()
+    private let hotkeyToggleSplash = HotkeyToggleSplashWindowController()
 
     // MARK: - Application Lifecycle
 
@@ -195,6 +198,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupKeyboardMonitoring()
         NSLog("✅ AppDelegate: Keyboard monitoring setup complete")
 
+        // Set up global toggle shortcut
+        hotkeyToggleMonitor.startMonitoring { [weak self] in
+            self?.toggleHotkeyEnabled()
+        }
+
+        // Listen for hotkey state changes
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(hotkeyEnabledStateDidChange),
+            name: .hotkeyEnabledChanged,
+            object: nil
+        )
+
         // Check for updates if enabled (silent, non-blocking)
         if Settings.shared.checkForUpdatesOnLaunch {
             Task {
@@ -273,6 +289,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        // Hotkey toggle control
+        let toggleItem = NSMenuItem(
+            title: "Enable Dictation Hotkey",
+            action: #selector(toggleHotkeyEnabled),
+            keyEquivalent: ""
+        )
+        toggleItem.state = Settings.shared.hotkeyEnabled ? .on : .off
+        self.hotkeyToggleMenuItem = toggleItem
+        menu.addItem(toggleItem)
+
+        menu.addItem(NSMenuItem.separator())
+
         // Meeting transcription
         menu.addItem(NSMenuItem(
             title: "Start Meeting Transcription...",
@@ -327,7 +355,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleRecording() {
         handleTriggerKey()
     }
-    
+
+    @objc private func toggleHotkeyEnabled() {
+        // Prevent disable during recording
+        if transcriptionState.isRecording {
+            let alert = NSAlert()
+            alert.messageText = "Recording In Progress"
+            alert.informativeText = "Cannot disable hotkey while recording. Stop recording first."
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+            return
+        }
+
+        // Toggle state - notification handler will update UI and show splash
+        let newState = !Settings.shared.hotkeyEnabled
+        Settings.shared.hotkeyEnabled = newState
+
+        NSLog("🔀 Hotkey monitoring %@", newState ? "enabled" : "disabled")
+    }
+
     @objc private func openSettings() {
         NSLog("📋 Opening Settings window...")
 
@@ -645,6 +692,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateRecordingMenuItem(isRecording: transcriptionState.isRecording)
     }
 
+    /// Handle hotkey enabled state changes
+    @objc private func hotkeyEnabledStateDidChange() {
+        let enabled = Settings.shared.hotkeyEnabled
+        keyboardMonitor.setEnabled(enabled)
+        hotkeyToggleMenuItem?.state = enabled ? .on : .off
+        updateMenuBarIconForHotkeyState(enabled: enabled)
+
+        // Show splash screen feedback for all toggle sources
+        hotkeyToggleSplash.show(isEnabled: enabled)
+    }
+
     // MARK: - Contextual Prompt Building
 
     /// Build an initial_prompt for Whisper based on the active app and field context
@@ -713,6 +771,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Handle Caps Lock key press - toggles recording
     private func handleTriggerKey() {
+        guard Settings.shared.hotkeyEnabled else {
+            NSLog("⚠️ Hotkey disabled - ignoring trigger")
+            return
+        }
+
         print("handleTriggerKey called, current state: \(transcriptionState.recordingState)")
 
         if transcriptionState.isRecording {
@@ -1076,6 +1139,53 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             recordingMenuItem?.title = "Start Recording (\(hotkeyName))"
         }
+    }
+
+    /// Update menu bar icon based on hotkey enabled state
+    private func updateMenuBarIconForHotkeyState(enabled: Bool) {
+        guard let button = statusItem?.button else { return }
+
+        if enabled {
+            button.image = emojiImage(from: "🙌🏾")
+        } else {
+            let baseImage = emojiImage(from: "🙌🏾", size: 18)
+            button.image = createDisabledIcon(from: baseImage)
+        }
+    }
+
+    /// Create a grayed-out icon with red badge for disabled state
+    private func createDisabledIcon(from baseImage: NSImage?) -> NSImage? {
+        guard let base = baseImage else { return nil }
+
+        let size = base.size
+        let image = NSImage(size: size)
+
+        image.lockFocus()
+
+        // Draw base with 30% opacity
+        base.draw(
+            in: NSRect(origin: .zero, size: size),
+            from: NSRect(origin: .zero, size: base.size),
+            operation: .sourceOver,
+            fraction: 0.3
+        )
+
+        // Add red badge dot
+        let badgeSize: CGFloat = 6
+        let badgeRect = NSRect(
+            x: size.width - badgeSize - 1,
+            y: size.height - badgeSize - 1,
+            width: badgeSize,
+            height: badgeSize
+        )
+
+        NSColor.systemRed.setFill()
+        NSBezierPath(ovalIn: badgeRect).fill()
+
+        image.unlockFocus()
+        image.isTemplate = false
+
+        return image
     }
 
     // MARK: - Update Checking
