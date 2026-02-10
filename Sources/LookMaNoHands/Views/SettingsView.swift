@@ -402,6 +402,78 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            Divider()
+                .padding(.vertical, 12)
+
+            // Hotkey Monitoring Control
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Hotkey Monitoring")
+                    .font(.headline)
+
+                Toggle("Enable dictation hotkey", isOn: $settings.hotkeyEnabled)
+                    .toggleStyle(.checkbox)
+
+                HStack(spacing: 6) {
+                    Image(systemName: settings.hotkeyEnabled ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(settings.hotkeyEnabled ? .green : .red)
+                        .font(.caption)
+                    Text(settings.hotkeyEnabled ? "Hotkey monitoring is active" : "Hotkey monitoring is paused")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Text("When disabled, the \(settings.effectiveHotkey.displayString) key will not trigger dictation")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Divider()
+                .padding(.vertical, 12)
+
+            // Global Toggle Shortcut
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Toggle Shortcut")
+                    .font(.headline)
+
+                HStack {
+                    Text("Global shortcut:")
+                        .font(.subheadline)
+
+                    HotkeyRecorderView(hotkey: $settings.toggleHotkeyShortcut)
+                        .frame(width: 150)
+
+                    Spacer()
+                }
+
+                Text("Press this shortcut anytime to quickly enable/disable dictation hotkey")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if let toggleShortcut = settings.toggleHotkeyShortcut {
+                    HStack(spacing: 6) {
+                        Image(systemName: "info.circle")
+                            .foregroundColor(.blue)
+                            .font(.caption)
+                        Text("Current: \(toggleShortcut.displayString)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .onChange(of: settings.toggleHotkeyShortcut) { oldValue, newValue in
+                guard let newHotkey = newValue else { return }
+
+                if newHotkey == settings.effectiveHotkey {
+                    let alert = NSAlert()
+                    alert.messageText = "Shortcut Conflict"
+                    alert.informativeText = "Toggle shortcut cannot match dictation trigger."
+                    alert.alertStyle = .warning
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
+                    settings.toggleHotkeyShortcut = oldValue
+                }
+            }
+
             Spacer()
         }
     }

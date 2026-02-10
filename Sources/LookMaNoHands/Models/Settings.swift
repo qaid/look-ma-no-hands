@@ -23,6 +23,8 @@ enum TriggerKey: String, CaseIterable, Identifiable {
 /// Notification posted when hotkey configuration changes
 extension Notification.Name {
     static let hotkeyConfigurationChanged = Notification.Name("hotkeyConfigurationChanged")
+    static let hotkeyEnabledChanged = Notification.Name("hotkeyEnabledChanged")
+    static let toggleShortcutChanged = Notification.Name("toggleShortcutChanged")
 }
 
 /// Available Whisper model sizes
@@ -252,6 +254,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
         static let lastUpdateCheckDate = "lastUpdateCheckDate"
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
+        static let hotkeyEnabled = "hotkeyEnabled"
+        static let toggleHotkeyShortcut = "toggleHotkeyShortcut"
     }
 
     // MARK: - File Paths
@@ -382,6 +386,28 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether dictation hotkey monitoring is enabled
+    @Published var hotkeyEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(hotkeyEnabled, forKey: Keys.hotkeyEnabled)
+            NotificationCenter.default.post(name: .hotkeyEnabledChanged, object: nil)
+        }
+    }
+
+    /// Global shortcut to toggle hotkey enabled/disabled state
+    @Published var toggleHotkeyShortcut: Hotkey? {
+        didSet {
+            if let hotkey = toggleHotkeyShortcut {
+                if let data = try? JSONEncoder().encode(hotkey) {
+                    UserDefaults.standard.set(data, forKey: Keys.toggleHotkeyShortcut)
+                }
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.toggleHotkeyShortcut)
+            }
+            NotificationCenter.default.post(name: .toggleShortcutChanged, object: nil)
+        }
+    }
+
     /// Date of the last successful update check
     var lastUpdateCheckDate: Date? {
         get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
@@ -469,6 +495,21 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.pauseMediaDuringDictation = true
         }
 
+        // Hotkey enabled defaults to true (enabled by default)
+        if UserDefaults.standard.object(forKey: Keys.hotkeyEnabled) != nil {
+            self.hotkeyEnabled = UserDefaults.standard.bool(forKey: Keys.hotkeyEnabled)
+        } else {
+            self.hotkeyEnabled = true
+        }
+
+        // Toggle shortcut defaults to Cmd+Shift+D (keyCode 2 = D)
+        if let data = UserDefaults.standard.data(forKey: Keys.toggleHotkeyShortcut),
+           let hotkey = try? JSONDecoder().decode(Hotkey.self, from: data) {
+            self.toggleHotkeyShortcut = hotkey
+        } else {
+            self.toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
+        }
+
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
@@ -547,5 +588,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         checkForUpdatesOnLaunch = false
         lastUpdateCheckDate = nil
         pauseMediaDuringDictation = true
+        hotkeyEnabled = true
+        toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
     }
 }
