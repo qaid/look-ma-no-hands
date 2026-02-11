@@ -166,6 +166,7 @@ struct MeetingView: View {
     @State private var jargonTerms = ""
     @State private var showAdvancedPrompt = false
     @State private var showCustomization = false
+    @State private var selectedPreset: NotePreset = .quickSummary
     @State private var menuRefreshTrigger = UUID()
     @State private var lastProgressUpdate = Date()
     @State private var showClearConfirmation = false
@@ -1413,12 +1414,11 @@ struct MeetingView: View {
     // MARK: - Prompt Editor Sheet
 
     private var promptEditorSheet: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 0) {
             // Header
             HStack {
                 Text("Generate Meeting Notes")
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 18, weight: .semibold))
 
                 Spacer()
 
@@ -1426,174 +1426,232 @@ struct MeetingView: View {
                     showPromptEditor = false
                 } label: {
                     Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
                         .foregroundColor(.secondary)
-                        .imageScale(.large)
+                        .symbolRenderingMode(.hierarchical)
                 }
                 .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .accessibilityLabel("Close")
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 16)
 
-            // Quick generate options - primary interface
-            VStack(alignment: .leading, spacing: 12) {
-                Text("What type of notes do you need?")
-                    .font(.headline)
+            Divider()
 
-                HStack(spacing: 12) {
-                    // Preset 1: Quick summary
-                    Button {
-                        generateWithPreset(.quickSummary)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Image(systemName: "list.bullet.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.blue)
-                            Text("Quick Summary")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Key points and action items")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+            // Main content
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // Note type selection - card-based with clear selected state
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Select note type")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+
+                        VStack(spacing: 12) {
+                            // Quick Summary Card
+                            noteTypeCard(
+                                preset: .quickSummary,
+                                icon: "list.bullet.clipboard",
+                                title: "Quick Summary",
+                                description: "3-5 key points, action items, and decisions (~2 min read)",
+                                isSelected: selectedPreset == .quickSummary
+                            )
+
+                            // Detailed Notes Card
+                            noteTypeCard(
+                                preset: .detailedNotes,
+                                icon: "doc.text",
+                                title: "Detailed Notes",
+                                description: "Comprehensive summary with full context and discussion points (~5 min read)",
+                                isSelected: selectedPreset == .detailedNotes
+                            )
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(Color(NSColor.controlBackgroundColor))
-                        .cornerRadius(8)
                     }
-                    .buttonStyle(.plain)
 
-                    // Preset 2: Detailed notes
-                    Button {
-                        generateWithPreset(.detailedNotes)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Image(systemName: "doc.text.fill")
-                                .font(.title2)
-                                .foregroundColor(.purple)
-                            Text("Detailed Notes")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                            Text("Full summary with context")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    // Customization - progressive disclosure
+                    DisclosureGroup(
+                        isExpanded: $showCustomization,
+                        content: {
+                            VStack(alignment: .leading, spacing: 16) {
+                                // Jargon/Terms input
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Domain-Specific Terms")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
+
+                                    TextEditor(text: $jargonTerms)
+                                        .font(.system(size: 13))
+                                        .frame(height: 60)
+                                        .scrollContentBackground(.hidden)
+                                        .padding(8)
+                                        .background(Color(NSColor.textBackgroundColor))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                        )
+
+                                    Text("Enter technical terms or acronyms (comma-separated)")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                // Advanced prompt editing
+                                DisclosureGroup(
+                                    isExpanded: $showAdvancedPrompt,
+                                    content: {
+                                        VStack(alignment: .leading, spacing: 8) {
+                                            HStack {
+                                                Text("Custom Prompt")
+                                                    .font(.system(size: 13, weight: .medium))
+
+                                                Spacer()
+
+                                                Button("Reset") {
+                                                    customPrompt = Settings.defaultMeetingPrompt
+                                                }
+                                                .buttonStyle(.borderless)
+                                                .controlSize(.small)
+                                                .foregroundColor(.accentColor)
+                                            }
+
+                                            TextEditor(text: $customPrompt)
+                                                .font(.system(size: 12, design: .monospaced))
+                                                .frame(height: 120)
+                                                .scrollContentBackground(.hidden)
+                                                .padding(8)
+                                                .background(Color(NSColor.textBackgroundColor))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 6)
+                                                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                                                )
+
+                                            Text("Transcript will be appended automatically")
+                                                .font(.system(size: 11))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.top, 8)
+                                    },
+                                    label: {
+                                        HStack {
+                                            Text("Advanced Options")
+                                                .font(.system(size: 13, weight: .medium))
+                                            Spacer()
+                                        }
+                                    }
+                                )
+                            }
+                            .padding(.top, 12)
+                        },
+                        label: {
+                            HStack {
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 13))
+                                Text("Customize")
+                                    .font(.system(size: 13, weight: .medium))
+                                Spacer()
+                            }
+                            .contentShape(Rectangle())
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding()
-                        .background(Color(NSColor.controlBackgroundColor))
-                        .cornerRadius(8)
-                    }
-                    .buttonStyle(.plain)
+                    )
+                    .accentColor(.primary)
                 }
+                .padding(.horizontal, 24)
+                .padding(.vertical, 20)
             }
 
             Divider()
 
-            // Customization - secondary, progressive disclosure
-            DisclosureGroup(
-                isExpanded: $showCustomization,
-                content: {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            // Jargon/Terms input
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Domain-Specific Terms & Jargon")
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-
-                                TextEditor(text: $jargonTerms)
-                                    .font(.body)
-                                    .frame(minHeight: 60)
-                                    .border(Color.gray.opacity(0.3), width: 1)
-                                    .cornerRadius(4)
-
-                                Text("Enter technical terms, acronyms, or jargon (comma-separated)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Divider()
-
-                            // Advanced prompt editing
-                            DisclosureGroup(
-                                isExpanded: $showAdvancedPrompt,
-                                content: {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        HStack {
-                                            Text("Full Prompt")
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-
-                                            Spacer()
-
-                                            Button("Reset to Default") {
-                                                customPrompt = Settings.defaultMeetingPrompt
-                                            }
-                                            .buttonStyle(.bordered)
-                                            .controlSize(.small)
-                                        }
-
-                                        TextEditor(text: $customPrompt)
-                                            .font(.system(.body, design: .monospaced))
-                                            .frame(minHeight: 150)
-                                            .border(Color.gray.opacity(0.3), width: 1)
-                                            .cornerRadius(4)
-
-                                        Text("The transcript will be automatically appended after this prompt.")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding(.top, 8)
-                                },
-                                label: {
-                                    Text("Advanced: Edit Full Prompt")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                }
-                            )
-                        }
-                        .padding(.vertical, 8)
-                    }
-                },
-                label: {
-                    Text("Customize Notes")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                }
-            )
-
-            Spacer()
-
-            // Model info
-            HStack {
-                Image(systemName: "info.circle")
-                    .foregroundColor(.blue)
-                Text("Using model: \(Settings.shared.ollamaModel)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-            }
-
-            // Action buttons (only show if customization expanded)
-            HStack {
+            // Bottom action bar
+            HStack(spacing: 12) {
                 Button("Cancel") {
                     showPromptEditor = false
                 }
-                .keyboardShortcut(.cancelAction)
+                .keyboardShortcut(.escape, modifiers: [])
+                .controlSize(.large)
 
                 Spacer()
 
-                if showCustomization {
-                    Button("Generate with Custom Settings") {
-                        showPromptEditor = false
-                        Task {
-                            await generateStructuredNotes(with: buildFinalPrompt())
-                        }
+                Button {
+                    generateNotes()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 13, weight: .medium))
+                        Text("Generate Notes")
+                            .font(.system(size: 13, weight: .medium))
                     }
-                    .keyboardShortcut(.defaultAction)
-                    .buttonStyle(.borderedProminent)
                 }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.return, modifiers: .command)
+                .controlSize(.large)
+                .accessibilityLabel("Generate notes with selected settings")
             }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 16)
         }
-        .padding(24)
-        .frame(width: 650, height: 550)
+        .frame(width: 560, height: 480)
+    }
+
+    /// Creates a selectable note type card with clear visual feedback
+    private func noteTypeCard(preset: NotePreset, icon: String, title: String, description: String, isSelected: Bool) -> some View {
+        Button {
+            selectedPreset = preset
+        } label: {
+            HStack(spacing: 14) {
+                // Icon
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    .frame(width: 32)
+                    .accessibilityHidden(true)
+
+                // Content
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primary)
+
+                    Text(description)
+                        .font(.system(size: 13))
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer()
+
+                // Selection indicator
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(isSelected ? .accentColor : Color(NSColor.tertiaryLabelColor))
+                    .accessibilityHidden(true)
+            }
+            .padding(16)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? Color.accentColor.opacity(0.08) : Color(NSColor.controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title): \(description)")
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+    }
+
+    /// Generates notes with the currently selected preset and customizations
+    private func generateNotes() {
+        showPromptEditor = false
+        Task {
+            let prompt = showCustomization ? buildFinalPrompt() : selectedPreset.prompt
+            await generateStructuredNotes(with: prompt)
+        }
     }
 
     private func generateWithPreset(_ preset: NotePreset) {
