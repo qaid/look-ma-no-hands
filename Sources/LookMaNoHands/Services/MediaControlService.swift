@@ -110,11 +110,12 @@ class MediaControlService {
                 semaphore.signal()
             }
 
-            let result = semaphore.wait(timeout: .now() + 0.1)
+            let result = semaphore.wait(timeout: .now() + 0.5)
             if result == .success {
+                NSLog("📊 MediaControlService: Now Playing check result: \(isPlaying)")
                 return isPlaying
             }
-            NSLog("⚠️ MediaControlService: Now Playing check timed out, falling back to app check")
+            NSLog("⚠️ MediaControlService: Now Playing check timed out after 0.5s, falling back to app check")
         }
 
         // Fallback: check if any known media app is running
@@ -131,11 +132,25 @@ class MediaControlService {
             "org.videolan.vlc",
             "com.coppertino.Vox",
             "com.plexapp.plexamp",
+            // Browsers that commonly play media
+            "com.google.Chrome",
+            "org.mozilla.firefox",
+            "com.apple.Safari",
+            "com.brave.Browser",
+            "com.microsoft.edgemac",
         ]
 
-        return NSWorkspace.shared.runningApplications.contains { app in
+        let hasMediaApp = NSWorkspace.shared.runningApplications.contains { app in
             guard let bundleID = app.bundleIdentifier else { return false }
             return mediaAppBundleIDs.contains(bundleID)
         }
+
+        if hasMediaApp {
+            NSLog("📊 MediaControlService: Found running media app")
+        } else {
+            NSLog("📊 MediaControlService: No media apps detected")
+        }
+
+        return hasMediaApp
     }
 }

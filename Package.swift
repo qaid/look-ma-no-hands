@@ -15,14 +15,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/exPHAT/SwiftWhisper.git",
-                 revision: "a192004db08de7c6eaa169eede77f1625e7d23fb")
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.14.1")
     ],
     targets: [
         .executableTarget(
             name: "LookMaNoHands",
             dependencies: [
-                .product(name: "SwiftWhisper", package: "SwiftWhisper")
+                .product(name: "WhisperKit", package: "WhisperKit")
             ],
             path: "Sources/LookMaNoHands",
             resources: [

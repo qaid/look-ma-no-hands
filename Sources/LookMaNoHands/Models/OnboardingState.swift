@@ -13,7 +13,6 @@ class OnboardingState {
 
     var currentStep: Step = .welcome
     var isDownloadingModel: Bool = false
-    var downloadProgress: Double = 0.0
     var ollamaSkipped: Bool = false
     var selectedModel: WhisperModel = .tiny
     var modelDownloaded: Bool = false

@@ -269,11 +269,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Create the menu
         let menu = NSMenu()
-        
+
         // Status section
-        let statusItem = NSMenuItem(title: "Status: Ready", action: nil, keyEquivalent: "")
-        statusItem.isEnabled = false
-        menu.addItem(statusItem)
+        let statusMenuItem = NSMenuItem(title: "Status: Initializing...", action: nil, keyEquivalent: "")
+        statusMenuItem.isEnabled = false
+        statusMenuItem.tag = 999 // Tag for easy lookup
+        menu.addItem(statusMenuItem)
         
         menu.addItem(NSMenuItem.separator())
 
@@ -527,30 +528,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func loadWhisperModel() {
         Task {
-            // Prefer tiny model for speed (3-4x faster than base with good accuracy)
-            let preferredModels = ["tiny", "base", "small"]
-            var modelToLoad: String?
-
-            for model in preferredModels {
-                if WhisperService.modelExists(named: model) {
-                    modelToLoad = model
-                    break
-                }
+            // Update menu to show loading state
+            await MainActor.run {
+                updateMenuBarStatus("Loading model...")
             }
 
-            if let model = modelToLoad {
-                // Load existing model
-                do {
-                    try await whisperService.loadModel(named: model)
-                    print("Whisper model '\(model)' loaded successfully")
-                } catch {
-                    await MainActor.run {
-                        showAlert(title: "Model Load Error", message: "Failed to load Whisper model: \(error.localizedDescription)")
+            // Try loading the model configured in Settings (respects user's choice from onboarding/settings)
+            let configuredModel = Settings.shared.whisperModel.rawValue
+            NSLog("🔍 loadWhisperModel: Attempting to load configured model: \(configuredModel)")
+            NSLog("🔍 loadWhisperModel: hasCompletedOnboarding: \(Settings.shared.hasCompletedOnboarding)")
+
+            do {
+                // Try to load the configured model - WhisperKit will download it if needed
+                try await whisperService.loadModel(named: configuredModel)
+                NSLog("✅ Whisper model '\(configuredModel)' loaded successfully")
+
+                // Update menu to show ready state
+                await MainActor.run {
+                    updateMenuBarStatus("Ready")
+                }
+            } catch {
+                // Model load failed - try fallback models or prompt for download
+                NSLog("⚠️ Failed to load configured model '\(configuredModel)': \(error.localizedDescription)")
+
+                // Try fallback models
+                let fallbackModels = ["tiny", "base", "small", "medium", "large-v3-turbo"]
+                var loadedFallback = false
+
+                for model in fallbackModels where model != configuredModel {
+                    do {
+                        NSLog("🔄 Trying fallback model: \(model)")
+                        try await whisperService.loadModel(named: model)
+                        NSLog("✅ Fallback model '\(model)' loaded successfully")
+                        loadedFallback = true
+                        break
+                    } catch {
+                        NSLog("⚠️ Fallback model '\(model)' also failed: \(error.localizedDescription)")
                     }
                 }
-            } else {
-                // No model found - prompt user to download
-                await promptModelDownload()
+
+                if !loadedFallback {
+                    // No model could be loaded - prompt user to download
+                    NSLog("❌ No model could be loaded - prompting user to download")
+                    await MainActor.run {
+                        updateMenuBarStatus("Model not found")
+                    }
+                    await promptModelDownload()
+                } else {
+                    // Fallback model loaded successfully
+                    await MainActor.run {
+                        updateMenuBarStatus("Ready")
+                    }
+                }
             }
         }
     }
@@ -610,19 +639,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func downloadModelWithProgress(modelName: String) async {
         print("Starting download of \(modelName) model...")
 
+        await MainActor.run {
+            updateMenuBarStatus("Downloading \(modelName)...")
+        }
+
         do {
-            try await WhisperService.downloadModel(named: modelName) { progress in
-                print("Download progress: \(Int(progress * 100))%")
+            try await WhisperService.downloadModel(named: modelName)
+
+            await MainActor.run {
+                updateMenuBarStatus("Loading \(modelName)...")
             }
 
             // After download, try to load it
             try await whisperService.loadModel(named: modelName)
 
             await MainActor.run {
+                updateMenuBarStatus("Ready")
                 showAlert(title: "Success", message: "Whisper model '\(modelName)' downloaded and loaded successfully!")
             }
         } catch {
             await MainActor.run {
+                updateMenuBarStatus("Download failed")
                 showAlert(title: "Download Failed", message: "Failed to download model: \(error.localizedDescription)")
             }
         }
@@ -825,6 +862,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Check if Whisper model is ready
+        if !whisperService.isModelLoaded {
+            if whisperService.isModelLoading {
+                showAlert(
+                    title: "Model Loading",
+                    message: "The Whisper model is still loading. Please wait a moment and try again."
+                )
+            } else {
+                showAlert(
+                    title: "Model Not Ready",
+                    message: "The Whisper model is not loaded. Please check Settings to download a model."
+                )
+            }
+            return
+        }
+
         // Capture field context NOW, before any previous transcription could contaminate it
         capturedInitialPrompt = buildInitialPrompt()
 
@@ -846,17 +899,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // CRITICAL: Pause media AFTER starting AVAudioEngine (not before)
             // This ensures we re-pause even if AVAudioEngine.start() triggers a system event that resumes media
             if Settings.shared.pauseMediaDuringDictation {
-                // Small delay to let AVAudioEngine fully initialize
-                Thread.sleep(forTimeInterval: 0.1)
+                // Small delay to let AVAudioEngine fully initialize (non-blocking)
+                Task {
+                    try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
 
-                // Use AppleScript to explicitly pause music players (Spotify, Apple Music)
-                MusicPlayerController.shared.pauseAllPlayers()
+                    // Use AppleScript to explicitly pause music players (Spotify, Apple Music)
+                    MusicPlayerController.shared.pauseAllPlayers()
 
-                // Send explicit pause command (not toggle) for browsers and other media sources
-                // Uses MediaRemote framework's MRMediaRemoteSendCommand(kMRPause) which is safe:
-                // - If media is playing: pauses it
-                // - If nothing is playing: no-op (won't launch Music app) (#128)
-                mediaControlService.pauseMedia()
+                    // Send explicit pause command (not toggle) for browsers and other media sources
+                    // Uses MediaRemote framework's MRMediaRemoteSendCommand(kMRPause) which is safe:
+                    // - If media is playing: pauses it
+                    // - If nothing is playing: no-op (won't launch Music app) (#128)
+                    self.mediaControlService.pauseMedia()
+                }
             }
         } catch {
             // More detailed error message for audio session failures
@@ -1138,6 +1193,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             recordingMenuItem?.title = "Stop Recording (\(hotkeyName))"
         } else {
             recordingMenuItem?.title = "Start Recording (\(hotkeyName))"
+        }
+    }
+
+    /// Update the status menu item to show current state
+    private func updateMenuBarStatus(_ status: String) {
+        guard let menu = statusItem?.menu else { return }
+        // Find the status menu item by tag
+        if let statusMenuItem = menu.item(withTag: 999) {
+            statusMenuItem.title = "Status: \(status)"
         }
     }
 
