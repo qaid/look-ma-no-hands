@@ -29,18 +29,18 @@ jobs:
           fi
           echo "✅ Package.resolved integrity verified"
 
-      - name: Verify SwiftWhisper revision
+      - name: Verify WhisperKit revision
         run: |
-          EXPECTED_REV="a192004db08de7c6eaa169eede77f1625e7d23fb"
-          ACTUAL_REV=$(grep -A 5 '"identity" : "swiftwhisper"' Package.resolved | grep '"revision"' | cut -d'"' -f4)
+          EXPECTED_REV="664e1b5a65296cd957dfdf262cd120ca88f3b24b"
+          ACTUAL_REV=$(grep -A 5 '"identity" : "whisperkit"' Package.resolved | grep '"revision"' | cut -d'"' -f4)
 
           if [ "$ACTUAL_REV" != "$EXPECTED_REV" ]; then
-            echo "❌ SwiftWhisper revision mismatch!"
+            echo "❌ WhisperKit revision mismatch!"
             echo "Expected: $EXPECTED_REV"
             echo "Actual: $ACTUAL_REV"
             exit 1
           fi
-          echo "✅ SwiftWhisper revision verified: $ACTUAL_REV"
+          echo "✅ WhisperKit revision verified: $ACTUAL_REV"
 
   build-verification:
     name: Verify Clean Build
