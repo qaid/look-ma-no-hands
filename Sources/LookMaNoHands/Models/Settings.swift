@@ -27,26 +27,24 @@ extension Notification.Name {
     static let toggleShortcutChanged = Notification.Name("toggleShortcutChanged")
 }
 
-/// Available Whisper model sizes
+/// Available Whisper model sizes (WhisperKit format)
 enum WhisperModel: String, CaseIterable, Identifiable {
     case tiny = "tiny"
     case base = "base"
     case small = "small"
     case medium = "medium"
+    case largev3turbo = "large-v3-turbo"
 
     var id: String { rawValue }
 
     var displayName: String {
         switch self {
-        case .tiny: return "Tiny (75MB, fastest)"
-        case .base: return "Base (150MB, balanced)"
-        case .small: return "Small (500MB, better)"
-        case .medium: return "Medium (1.5GB, best)"
+        case .tiny: return "Tiny (fastest, lowest accuracy)"
+        case .base: return "Base (balanced)"
+        case .small: return "Small (better accuracy)"
+        case .medium: return "Medium (high accuracy)"
+        case .largev3turbo: return "Large v3 Turbo (best accuracy, recommended)"
         }
-    }
-
-    var modelFileName: String {
-        "ggml-\(rawValue).bin"
     }
 }
 

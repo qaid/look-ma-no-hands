@@ -349,7 +349,7 @@ struct WhisperModelStepView: View {
                 .font(.system(size: 24, weight: .bold))
 
             // Description
-            Text("Required for voice transcription.\nWe recommend the Tiny model for best speed.")
+            Text("Required for voice transcription.\nWe recommend Base for most users, or Large v3 Turbo for meetings.")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
 
@@ -369,35 +369,40 @@ struct WhisperModelStepView: View {
                 VStack(spacing: 20) {
                     // Model picker
                     Picker("Select Model", selection: $onboardingState.selectedModel) {
-                        Text("Tiny (75MB) - Recommended").tag(WhisperModel.tiny)
-                        Text("Base (142MB)").tag(WhisperModel.base)
-                        Text("Small (466MB)").tag(WhisperModel.small)
+                        ForEach(WhisperModel.allCases) { model in
+                            Text(model.displayName).tag(model)
+                        }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
                     .frame(maxWidth: 450)
 
                     // Download button or progress
                     if onboardingState.isDownloadingModel {
                         VStack(spacing: 12) {
-                            ProgressView(value: onboardingState.downloadProgress, total: 1.0)
-                                .frame(maxWidth: 350)
+                            ProgressView()
+                                .controlSize(.regular)
+                                .scaleEffect(1.2)
 
-                            Text("\(Int(onboardingState.downloadProgress * 100))% complete")
+                            Text("Downloading \(onboardingState.selectedModel.displayName) model...")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+
+                            Text("This may take a few minutes depending on your connection")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
+                        .padding(.vertical, 8)
                     } else {
                         Button(action: {
                             downloadModel()
                         }) {
                             Label("Download Model", systemImage: "arrow.down.circle.fill")
                                 .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        .frame(maxWidth: 350)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 8)
                     }
                 }
             }
@@ -420,12 +425,11 @@ struct WhisperModelStepView: View {
             // Check if the configured model exists on disk
             let configuredModelExists = WhisperService.modelExists(named: configuredModel.rawValue)
 
-            // Also check other models for fallback
-            let tinyExists = WhisperService.modelExists(named: "tiny")
-            let baseExists = WhisperService.modelExists(named: "base")
-            let smallExists = WhisperService.modelExists(named: "small")
-
-            let anyModelExists = tinyExists || baseExists || smallExists
+            // Check all available models
+            let modelChecks = WhisperModel.allCases.map { model in
+                (model, WhisperService.modelExists(named: model.rawValue))
+            }
+            let anyModelExists = modelChecks.contains { $0.1 }
 
             await MainActor.run {
                 modelExists = anyModelExists
@@ -437,33 +441,21 @@ struct WhisperModelStepView: View {
                     onboardingState.selectedModel = configuredModel
                 } else if anyModelExists {
                     // PRIORITY 2: Fallback to first available model
-                    if tinyExists {
-                        onboardingState.selectedModel = .tiny
-                    } else if baseExists {
-                        onboardingState.selectedModel = .base
-                    } else if smallExists {
-                        onboardingState.selectedModel = .small
+                    if let firstAvailable = modelChecks.first(where: { $0.1 }) {
+                        onboardingState.selectedModel = firstAvailable.0
                     }
                 }
-                // PRIORITY 3: No models exist, keep default .tiny for download
+                // PRIORITY 3: No models exist, keep default .base for download
             }
         }
     }
 
     private func downloadModel() {
         onboardingState.isDownloadingModel = true
-        onboardingState.downloadProgress = 0.0
 
         Task {
             do {
-                try await WhisperService.downloadModel(
-                    named: onboardingState.selectedModel.rawValue,
-                    progress: { progress in
-                        Task { @MainActor in
-                            onboardingState.downloadProgress = progress
-                        }
-                    }
-                )
+                try await WhisperService.downloadModel(named: onboardingState.selectedModel.rawValue)
 
                 await MainActor.run {
                     onboardingState.isDownloadingModel = false

@@ -38,7 +38,6 @@ struct SettingsView: View {
     @State private var ollamaStatus: ConnectionState = .unknown
     @State private var availableOllamaModels: [String] = []
     @State private var isDownloadingModel = false
-    @State private var modelDownloadProgress: Double = 0.0
     @State private var modelDownloadError: String?
     @State private var modelAvailability: [WhisperModel: Bool] = [:]
 
@@ -640,15 +639,15 @@ struct SettingsView: View {
                         Spacer()
                             .frame(width: 80)
                         VStack(alignment: .leading, spacing: 4) {
-                            HStack {
-                                ProgressView(value: modelDownloadProgress)
-                                    .frame(width: 200)
-                                Text("\(Int(modelDownloadProgress * 100))%")
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Downloading \(settings.whisperModel.displayName)...")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
-                            Text("Downloading \(settings.whisperModel.displayName)...")
-                                .font(.caption)
+                            Text("This may take a few minutes depending on your connection")
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -673,7 +672,7 @@ struct SettingsView: View {
                 HStack {
                     Spacer()
                         .frame(width: 80)
-                    Text("Larger models are more accurate but slower")
+                    Text("Larger models are more accurate. All models use Neural Engine acceleration.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -1485,22 +1484,16 @@ struct SettingsView: View {
     /// Download a Whisper model
     private func downloadModel(_ model: WhisperModel) async {
         isDownloadingModel = true
-        modelDownloadProgress = 0.0
         modelDownloadError = nil
 
         print("SettingsView: Starting download of \(model.rawValue) model...")
 
         do {
-            try await WhisperService.downloadModel(named: model.rawValue) { progress in
-                DispatchQueue.main.async {
-                    self.modelDownloadProgress = progress
-                }
-            }
+            try await WhisperService.downloadModel(named: model.rawValue)
 
             // Download successful
             DispatchQueue.main.async {
                 self.isDownloadingModel = false
-                self.modelDownloadProgress = 1.0
                 self.modelAvailability[model] = true
                 print("SettingsView: Model \(model.rawValue) downloaded successfully")
 
