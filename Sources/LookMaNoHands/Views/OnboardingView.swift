@@ -333,6 +333,7 @@ struct WhisperModelStepView: View {
 
     @State private var modelExists: Bool = false
     @State private var isCheckingModel: Bool = true
+    @State private var downloadError: String?
 
     var body: some View {
         VStack(spacing: 18) {
@@ -404,6 +405,27 @@ struct WhisperModelStepView: View {
                         .padding(.horizontal, 40)
                         .padding(.vertical, 8)
                     }
+
+                    // Show download error if present
+                    if let error = downloadError {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Download Failed")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.red)
+                                Text(error)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(12)
+                        .frame(maxWidth: 450)
+                        .background(Color.red.opacity(0.1))
+                        .cornerRadius(8)
+                    }
                 }
             }
 
@@ -418,55 +440,37 @@ struct WhisperModelStepView: View {
 
     private func checkExistingModel() {
         isCheckingModel = true
-        Task {
-            // FIRST: Get the currently configured model from Settings
-            let configuredModel = Settings.shared.whisperModel
+        let configuredModel = Settings.shared.whisperModel
 
-            // Check if the configured model exists on disk
-            let configuredModelExists = WhisperService.modelExists(named: configuredModel.rawValue)
+        // Check if the configured model already exists in the cache
+        let exists = WhisperService.modelExists(named: configuredModel.rawValue)
 
-            // Check all available models
-            let modelChecks = WhisperModel.allCases.map { model in
-                (model, WhisperService.modelExists(named: model.rawValue))
-            }
-            let anyModelExists = modelChecks.contains { $0.1 }
-
-            await MainActor.run {
-                modelExists = anyModelExists
-                onboardingState.modelDownloaded = anyModelExists
-                isCheckingModel = false
-
-                // PRIORITY 1: Use configured model if it exists on disk
-                if configuredModelExists {
-                    onboardingState.selectedModel = configuredModel
-                } else if anyModelExists {
-                    // PRIORITY 2: Fallback to first available model
-                    if let firstAvailable = modelChecks.first(where: { $0.1 }) {
-                        onboardingState.selectedModel = firstAvailable.0
-                    }
-                }
-                // PRIORITY 3: No models exist, keep default .base for download
-            }
-        }
+        modelExists = exists
+        onboardingState.modelDownloaded = exists
+        onboardingState.selectedModel = configuredModel
+        isCheckingModel = false
     }
 
     private func downloadModel() {
         onboardingState.isDownloadingModel = true
+        downloadError = nil
 
         Task {
             do {
-                try await WhisperService.downloadModel(named: onboardingState.selectedModel.rawValue)
+                let modelName = onboardingState.selectedModel.rawValue
+                // loadModel() downloads if needed and keeps the WhisperKit instance ready
+                try await whisperService.loadModel(named: modelName)
 
                 await MainActor.run {
                     onboardingState.isDownloadingModel = false
                     onboardingState.modelDownloaded = true
                     Settings.shared.whisperModel = onboardingState.selectedModel
+                    downloadError = nil
                 }
             } catch {
                 await MainActor.run {
                     onboardingState.isDownloadingModel = false
-                    // Show error (simplified for now)
-                    print("Download error: \(error)")
+                    downloadError = "Download failed: \(error.localizedDescription)"
                 }
             }
         }

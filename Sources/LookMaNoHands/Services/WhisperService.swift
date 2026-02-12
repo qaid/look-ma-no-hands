@@ -30,21 +30,39 @@ class WhisperService: @unchecked Sendable {
 
         Logger.shared.info("Loading WhisperKit model '\(modelName)'...", category: .whisper)
 
-        // Configure WhisperKit
+        // Use Caches directory as the download base to avoid Documents folder permission prompt.
+        // NOTE: downloadBase controls where HuggingFace Hub downloads models TO.
+        //       modelFolder tells WhisperKit to skip downloading and load from a local path.
+        //       We must NOT set modelFolder here, or the download will be skipped entirely.
+        guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw WhisperError.downloadFailed("Could not access caches directory")
+        }
+
         let config = WhisperKitConfig(
             model: modelName,
+            downloadBase: cacheDir,
             verbose: false,
             logLevel: .info
         )
 
         // Initialize WhisperKit (downloads model if needed)
-        let kit = try await WhisperKit(config)
+        // Retry once if initialization fails (handles corrupted downloads - WhisperKit issue #171)
+        do {
+            let kit = try await WhisperKit(config)
+            self.whisperKit = kit
+            self.tokenizer = kit.tokenizer
+            isModelLoaded = true
+            Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully with Neural Engine acceleration", category: .whisper)
+        } catch {
+            Logger.shared.warning("First load attempt failed, retrying after cleanup: \(error.localizedDescription)", category: .whisper)
 
-        self.whisperKit = kit
-        self.tokenizer = kit.tokenizer
-        isModelLoaded = true
-
-        Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully with Neural Engine acceleration", category: .whisper)
+            // Retry initialization (WhisperKit will re-download if needed)
+            let kit = try await WhisperKit(config)
+            self.whisperKit = kit
+            self.tokenizer = kit.tokenizer
+            isModelLoaded = true
+            Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully on retry", category: .whisper)
+        }
     }
     
     // MARK: - Transcription
@@ -122,58 +140,44 @@ class WhisperService: @unchecked Sendable {
     
     // MARK: - Model Management
 
-    /// Check if a WhisperKit model is available in the Hugging Face cache
-    /// WhisperKit downloads models from Hugging Face and caches them in ~/Library/Caches/huggingface/
+    /// Check if a WhisperKit model is available in the HuggingFace hub cache.
+    /// Models are downloaded to ~/Library/Caches/models--argmaxinc--whisperkit-coreml/
+    ///
+    /// **NOTE**: This is a basic existence check. For reliability,
+    /// prefer using `loadModel()` and catching errors instead.
     static func modelExists(named modelName: String) -> Bool {
-        // WhisperKit models are stored in: ~/Library/Caches/huggingface/hub/models--argmaxinc--whisperkit-coreml
         let fileManager = FileManager.default
 
-        // Get the user's cache directory
         guard let cacheDir = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            Logger.shared.warning("Could not access caches directory", category: .whisper)
             return false
         }
 
-        // WhisperKit stores models in the Hugging Face Hub cache structure
-        let huggingfaceDir = cacheDir.appendingPathComponent("huggingface/hub")
-        let modelsDir = huggingfaceDir.appendingPathComponent("models--argmaxinc--whisperkit-coreml")
+        // WhisperKit uses HuggingFace Hub which stores models in this structure:
+        // ~/Library/Caches/models--argmaxinc--whisperkit-coreml/snapshots/<hash>/openai_whisper-<model>/
+        let hubCacheDir = cacheDir.appendingPathComponent("models--argmaxinc--whisperkit-coreml")
 
-        // Check if the huggingface models directory exists at all
-        guard fileManager.fileExists(atPath: modelsDir.path) else {
-            Logger.shared.info("WhisperKit cache directory does not exist: \(modelsDir.path)", category: .whisper)
+        guard fileManager.fileExists(atPath: hubCacheDir.path) else {
             return false
         }
 
-        // Check for snapshot directories (each model has a snapshot/commit hash subdirectory)
-        let snapshotsDir = modelsDir.appendingPathComponent("snapshots")
+        // Check for the specific model variant in snapshots
+        let snapshotsDir = hubCacheDir.appendingPathComponent("snapshots")
         guard fileManager.fileExists(atPath: snapshotsDir.path) else {
-            Logger.shared.info("No WhisperKit model snapshots found", category: .whisper)
             return false
         }
 
-        // If the snapshots directory exists and has content, check for the specific model
-        // Model files are typically named like: openai_whisper-{modelName}/...
         do {
             let snapshots = try fileManager.contentsOfDirectory(atPath: snapshotsDir.path)
-
             for snapshot in snapshots {
-                let snapshotPath = snapshotsDir.appendingPathComponent(snapshot)
-
-                // Check if this snapshot contains the model we're looking for
-                // WhisperKit models are in directories like "openai_whisper-base", "openai_whisper-tiny", etc.
-                let modelDirName = "openai_whisper-\(modelName)"
-                let modelPath = snapshotPath.appendingPathComponent(modelDirName)
-
-                if fileManager.fileExists(atPath: modelPath.path) {
-                    Logger.shared.info("✅ Found WhisperKit model '\(modelName)' at: \(modelPath.path)", category: .whisper)
+                let modelDir = snapshotsDir
+                    .appendingPathComponent(snapshot)
+                    .appendingPathComponent("openai_whisper-\(modelName)")
+                if fileManager.fileExists(atPath: modelDir.path) {
                     return true
                 }
             }
-
-            Logger.shared.info("Model '\(modelName)' not found in \(snapshots.count) snapshot(s)", category: .whisper)
             return false
         } catch {
-            Logger.shared.warning("Error checking for model '\(modelName)': \(error.localizedDescription)", category: .whisper)
             return false
         }
     }
@@ -202,18 +206,35 @@ class WhisperService: @unchecked Sendable {
     static func downloadModel(named modelName: String) async throws {
         Logger.shared.info("Downloading WhisperKit model '\(modelName)'...", category: .whisper)
 
-        // WhisperKit downloads and caches models automatically on initialization
+        // Use Caches directory as the download base to avoid Documents folder permission prompt.
+        // NOTE: downloadBase controls where HuggingFace Hub downloads models TO.
+        //       modelFolder tells WhisperKit to skip downloading and load from a local path.
+        //       We must NOT set modelFolder here, or the download will be skipped entirely.
+        guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            throw WhisperError.downloadFailed("Could not access caches directory")
+        }
+
         let config = WhisperKitConfig(
             model: modelName,
+            downloadBase: cacheDir,
             verbose: true,
             logLevel: .info
         )
 
-        // This will download the model if not already cached (blocks until complete)
-        _ = try await WhisperKit(config)
+        // WhisperKit downloads and caches models automatically on initialization.
+        // Retry once if initialization fails (handles corrupted downloads - WhisperKit issue #171)
+        do {
+            _ = try await WhisperKit(config)
+            Logger.shared.info("✅ Model '\(modelName)' downloaded successfully", category: .whisper)
+        } catch {
+            Logger.shared.warning("Download failed, retrying: \(error.localizedDescription)", category: .whisper)
 
-        Logger.shared.info("✅ Model '\(modelName)' downloaded successfully", category: .whisper)
+            // Retry download (WhisperKit will re-download if needed)
+            _ = try await WhisperKit(config)
+            Logger.shared.info("✅ Model '\(modelName)' downloaded successfully on retry", category: .whisper)
+        }
     }
+
 }
 
 // MARK: - Errors

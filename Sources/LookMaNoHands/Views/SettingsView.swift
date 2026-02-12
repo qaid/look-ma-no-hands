@@ -1457,8 +1457,7 @@ struct SettingsView: View {
     /// Check availability of all Whisper models
     private func checkWhisperModelStatus() {
         for model in WhisperModel.allCases {
-            let exists = WhisperService.modelExists(named: model.rawValue)
-            modelAvailability[model] = exists
+            modelAvailability[model] = WhisperService.modelExists(named: model.rawValue)
         }
     }
 
@@ -1467,17 +1466,10 @@ struct SettingsView: View {
         // Clear any previous error
         modelDownloadError = nil
 
-        // Check if model exists
-        let modelExists = WhisperService.modelExists(named: newModel.rawValue)
-
-        if !modelExists {
-            // Model doesn't exist, start download
+        if !WhisperService.modelExists(named: newModel.rawValue) {
             Task {
                 await downloadModel(newModel)
             }
-        } else {
-            print("SettingsView: Model \(newModel.rawValue) already downloaded")
-            // TODO: Notify AppDelegate to reload the model if needed
         }
     }
 
