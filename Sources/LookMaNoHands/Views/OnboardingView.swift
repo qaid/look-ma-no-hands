@@ -461,6 +461,12 @@ struct WhisperModelStepView: View {
                 // loadModel() downloads if needed and keeps the WhisperKit instance ready
                 try await whisperService.loadModel(named: modelName)
 
+                // Warm up the Neural Engine with a short silent transcription.
+                // This runs while the download progress UI is still visible, so the user
+                // just sees a slightly longer "download" time. Prevents slow first dictation.
+                let silentSamples = [Float](repeating: 0.0, count: 16000)
+                _ = try? await whisperService.transcribe(samples: silentSamples)
+
                 await MainActor.run {
                     onboardingState.isDownloadingModel = false
                     onboardingState.modelDownloaded = true

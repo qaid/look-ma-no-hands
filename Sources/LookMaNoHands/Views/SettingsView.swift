@@ -29,6 +29,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
 /// Settings window for configuring Look Ma No Hands
 struct SettingsView: View {
+    let whisperService: WhisperService
     @ObservedObject private var settings = Settings.shared
 
     // Permission states (would be updated by checking actual permissions)
@@ -1457,7 +1458,12 @@ struct SettingsView: View {
     /// Check availability of all Whisper models
     private func checkWhisperModelStatus() {
         for model in WhisperModel.allCases {
-            modelAvailability[model] = WhisperService.modelExists(named: model.rawValue)
+            // If the model is currently loaded in the WhisperService, it's definitely available
+            if whisperService.loadedModelName == model.rawValue {
+                modelAvailability[model] = true
+            } else {
+                modelAvailability[model] = WhisperService.modelExists(named: model.rawValue)
+            }
         }
     }
 
@@ -1466,7 +1472,11 @@ struct SettingsView: View {
         // Clear any previous error
         modelDownloadError = nil
 
-        if !WhisperService.modelExists(named: newModel.rawValue) {
+        // If the model is already loaded or exists on disk, no download needed
+        let isLoaded = whisperService.loadedModelName == newModel.rawValue
+        let existsOnDisk = WhisperService.modelExists(named: newModel.rawValue)
+
+        if !isLoaded && !existsOnDisk {
             Task {
                 await downloadModel(newModel)
             }
