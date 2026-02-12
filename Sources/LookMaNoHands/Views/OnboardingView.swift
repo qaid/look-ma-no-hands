@@ -446,9 +446,33 @@ struct WhisperModelStepView: View {
         let exists = WhisperService.modelExists(named: configuredModel.rawValue)
 
         modelExists = exists
-        onboardingState.modelDownloaded = exists
         onboardingState.selectedModel = configuredModel
         isCheckingModel = false
+
+        // If model exists, load it and warm up the Neural Engine
+        // (warmup is essential to prevent 10-second latency on first dictation)
+        if exists {
+            Task {
+                do {
+                    // Load the existing model
+                    try await whisperService.loadModel(named: configuredModel.rawValue)
+
+                    // Warm up the Neural Engine (issue #161)
+                    await whisperService.warmUpNeuralEngine()
+
+                    await MainActor.run {
+                        onboardingState.modelDownloaded = true
+                        Settings.shared.whisperModel = onboardingState.selectedModel
+                    }
+                } catch {
+                    // If loading fails, user needs to re-download
+                    await MainActor.run {
+                        modelExists = false
+                        onboardingState.modelDownloaded = false
+                    }
+                }
+            }
+        }
     }
 
     private func downloadModel() {
@@ -461,11 +485,10 @@ struct WhisperModelStepView: View {
                 // loadModel() downloads if needed and keeps the WhisperKit instance ready
                 try await whisperService.loadModel(named: modelName)
 
-                // Warm up the Neural Engine with a short silent transcription.
-                // This runs while the download progress UI is still visible, so the user
-                // just sees a slightly longer "download" time. Prevents slow first dictation.
-                let silentSamples = [Float](repeating: 0.0, count: 16000)
-                _ = try? await whisperService.transcribe(samples: silentSamples)
+                // Warm up the Neural Engine with realistic audio to prevent 10-second latency
+                // on first dictation (issue #161). This runs while the download progress UI
+                // is still visible, so the user just sees a slightly longer "download" time.
+                await whisperService.warmUpNeuralEngine()
 
                 await MainActor.run {
                     onboardingState.isDownloadingModel = false
@@ -557,22 +580,36 @@ struct PermissionsStepView: View {
     }
 
     private func requestMicrophonePermission() {
-        Task {
-            let granted = await AVCaptureDevice.requestAccess(for: .audio)
-            await MainActor.run {
-                onboardingState.hasMicrophonePermission = granted
+        // Check current status first
+        let currentStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+
+        if currentStatus == .notDetermined {
+            // Only request if status is not determined (will show system dialog)
+            Task {
+                let granted = await AVCaptureDevice.requestAccess(for: .audio)
+                await MainActor.run {
+                    onboardingState.hasMicrophonePermission = granted
+                }
             }
+        } else {
+            // Permission already determined - open System Settings
+            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")!
+            NSWorkspace.shared.open(url)
         }
     }
 
     private func openAccessibilitySettings() {
         // First, trigger the system prompt to add this app to Accessibility
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        // IMPORTANT: The dictionary must be created as NSDictionary and cast to CFDictionary
+        let options = NSDictionary(dictionary: [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true])
         let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
 
-        // Also open System Settings to the Accessibility pane
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
-        NSWorkspace.shared.open(url)
+        // Small delay to let the dialog appear before opening System Settings
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Also open System Settings to the Accessibility pane
+            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+            NSWorkspace.shared.open(url)
+        }
     }
 
     private func startPermissionChecking() {
