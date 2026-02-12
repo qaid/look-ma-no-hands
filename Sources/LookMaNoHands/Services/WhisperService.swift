@@ -143,7 +143,74 @@ class WhisperService: @unchecked Sendable {
 
         return text
     }
-    
+
+    /// Generate realistic synthetic audio for Neural Engine warm-up.
+    /// Creates a multi-tone signal that exercises the full Whisper pipeline.
+    ///
+    /// - Parameter duration: Duration in seconds (default: 3.0)
+    /// - Returns: Audio samples at 16kHz sample rate
+    private func generateWarmupAudio(duration: Double = 3.0) -> [Float] {
+        let sampleRate: Double = 16000
+        let sampleCount = Int(duration * sampleRate)
+        var samples = [Float](repeating: 0.0, count: sampleCount)
+
+        // Mix multiple frequencies to simulate speech-like spectral content
+        // These frequencies span the typical human speech range (85-255 Hz fundamental)
+        let frequencies: [Double] = [120.0, 240.0, 480.0, 960.0]  // Fundamental + harmonics
+        let amplitudes: [Float] = [0.3, 0.15, 0.1, 0.05]  // Decreasing harmonic strength
+
+        for i in 0..<sampleCount {
+            let t = Double(i) / sampleRate
+            var sample: Float = 0.0
+
+            // Mix harmonics with varying amplitudes
+            for (frequency, amplitude) in zip(frequencies, amplitudes) {
+                sample += Float(sin(2.0 * .pi * frequency * t)) * amplitude
+            }
+
+            // Apply simple envelope to avoid clicks (fade in/out over 0.1 seconds)
+            let fadeInSamples = Int(0.1 * sampleRate)
+            let fadeOutStart = sampleCount - fadeInSamples
+
+            if i < fadeInSamples {
+                let envelope = Float(i) / Float(fadeInSamples)
+                sample *= envelope
+            } else if i > fadeOutStart {
+                let envelope = Float(sampleCount - i) / Float(fadeInSamples)
+                sample *= envelope
+            }
+
+            samples[i] = sample
+        }
+
+        return samples
+    }
+
+    /// Warm up the Neural Engine by running two transcription passes.
+    /// This prevents the 10-second latency on the first real dictation after installation.
+    ///
+    /// Runs two passes to exercise different code paths:
+    /// - Pass 1: Without prompt (standard inference)
+    /// - Pass 2: With prompt (context-aware inference)
+    ///
+    /// Failures are silently ignored as warm-up is an optimization, not critical path.
+    func warmUpNeuralEngine() async {
+        Logger.shared.info("🔥 Warming up Neural Engine...", category: .whisper)
+        let startTime = Date()
+
+        // Generate 3 seconds of synthetic audio with speech-like characteristics
+        let warmupSamples = generateWarmupAudio(duration: 3.0)
+
+        // Pass 1: Transcribe without prompt (exercises standard inference path)
+        _ = try? await transcribe(samples: warmupSamples)
+
+        // Pass 2: Transcribe with prompt (exercises context-aware inference path)
+        _ = try? await transcribe(samples: warmupSamples, initialPrompt: "This is a test.")
+
+        let elapsed = Date().timeIntervalSince(startTime)
+        Logger.shared.info("✅ Neural Engine warm-up complete in \(String(format: "%.2f", elapsed))s", category: .whisper)
+    }
+
     // MARK: - Model Management
 
     /// Check if a WhisperKit model is available in the cache.
