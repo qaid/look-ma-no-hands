@@ -237,7 +237,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             switch url.host {
             case "toggle":
                 NSLog("📞 URL command: toggle recording")
-                handleTriggerKey()
+                startOrStopRecording()
             case "start":
                 NSLog("📞 URL command: start recording")
                 if !transcriptionState.isRecording && transcriptionState.recordingState == .idle {
@@ -354,7 +354,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc private func toggleRecording() {
-        handleTriggerKey()
+        startOrStopRecording()
     }
 
     @objc private func toggleHotkeyEnabled() {
@@ -679,7 +679,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               hotkey.isSingleModifierKey ? "YES" : "NO")
 
         let success = keyboardMonitor.startMonitoring(hotkey: hotkey) { [weak self] in
-            self?.handleTriggerKey()
+            self?.handleHotkeyTrigger()
         }
 
         // Set up ESC key cancellation callback
@@ -696,7 +696,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 NSLog("🔄 Retrying keyboard monitoring setup...")
                 let retryHotkey = Settings.shared.effectiveHotkey
                 if self?.keyboardMonitor.startMonitoring(hotkey: retryHotkey, onTrigger: { [weak self] in
-                    self?.handleTriggerKey()
+                    self?.handleHotkeyTrigger()
                 }) == true {
                     NSLog("✅ Keyboard monitoring started on retry for %@", retryHotkey.displayString)
                 }
@@ -806,14 +806,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Recording Workflow
 
-    /// Handle Caps Lock key press - toggles recording
-    private func handleTriggerKey() {
+    /// Handle hotkey press (Caps Lock, etc.) - toggles recording
+    /// This method respects the hotkeyEnabled setting
+    private func handleHotkeyTrigger() {
         guard Settings.shared.hotkeyEnabled else {
             NSLog("⚠️ Hotkey disabled - ignoring trigger")
             return
         }
 
-        print("handleTriggerKey called, current state: \(transcriptionState.recordingState)")
+        startOrStopRecording()
+    }
+
+    /// Start or stop recording (used by menu bar, URL scheme, and hotkey)
+    /// This method bypasses the hotkeyEnabled check - it's for manual user actions
+    private func startOrStopRecording() {
+        print("startOrStopRecording called, current state: \(transcriptionState.recordingState)")
 
         if transcriptionState.isRecording {
             print("Stopping recording...")
