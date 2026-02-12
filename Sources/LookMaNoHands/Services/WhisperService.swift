@@ -140,8 +140,8 @@ class WhisperService: @unchecked Sendable {
     
     // MARK: - Model Management
 
-    /// Check if a WhisperKit model is available in the HuggingFace hub cache.
-    /// Models are downloaded to ~/Library/Caches/models--argmaxinc--whisperkit-coreml/
+    /// Check if a WhisperKit model is available in the cache.
+    /// Models are downloaded to ~/Library/Caches/models/argmaxinc/whisperkit-coreml/
     ///
     /// **NOTE**: This is a basic existence check. For reliability,
     /// prefer using `loadModel()` and catching errors instead.
@@ -152,34 +152,15 @@ class WhisperService: @unchecked Sendable {
             return false
         }
 
-        // WhisperKit uses HuggingFace Hub which stores models in this structure:
-        // ~/Library/Caches/models--argmaxinc--whisperkit-coreml/snapshots/<hash>/openai_whisper-<model>/
-        let hubCacheDir = cacheDir.appendingPathComponent("models--argmaxinc--whisperkit-coreml")
+        // WhisperKit 0.14.1 uses a simpler cache structure:
+        // ~/Library/Caches/models/argmaxinc/whisperkit-coreml/openai_whisper-<model>/
+        let modelDir = cacheDir
+            .appendingPathComponent("models")
+            .appendingPathComponent("argmaxinc")
+            .appendingPathComponent("whisperkit-coreml")
+            .appendingPathComponent("openai_whisper-\(modelName)")
 
-        guard fileManager.fileExists(atPath: hubCacheDir.path) else {
-            return false
-        }
-
-        // Check for the specific model variant in snapshots
-        let snapshotsDir = hubCacheDir.appendingPathComponent("snapshots")
-        guard fileManager.fileExists(atPath: snapshotsDir.path) else {
-            return false
-        }
-
-        do {
-            let snapshots = try fileManager.contentsOfDirectory(atPath: snapshotsDir.path)
-            for snapshot in snapshots {
-                let modelDir = snapshotsDir
-                    .appendingPathComponent(snapshot)
-                    .appendingPathComponent("openai_whisper-\(modelName)")
-                if fileManager.fileExists(atPath: modelDir.path) {
-                    return true
-                }
-            }
-            return false
-        } catch {
-            return false
-        }
+        return fileManager.fileExists(atPath: modelDir.path)
     }
 
     /// Get available WhisperKit models to download
