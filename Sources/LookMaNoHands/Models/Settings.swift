@@ -583,12 +583,16 @@ Now produce the complete meeting notes following the format above. Ensure every 
 
             // Save to file
             if let data = try? JSONEncoder().encode(hotkey) {
-                try? data.write(to: fileURL, options: .atomic)
-                NSLog("✅ Migration complete: toggle hotkey saved to \(fileURL.path)")
-            }
+                do {
+                    try data.write(to: fileURL, options: .atomic)
+                    NSLog("✅ Migration complete: toggle hotkey saved to \(fileURL.path)")
 
-            // Remove from UserDefaults after successful migration
-            UserDefaults.standard.removeObject(forKey: Keys.toggleHotkeyShortcut)
+                    // Remove from UserDefaults only after successful migration
+                    UserDefaults.standard.removeObject(forKey: Keys.toggleHotkeyShortcut)
+                } catch {
+                    NSLog("⚠️ Failed to write toggle hotkey during migration: \(error.localizedDescription)")
+                }
+            }
 
             return hotkey
         }
