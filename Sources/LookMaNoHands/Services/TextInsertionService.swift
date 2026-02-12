@@ -110,7 +110,7 @@ class TextInsertionService {
     }
     
     /// Get the currently focused accessibility element
-    private func getFocusedElement() -> AXUIElement? {
+    func getFocusedElement() -> AXUIElement? {
         // Get the system-wide accessibility element
         let systemWide = AXUIElementCreateSystemWide()
         

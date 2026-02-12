@@ -23,6 +23,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Pre-captured initial prompt (captured at recording start, before any insertion)
     private var capturedInitialPrompt: String?
 
+    // Focused element before recording started (for restoring focus on cancel)
+    private var focusedElementBeforeRecording: AXUIElement?
+
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
 
@@ -842,6 +845,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Update state to idle (skips processing)
         transcriptionState.cancelRecording()
 
+        // Restore focus to the original field
+        if let focusedElement = focusedElementBeforeRecording {
+            restoreFocus(to: focusedElement)
+            focusedElementBeforeRecording = nil
+        }
+
         // Update UI
         updateMenuBarIcon(isRecording: false)
         recordingIndicator.hide()
@@ -853,6 +862,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NSLog("✅ Recording canceled - no text will be inserted")
+    }
+
+    /// Restore focus to a previously focused element
+    private func restoreFocus(to element: AXUIElement) {
+        let result = AXUIElementSetAttributeValue(
+            element,
+            kAXFocusedAttribute as CFString,
+            kCFBooleanTrue
+        )
+
+        if result == .success {
+            NSLog("✅ Focus restored to original field")
+        } else {
+            NSLog("⚠️ Failed to restore focus: \(result.rawValue)")
+            // Element may no longer exist (app closed, field destroyed)
+            // This is expected behavior - gracefully continue
+        }
     }
 
     /// Start recording audio
@@ -903,6 +929,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return
         }
+
+        // Capture the focused element BEFORE showing indicator
+        focusedElementBeforeRecording = textInsertionService.getFocusedElement()
 
         // Capture field context NOW, before any previous transcription could contaminate it
         capturedInitialPrompt = buildInitialPrompt()
@@ -1119,6 +1148,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.textInsertionService.insertText(formattedText)
                         self.transcriptionState.setFormattedText(formattedText)
                         self.transcriptionState.completeProcessing()
+
+                        // Clear the stored focus since we successfully completed
+                        self.focusedElementBeforeRecording = nil
                     }
                 }
                 let insertTime = Date().timeIntervalSince(insertStart)
