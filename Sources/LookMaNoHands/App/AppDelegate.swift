@@ -192,8 +192,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func completeInitialization() {
-        checkPermissions()
-        NSLog("✅ AppDelegate: Permissions checked")
+        updatePermissionStatus()
+        NSLog("✅ AppDelegate: Permission status updated")
 
         loadWhisperModel()
         NSLog("✅ AppDelegate: Whisper model load initiated")
@@ -470,47 +470,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     // MARK: - Permission Checks
-    
-    private func checkPermissions() {
-        // Check microphone permission
-        checkMicrophonePermission()
-        
-        // Check accessibility permission
-        checkAccessibilityPermission()
-    }
-    
-    private func checkMicrophonePermission() {
-        AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
-            DispatchQueue.main.async {
-                self?.transcriptionState.hasMicrophonePermission = granted
-                print("Microphone permission: \(granted ? "Granted" : "Denied")")
 
-                if !granted {
-                    self?.showAlert(
-                        title: "Microphone Permission Required",
-                        message: "Look Ma No Hands needs microphone access to record audio. Please grant permission in System Settings > Privacy & Security > Microphone."
-                    )
-                }
-            }
-        }
-    }
-    
-    private func checkAccessibilityPermission() {
-        // Check if we have accessibility permissions
+    /// Update permission status without triggering any system dialogs (read-only status check)
+    private func updatePermissionStatus() {
+        // Check microphone permission status only - no requestAccess() call
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        transcriptionState.hasMicrophonePermission = (micStatus == .authorized)
+        print("Microphone permission status: \(micStatus == .authorized ? "Granted" : "Not granted")")
+
+        // Check accessibility permission status only - no prompt
         let trusted = AXIsProcessTrusted()
         transcriptionState.hasAccessibilityPermission = trusted
-        print("Accessibility permission: \(trusted ? "Granted" : "Not granted")")
-
-        if !trusted && !justCompletedOnboarding {
-            // Prompt user to grant accessibility permission
-            // (but not if we just finished onboarding, which already prompted)
-            promptForAccessibilityPermission()
-        }
+        print("Accessibility permission status: \(trusted ? "Granted" : "Not granted")")
 
         // Reset the flag after checking
         justCompletedOnboarding = false
     }
-    
+
+    /// Show alert to prompt for microphone permission
+    private func showMicrophonePermissionAlert() {
+        showAlert(
+            title: "Microphone Permission Required",
+            message: "Look Ma No Hands needs microphone access to record audio. Please grant permission in System Settings > Privacy & Security > Microphone."
+        )
+    }
+
+    /// Open System Settings to Accessibility pane
     private func promptForAccessibilityPermission() {
         // Open System Preferences to Accessibility pane
         let alert = NSAlert()
@@ -519,7 +504,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Open System Preferences")
         alert.addButton(withTitle: "Later")
-        
+
         if alert.runModal() == .alertFirstButtonReturn {
             // Open System Preferences > Privacy & Security > Accessibility
             let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
@@ -872,10 +857,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Start recording audio
     private func startRecording() {
-        // Check permissions first
+        // Check accessibility permission first
         guard transcriptionState.hasAccessibilityPermission else {
             handleMissingAccessibilityPermission()
             return
+        }
+
+        // Check microphone permission lazily - request if needed
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        if micStatus != .authorized {
+            if micStatus == .notDetermined {
+                // First time - request permission
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+                    DispatchQueue.main.async {
+                        self?.transcriptionState.hasMicrophonePermission = granted
+                        if granted {
+                            // Permission granted - retry recording
+                            self?.startRecording()
+                        } else {
+                            // Permission denied - show alert
+                            self?.showMicrophonePermissionAlert()
+                        }
+                    }
+                }
+                return
+            } else {
+                // Permission previously denied - show alert
+                showMicrophonePermissionAlert()
+                return
+            }
         }
 
         // Check if Whisper model is ready
