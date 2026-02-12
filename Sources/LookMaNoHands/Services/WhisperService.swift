@@ -193,19 +193,37 @@ class WhisperService: @unchecked Sendable {
     /// - Pass 1: Without prompt (standard inference)
     /// - Pass 2: With prompt (context-aware inference)
     ///
-    /// Failures are silently ignored as warm-up is an optimization, not critical path.
+    /// Failures are logged but don't block onboarding (warm-up is an optimization).
     func warmUpNeuralEngine() async {
         Logger.shared.info("🔥 Warming up Neural Engine...", category: .whisper)
         let startTime = Date()
+
+        // Verify model is loaded before attempting warm-up
+        guard isModelLoaded else {
+            Logger.shared.warning("⚠️ Cannot warm up: Model not loaded yet. Will use cold start on first dictation.", category: .whisper)
+            return
+        }
 
         // Generate 3 seconds of synthetic audio with speech-like characteristics
         let warmupSamples = generateWarmupAudio(duration: 3.0)
 
         // Pass 1: Transcribe without prompt (exercises standard inference path)
-        _ = try? await transcribe(samples: warmupSamples)
+        Logger.shared.info("   Pass 1: Standard inference (no prompt)...", category: .whisper)
+        do {
+            _ = try await transcribe(samples: warmupSamples)
+            Logger.shared.info("   ✓ Pass 1 complete", category: .whisper)
+        } catch {
+            Logger.shared.warning("   ⚠️ Pass 1 failed: \(error.localizedDescription)", category: .whisper)
+        }
 
         // Pass 2: Transcribe with prompt (exercises context-aware inference path)
-        _ = try? await transcribe(samples: warmupSamples, initialPrompt: "This is a test.")
+        Logger.shared.info("   Pass 2: Context-aware inference (with prompt)...", category: .whisper)
+        do {
+            _ = try await transcribe(samples: warmupSamples, initialPrompt: "This is a test.")
+            Logger.shared.info("   ✓ Pass 2 complete", category: .whisper)
+        } catch {
+            Logger.shared.warning("   ⚠️ Pass 2 failed: \(error.localizedDescription)", category: .whisper)
+        }
 
         let elapsed = Date().timeIntervalSince(startTime)
         Logger.shared.info("✅ Neural Engine warm-up complete in \(String(format: "%.2f", elapsed))s", category: .whisper)

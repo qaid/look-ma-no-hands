@@ -546,6 +546,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 try await whisperService.loadModel(named: configuredModel)
                 NSLog("✅ Whisper model '\(configuredModel)' loaded successfully")
 
+                // Warm up the Neural Engine to prevent latency on first dictation (issue #161)
+                // This is crucial for first-launch experience - skipping would result in 10+ second latency
+                if Settings.shared.hasCompletedOnboarding {
+                    await whisperService.warmUpNeuralEngine()
+                }
+
                 // Update menu to show ready state
                 await MainActor.run {
                     updateMenuBarStatus("Ready")
