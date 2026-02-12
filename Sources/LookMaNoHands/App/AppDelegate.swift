@@ -40,6 +40,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let updateService = UpdateService()
     private let mediaControlService = MediaControlService()
 
+    /// Exposed for SettingsView to check model status
+    var whisperServiceForSettings: WhisperService { whisperService }
+
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
     private let launchSplash = LaunchSplashWindowController()
@@ -403,7 +406,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.delegate = self
 
         // Create SwiftUI settings view and wrap it in NSHostingView
-        let settingsView = SettingsView()
+        let settingsView = SettingsView(whisperService: whisperService)
         let hostingView = NSHostingView(rootView: settingsView)
         window.contentView = hostingView
 
@@ -1036,8 +1039,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         transcriptionState.stopRecording()
         updateMenuBarIcon(isRecording: false)
 
-        // Hide indicator immediately to avoid frozen waveform
-        // (waveform stops animating when isRecording = false)
+        // DESIGN: No processing indicator is shown after recording stops.
+        // Hide the recording indicator immediately and process in the background.
+        // The transcribed text appears directly - no spinner, shimmer, or progress bar.
+        // This makes dictation feel instant. The Neural Engine warm-up happens during onboarding.
         recordingIndicator.hide()
 
         // Resume system media if we paused it

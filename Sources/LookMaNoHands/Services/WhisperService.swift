@@ -19,6 +19,9 @@ class WhisperService: @unchecked Sendable {
 
     /// Whether model is currently loading
     private(set) var isModelLoading = false
+
+    /// Name of the currently loaded model (e.g., "base", "large-v3-turbo")
+    private(set) var loadedModelName: String?
     
     // MARK: - Initialization
 
@@ -26,7 +29,10 @@ class WhisperService: @unchecked Sendable {
     /// - Parameter modelName: Name of the model (e.g., "base", "small", "tiny", "large-v3-turbo")
     func loadModel(named modelName: String = "base") async throws {
         isModelLoading = true
-        defer { isModelLoading = false }
+        defer {
+            isModelLoading = false
+            if isModelLoaded { loadedModelName = modelName }
+        }
 
         Logger.shared.info("Loading WhisperKit model '\(modelName)'...", category: .whisper)
 

@@ -11,7 +11,7 @@ struct LookMaNoHandsApp: App {
     var body: some Scene {
         // Settings window - opened from menu bar
         SwiftUI.Settings {
-            SettingsView()
+            SettingsView(whisperService: appDelegate.whisperServiceForSettings)
         }
     }
 }
