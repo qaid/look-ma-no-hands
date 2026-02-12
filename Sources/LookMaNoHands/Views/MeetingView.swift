@@ -828,8 +828,11 @@ struct MeetingView: View {
             return
         }
 
-        // Check permissions
-        // TODO: Add permission checks
+        // Check screen recording permission
+        if !SystemAudioRecorder.hasPermission() {
+            meetingState.status = .missingPermissions
+            return
+        }
 
         meetingState.status = .ready
     }
@@ -1019,6 +1022,16 @@ struct MeetingView: View {
 
     private func startRecording() async {
         do {
+            // Request screen recording permission if not yet determined
+            if !SystemAudioRecorder.hasPermission() {
+                let granted = await SystemAudioRecorder.requestPermission()
+                if !granted {
+                    meetingState.status = .missingPermissions
+                    meetingState.statusMessage = "Screen recording permission required"
+                    return
+                }
+            }
+
             // Set session start date on first recording
             if meetingState.sessionStartDate == nil {
                 meetingState.sessionStartDate = Date()
