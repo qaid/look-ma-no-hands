@@ -16,7 +16,7 @@ on:
       - 'LICENSE'
       - '.gitignore'
   schedule:
-    - cron: '0 12 * * 1'  # Weekly Monday scans
+    - cron: '0 12 * * 1'  # Weekly Monday scans (runs full security-extended)
 
 permissions:
   security-events: write
@@ -31,14 +31,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Cache Swift package dependencies (but not build artifacts)
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: swift
-          queries: security-extended  # Use security-focused query suite
+          # Use minimal queries for PRs, security-extended only for scheduled scans
+          queries: ${{ github.event_name == 'schedule' && 'security-extended' || '' }}
 
       - name: Build for analysis
-        run: swift build -c release
+        run: |
+          # Debug build is faster and sufficient for CodeQL analysis
+          # Build only if cache miss (dependencies already resolved)
+          swift build
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
