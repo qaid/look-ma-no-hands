@@ -22,7 +22,7 @@ jobs:
       - name: Run FOSSology License Scanner
         uses: fossology/fossology-action@v1
         with:
-          scan_mode: license
+          scan_mode: nomos
           report_format: markdown
 
       - name: Upload License Report

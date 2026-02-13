@@ -80,14 +80,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install OSV-Scanner
+        run: |
+          curl -L https://github.com/google/osv-scanner/releases/download/v1.8.5/osv-scanner_linux_amd64 -o osv-scanner
+          chmod +x osv-scanner
+
       - name: Run OSV-Scanner
-        uses: google/osv-scanner-action@v2
-        with:
-          scan-args: |-
-            --lockfile=Package.resolved
-            --format=json
-            --output=osv-results.json
-        continue-on-error: true  # Don't block builds initially
+        run: |
+          ./osv-scanner --lockfile=Package.resolved --format=json --output=osv-results.json || true
 
       - name: Upload OSV Results
         uses: actions/upload-artifact@v4
