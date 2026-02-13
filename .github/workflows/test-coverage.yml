@@ -1,0 +1,29 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Note on test coverage
+        run: |
+          echo "ℹ️  Test coverage reporting is configured."
+          echo "Tests are currently being set up for this project."
+          echo "Once tests are available, coverage will be automatically reported to Codecov."
+          echo ""
+          echo "Next steps:"
+          echo "1. Create test files in Tests/LookMaNoHandsTests/"
+          echo "2. Ensure Xcode is installed (XCTest framework requirement)"
+          echo "3. Run: swift test --enable-code-coverage"

@@ -1,0 +1,32 @@
+name: License Compliance
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'Package.swift'
+      - 'Package.resolved'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  license-scan:
+    name: Scan OSS Licenses
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run FOSSology License Scanner
+        uses: fossology/fossology-action@v1
+        with:
+          scan_mode: nomos
+          report_format: TEXT
+
+      - name: Upload License Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-scan-report
+          path: fossology-report.txt

@@ -1,5 +1,5 @@
 import XCTest
-@testable import WhisperDictation
+@testable import LookMaNoHands
 
 final class WhisperDictationTests: XCTestCase {
     

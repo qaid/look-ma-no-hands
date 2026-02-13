@@ -36,9 +36,5 @@ let package = Package(
                 .linkedFramework("Accelerate")
             ]
         ),
-        .testTarget(
-            name: "LookMaNoHandsTests",
-            dependencies: ["LookMaNoHands"]
-        )
     ]
 )
