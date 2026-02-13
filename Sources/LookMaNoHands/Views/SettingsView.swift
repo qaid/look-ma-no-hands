@@ -508,7 +508,7 @@ struct SettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            // Vocabulary list
+            // Vocabulary list (scrollable)
             if settings.customVocabulary.isEmpty && !isAddingNewEntry {
                 VStack(spacing: 8) {
                     Text("No custom vocabulary entries yet.")
@@ -521,119 +521,47 @@ struct SettingsView: View {
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
             } else {
-                // Column headers
-                HStack(spacing: 8) {
-                    Text("Active")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 50, alignment: .leading)
-
-                    Text("Heard as")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 160, alignment: .leading)
-
-                    Text("Correct spelling")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 160, alignment: .leading)
-
-                    Spacer()
-
-                    Text("Actions")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 60, alignment: .trailing)
-                }
-                .padding(.horizontal, 4)
-
-                // Add new entry row (if in add mode)
-                if isAddingNewEntry {
-                    HStack(spacing: 8) {
-                        // Disabled toggle for new entries
-                        Toggle("", isOn: .constant(true))
-                            .toggleStyle(.checkbox)
-                            .disabled(true)
-                            .opacity(0.3)
-
-                        TextField("e.g. work tree", text: $newEntryPhrase)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 160)
-
-                        TextField("e.g. worktree", text: $newEntryReplacement)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 160)
-
-                        Spacer()
-
-                        // Confirm button
-                        Button {
-                            confirmAddEntry()
-                        } label: {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                        }
-                        .buttonStyle(.plain)
-                        .help("Save this entry")
-                        .disabled(newEntryReplacement.isEmpty)
-
-                        // Cancel button
-                        Button {
-                            cancelAddEntry()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        // Column headers
+                        HStack(spacing: 8) {
+                            Text("Active")
+                                .font(.caption)
                                 .foregroundColor(.secondary)
+                                .frame(width: 50, alignment: .leading)
+
+                            Text("Heard as")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(width: 160, alignment: .leading)
+
+                            Text("Correct spelling")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(width: 160, alignment: .leading)
+
+                            Spacer()
+
+                            Text("Actions")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .frame(width: 60, alignment: .trailing)
                         }
-                        .buttonStyle(.plain)
-                        .help("Cancel")
+                        .padding(.horizontal, 4)
+
+                        // Existing vocabulary entries
+                        ForEach(settings.customVocabulary) { entry in
+                            if editingEntryId == entry.id {
+                                // Edit mode row
+                                editModeRow(entry: entry)
+                            } else {
+                                // Display mode row
+                                displayModeRow(entry: entry)
+                            }
+                        }
                     }
                 }
-
-                // Existing vocabulary entries
-                ForEach(settings.customVocabulary) { entry in
-                    if editingEntryId == entry.id {
-                        // Edit mode row
-                        editModeRow(entry: entry)
-                    } else {
-                        // Display mode row
-                        displayModeRow(entry: entry)
-                    }
-                }
             }
-
-            // Add Word button
-            Button {
-                startAddingNewEntry()
-            } label: {
-                Label("Add Word", systemImage: "plus")
-            }
-            .controlSize(.small)
-            .disabled(isAddingNewEntry)
-
-            // Auto-save note with entry count
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle")
-                    .foregroundColor(.green)
-                    .font(.caption)
-                Text("Changes are saved automatically.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                // Show entry statistics
-                if !settings.customVocabulary.isEmpty {
-                    Text("•")
-                        .foregroundColor(.secondary)
-                        .font(.caption)
-
-                    let enabledCount = settings.customVocabulary.filter { $0.enabled }.count
-                    Text("\(settings.customVocabulary.count) \(settings.customVocabulary.count == 1 ? "entry" : "entries"), \(enabledCount) active")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.top, 4)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Changes are saved automatically as you type")
 
             // Tip
             HStack(spacing: 6) {
@@ -647,6 +575,57 @@ struct SettingsView: View {
             .padding(.top, 4)
 
             Spacer()
+
+            // Add new entry row (if in add mode) - appears before the button
+            if isAddingNewEntry {
+                HStack(spacing: 8) {
+                    // Disabled toggle for new entries
+                    Toggle("", isOn: .constant(true))
+                        .toggleStyle(.checkbox)
+                        .disabled(true)
+                        .opacity(0.3)
+
+                    TextField("e.g. work tree", text: $newEntryPhrase)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+
+                    TextField("e.g. worktree", text: $newEntryReplacement)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+
+                    Spacer()
+
+                    // Confirm button
+                    Button {
+                        confirmAddEntry()
+                    } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Save this entry")
+                    .disabled(newEntryReplacement.isEmpty)
+
+                    // Cancel button
+                    Button {
+                        cancelAddEntry()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Cancel")
+                }
+            }
+
+            // Add Word button
+            Button {
+                startAddingNewEntry()
+            } label: {
+                Label("Add Word", systemImage: "plus")
+            }
+            .controlSize(.small)
+            .disabled(isAddingNewEntry)
         }
         .padding()
         .confirmationDialog(
