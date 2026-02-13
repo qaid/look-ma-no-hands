@@ -142,7 +142,7 @@ On first launch, grant:
 
 **Toggling Dictation On/Off**:
 - Press **Cmd+Shift+D** to temporarily disable/enable dictation
-- Or click the menu bar icon and select **Toggle Dictation**
+- Or click the menu bar icon and select **Enable Dictation Hotkey**
 - The menu bar icon shows a red badge when dictation is disabled
 - State is saved and persists across app restarts
 
