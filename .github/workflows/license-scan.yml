@@ -23,10 +23,10 @@ jobs:
         uses: fossology/fossology-action@v1
         with:
           scan_mode: nomos
-          report_format: markdown
+          report_format: TEXT
 
       - name: Upload License Report
         uses: actions/upload-artifact@v4
         with:
           name: license-scan-report
-          path: fossology-report.md
+          path: fossology-report.txt
