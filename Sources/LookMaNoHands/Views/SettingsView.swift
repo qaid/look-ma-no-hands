@@ -62,6 +62,20 @@ struct SettingsView: View {
     @State private var previousAccessibilityPermission: PermissionState = .unknown
     @State private var shouldShowAccessibilityRestartBanner = false
 
+    // Vocabulary state for add mode
+    @State private var isAddingNewEntry = false
+    @State private var newEntryPhrase = ""
+    @State private var newEntryReplacement = ""
+
+    // Vocabulary state for edit mode
+    @State private var editingEntryId: UUID? = nil
+    @State private var editingPhrase = ""
+    @State private var editingReplacement = ""
+
+    // Vocabulary state for delete confirmation
+    @State private var entryToDelete: VocabularyEntry? = nil
+    @State private var showDeleteConfirmation = false
+
     var body: some View {
         NavigationSplitView {
             sidebarContent
@@ -495,7 +509,7 @@ struct SettingsView: View {
             }
 
             // Vocabulary list
-            if settings.customVocabulary.isEmpty {
+            if settings.customVocabulary.isEmpty && !isAddingNewEntry {
                 VStack(spacing: 8) {
                     Text("No custom vocabulary entries yet.")
                         .font(.caption)
@@ -509,61 +523,113 @@ struct SettingsView: View {
             } else {
                 // Column headers
                 HStack(spacing: 8) {
+                    Text("Active")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 50, alignment: .leading)
+
                     Text("Heard as")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 160, alignment: .leading)
+
                     Text("Correct spelling")
                         .font(.caption)
                         .foregroundColor(.secondary)
                         .frame(width: 160, alignment: .leading)
+
                     Spacer()
+
+                    Text("Actions")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .trailing)
                 }
                 .padding(.horizontal, 4)
 
-                // Entries
-                ForEach($settings.customVocabulary) { $entry in
+                // Add new entry row (if in add mode)
+                if isAddingNewEntry {
                     HStack(spacing: 8) {
-                        TextField("e.g. swift ui", text: $entry.phrase)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 160)
-
-                        TextField("e.g. SwiftUI", text: $entry.replacement)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 160)
-
-                        Toggle("", isOn: $entry.enabled)
+                        // Disabled toggle for new entries
+                        Toggle("", isOn: .constant(true))
                             .toggleStyle(.checkbox)
-                            .labelsHidden()
+                            .disabled(true)
+                            .opacity(0.3)
 
-                        Button(role: .destructive) {
-                            settings.customVocabulary.removeAll { $0.id == entry.id }
+                        TextField("e.g. work tree", text: $newEntryPhrase)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 160)
+
+                        TextField("e.g. worktree", text: $newEntryReplacement)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 160)
+
+                        Spacer()
+
+                        // Confirm button
+                        Button {
+                            confirmAddEntry()
+                        } label: {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Save this entry")
+                        .disabled(newEntryReplacement.isEmpty)
+
+                        // Cancel button
+                        Button {
+                            cancelAddEntry()
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
                         }
                         .buttonStyle(.plain)
-                        .help("Remove this entry")
+                        .help("Cancel")
+                    }
+                }
+
+                // Existing vocabulary entries
+                ForEach(settings.customVocabulary) { entry in
+                    if editingEntryId == entry.id {
+                        // Edit mode row
+                        editModeRow(entry: entry)
+                    } else {
+                        // Display mode row
+                        displayModeRow(entry: entry)
                     }
                 }
             }
 
-            // Add button
+            // Add Word button
             Button {
-                settings.customVocabulary.append(VocabularyEntry())
+                startAddingNewEntry()
             } label: {
                 Label("Add Word", systemImage: "plus")
             }
             .controlSize(.small)
+            .disabled(isAddingNewEntry)
 
-            // Auto-save note
+            // Auto-save note with entry count
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle")
                     .foregroundColor(.green)
                     .font(.caption)
-                Text("Changes are saved automatically as you type.")
+                Text("Changes are saved automatically.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+
+                // Show entry statistics
+                if !settings.customVocabulary.isEmpty {
+                    Text("•")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+
+                    let enabledCount = settings.customVocabulary.filter { $0.enabled }.count
+                    Text("\(settings.customVocabulary.count) \(settings.customVocabulary.count == 1 ? "entry" : "entries"), \(enabledCount) active")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.top, 4)
             .accessibilityElement(children: .combine)
@@ -583,6 +649,21 @@ struct SettingsView: View {
             Spacer()
         }
         .padding()
+        .confirmationDialog(
+            "Delete Vocabulary Entry?",
+            isPresented: $showDeleteConfirmation,
+            presenting: entryToDelete
+        ) { entry in
+            Button("Delete", role: .destructive) {
+                settings.customVocabulary.removeAll { $0.id == entry.id }
+                entryToDelete = nil
+            }
+            Button("Cancel", role: .cancel) {
+                entryToDelete = nil
+            }
+        } message: { entry in
+            Text("This will permanently delete the entry '\(entry.replacement)' from your custom vocabulary.")
+        }
     }
 
     // MARK: - Models Tab
@@ -1622,6 +1703,157 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Vocabulary Management Functions
+
+    /// Display mode row showing a read-only vocabulary entry with edit/delete actions
+    private func displayModeRow(entry: VocabularyEntry) -> some View {
+        HStack(spacing: 8) {
+            // Enable/disable toggle
+            Toggle("", isOn: Binding(
+                get: { entry.enabled },
+                set: { newValue in
+                    if let index = settings.customVocabulary.firstIndex(where: { $0.id == entry.id }) {
+                        settings.customVocabulary[index].enabled = newValue
+                    }
+                }
+            ))
+            .toggleStyle(.checkbox)
+            .labelsHidden()
+            .help(entry.enabled ? "Enabled" : "Disabled")
+            .frame(width: 50, alignment: .leading)
+
+            // Heard as (read-only)
+            Text(entry.phrase.isEmpty ? "(prompt only)" : entry.phrase)
+                .frame(width: 160, alignment: .leading)
+                .foregroundColor(entry.phrase.isEmpty ? .secondary : .primary)
+
+            // Correct spelling (read-only)
+            Text(entry.replacement)
+                .frame(width: 160, alignment: .leading)
+
+            Spacer()
+
+            // Edit button
+            Button {
+                startEditingEntry(entry)
+            } label: {
+                Image(systemName: "pencil")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Edit this entry")
+
+            // Delete button
+            Button {
+                entryToDelete = entry
+                showDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Delete this entry")
+        }
+    }
+
+    /// Edit mode row showing editable fields with save/cancel buttons
+    private func editModeRow(entry: VocabularyEntry) -> some View {
+        HStack(spacing: 8) {
+            // Enable/disable toggle (disabled during edit)
+            Toggle("", isOn: .constant(entry.enabled))
+                .toggleStyle(.checkbox)
+                .disabled(true)
+                .opacity(0.5)
+                .frame(width: 50, alignment: .leading)
+
+            // Editable fields
+            TextField("e.g. swift ui", text: $editingPhrase)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+
+            TextField("e.g. SwiftUI", text: $editingReplacement)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 160)
+
+            Spacer()
+
+            // Save button
+            Button {
+                saveEditingEntry(entry)
+            } label: {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+            }
+            .buttonStyle(.plain)
+            .help("Save changes")
+            .disabled(editingReplacement.isEmpty)
+
+            // Cancel button
+            Button {
+                cancelEditingEntry()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Cancel editing")
+        }
+    }
+
+    private func startAddingNewEntry() {
+        isAddingNewEntry = true
+        newEntryPhrase = ""
+        newEntryReplacement = ""
+    }
+
+    private func confirmAddEntry() {
+        guard !newEntryReplacement.isEmpty else { return }
+
+        let newEntry = VocabularyEntry(
+            phrase: newEntryPhrase.trimmingCharacters(in: .whitespaces),
+            replacement: newEntryReplacement.trimmingCharacters(in: .whitespaces),
+            enabled: true
+        )
+        settings.customVocabulary.append(newEntry)
+
+        // Reset state
+        isAddingNewEntry = false
+        newEntryPhrase = ""
+        newEntryReplacement = ""
+    }
+
+    private func cancelAddEntry() {
+        isAddingNewEntry = false
+        newEntryPhrase = ""
+        newEntryReplacement = ""
+    }
+
+    private func startEditingEntry(_ entry: VocabularyEntry) {
+        editingEntryId = entry.id
+        editingPhrase = entry.phrase
+        editingReplacement = entry.replacement
+    }
+
+    private func saveEditingEntry(_ entry: VocabularyEntry) {
+        guard !editingReplacement.isEmpty else { return }
+
+        if let index = settings.customVocabulary.firstIndex(where: { $0.id == entry.id }) {
+            settings.customVocabulary[index].phrase = editingPhrase.trimmingCharacters(in: .whitespaces)
+            settings.customVocabulary[index].replacement = editingReplacement.trimmingCharacters(in: .whitespaces)
+        }
+
+        // Reset edit state
+        editingEntryId = nil
+        editingPhrase = ""
+        editingReplacement = ""
+    }
+
+    private func cancelEditingEntry() {
+        editingEntryId = nil
+        editingPhrase = ""
+        editingReplacement = ""
     }
 }
 
