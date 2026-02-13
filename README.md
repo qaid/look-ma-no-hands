@@ -414,7 +414,7 @@ Example customizations:
 ```bash
 swift build -c release
 # Or use the deployment script:
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 ## 👥 Contributing
