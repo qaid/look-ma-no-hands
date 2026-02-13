@@ -488,7 +488,7 @@ struct SettingsView: View {
                 Text("Custom Vocabulary")
                     .font(.headline)
                     .fontWeight(.semibold)
-                Text("Add words that dictation often gets wrong. Correct spellings are used to hint Whisper, and misheard forms are replaced after transcription.")
+                Text("Add words that dictation often gets wrong. Correct spellings are used to hint Whisper, and misheard forms are replaced after transcription. Changes save automatically.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -555,6 +555,19 @@ struct SettingsView: View {
                 Label("Add Word", systemImage: "plus")
             }
             .controlSize(.small)
+
+            // Auto-save note
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle")
+                    .foregroundColor(.green)
+                    .font(.caption)
+                Text("Changes are saved automatically as you type.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.top, 4)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Changes are saved automatically as you type")
 
             // Tip
             HStack(spacing: 6) {
