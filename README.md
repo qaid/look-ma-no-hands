@@ -24,7 +24,7 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 ## ✨ Features
 
 ### Voice Dictation
-- **Lightning Fast**: ~1 second transcription with Core ML acceleration (8-15x faster than competitors)
+- **Lightning Fast**: ~1 second transcription with WhisperKit acceleration (2.7x faster, 75% less energy than CPU)
 - **System-wide**: Works in any app, any text field
 - **Fully Customizable Hotkeys**:
   - Caps Lock toggle (default, press once to start, again to stop)
@@ -32,7 +32,8 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
   - Predefined alternatives (Right Option, Fn key)
   - Dynamic switching without app restart
   - System-reserved hotkey protection
-- **Menu bar control**: Start/Stop Recording button
+- **Hotkey Toggle**: Global keyboard shortcut (Cmd+Shift+D) to temporarily disable/enable dictation. State persists across restarts.
+- **Menu bar control**: Start/Stop Recording button and toggle indicator
 - **Smart formatting**: Automatic capitalization, punctuation, context-aware insertion, and cleanup
 - **Auto-pause media**: Automatically pauses playing media (Apple Music, Spotify, Pocket Casts, etc.) when dictation starts and resumes when it stops. Toggle in Settings → General.
 
@@ -56,8 +57,9 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
   - Menu bar app with status icon that changes during recording
   - Settings window for permission and model management
   - Custom app icon
-- **Core ML Optimized**: Utilizes Apple Neural Engine for maximum performance
+- **WhisperKit Optimized**: Utilizes Apple Neural Engine with native async/await for maximum performance
 - **Automatic model management**: Download and switch between Whisper models from the UI
+- **Persistent vocabulary**: Custom vocabulary stored locally and survives app reinstalls
 
 ## 🚀 Quick Start
 
@@ -80,21 +82,14 @@ swift build -c release
 
 **Easy Way**: Look Ma No Hands will prompt you to download a model on first launch. Choose "tiny" for best speed.
 
-**Manual Way** (optional):
-```bash
-mkdir -p ~/.whisper/models
-cd ~/.whisper/models
+**Settings Way**: Use **Settings → Models → Dictation** to download and switch models with one click. WhisperKit handles all downloads and optimization automatically.
 
-# Download tiny model (75 MB)
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
-
-# Download Core ML acceleration (14 MB) - 5-10x faster!
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny-encoder.mlmodelc.zip
-unzip ggml-tiny-encoder.mlmodelc.zip
-rm ggml-tiny-encoder.mlmodelc.zip
-```
-
-You can also download and switch models from **Settings → Models** in the app.
+The app supports:
+- **tiny** (75 MB) - Fastest, recommended for dictation
+- **base** (142 MB) - Better accuracy
+- **small** (466 MB) - High accuracy for complex terminology
+- **medium** (1.5 GB) - Highest accuracy
+- **large-v3-turbo** - Optimized for faster inference with high accuracy
 
 ### 3. Run
 
@@ -145,6 +140,12 @@ On first launch, grant:
 - Real-time validation prevents system-reserved shortcuts
 - Changes apply immediately—no restart needed
 
+**Toggling Dictation On/Off**:
+- Press **Cmd+Shift+D** to temporarily disable/enable dictation
+- Or click the menu bar icon and select **Toggle Dictation**
+- The menu bar icon shows a red badge when dictation is disabled
+- State is saved and persists across app restarts
+
 ### Voice Dictation (Menu Bar)
 1. Click the **Look Ma No Hands** menu bar icon
 2. Select **Start Recording**
@@ -170,6 +171,7 @@ On first launch, grant:
 Access via menu bar → **Settings** to:
 - **General Tab**:
   - Configure recording hotkey with real-time validation (Raycast-style hotkey recorder)
+  - Hotkey toggle enabled/disabled state
   - Recording indicator style preferences
   - Predefined hotkey shortcuts (Caps Lock, Right Option, Fn)
 - **Models Tab**:
@@ -187,12 +189,13 @@ Access via menu bar → **Settings** to:
 
 | Model | Size | Speed (16s audio) | Accuracy | Recommended |
 |-------|------|-------------------|----------|-------------|
-| **tiny** | 75 MB | **~1s** (Core ML) | Good for dictation | ✅ **Yes** |
-| base | 142 MB | ~2-3s (Core ML) | Better accuracy | For longer transcriptions |
-| small | 466 MB | ~5-7s (Core ML) | High accuracy | Complex terminology |
+| **tiny** | 75 MB | **~1s** (WhisperKit) | Good for dictation | ✅ **Yes** |
+| base | 142 MB | ~1-2s (WhisperKit) | Better accuracy | For longer transcriptions |
+| small | 466 MB | ~2-3s (WhisperKit) | High accuracy | Complex terminology |
 
-**With Core ML**: 8-15x faster on Apple Silicon!
-**Without Core ML**: Falls back to CPU (still works, just slower)
+**WhisperKit Performance**: 2.7x faster than CPU, 75% less energy consumption on Apple Silicon with native async/await streaming.
+
+**Benchmarks**: Measured on Apple Silicon (M-series) with whisper.cpp/SwiftWhisper baseline. WhisperKit provides improved performance through native integration with Core ML and the Neural Engine.
 
 See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
 
@@ -211,8 +214,8 @@ See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
 
 ### For Voice Dictation
 - **macOS 14+** (Sonoma or later)
-- **Apple Silicon** recommended (Intel Macs supported but slower)
-- **~200 MB disk space** for tiny model + Core ML
+- **Apple Silicon** recommended (Intel Macs supported but significantly slower)
+- **~150-200 MB disk space** for tiny model with WhisperKit
 
 ### For Meeting Transcription
 - **macOS 14+** (Sonoma or later)
@@ -224,16 +227,16 @@ See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
 
 ### Voice Dictation
 1. **Audio Capture**: AVFoundation records high-quality 16kHz mono audio from microphone
-2. **Transcription**: Whisper.cpp with Core ML converts speech to text
-3. **Formatting**: Rule-based system adds capitalization and punctuation
-4. **Insertion**: Accessibility API pastes text directly into focused field
+2. **Transcription**: WhisperKit with native async/await converts speech to text using Core ML and Neural Engine
+3. **Formatting**: Rule-based system adds context-aware capitalization and punctuation
+4. **Insertion**: Accessibility API (with clipboard fallback) pastes text directly into focused field
 
-All processing happens on your Mac in under 1 second!
+All processing happens on your Mac in under 1 second with WhisperKit acceleration!
 
 ### Meeting Transcription
 1. **System Audio Capture**: ScreenCaptureKit records audio from your video call app
-2. **Continuous Transcription**: Audio is chunked and transcribed in real-time using Whisper
-3. **Live Display**: Transcript appears as you speak during the meeting
+2. **Continuous Transcription**: Audio is chunked and transcribed in real-time using WhisperKit
+3. **Live Display**: Transcript appears as you speak during the meeting (with session dividers for clarity)
 4. **AI Processing**: When you click "Generate Notes", Ollama transforms the raw transcript into structured meeting notes
 5. **Structured Output**: Returns formatted document with decisions, action items, discussion summary, etc.
 
@@ -262,9 +265,10 @@ In the Meeting Transcription window:
 - The app needs to restart after granting accessibility permission
 - Look Ma No Hands will prompt you to restart automatically - click "Restart App Now"
 
-**Core ML not loading?**
-- Check console for `whisper_init_state: Core ML model loaded`
-- Ensure `.mlmodelc` file is in `~/.whisper/models/`
+**WhisperKit model not loading?**
+- Ensure you have enough disk space (~200 MB for tiny model)
+- Check Settings → Models to verify model download completed
+- Try re-downloading the model from Settings
 - Requires Apple Silicon for best performance
 
 **Text not inserting?**
@@ -304,7 +308,7 @@ LookMaNoHands/
 │   ├── Services/         # Core functionality
 │   │   ├── AudioRecorder.swift       # Microphone capture (dictation)
 │   │   ├── SystemAudioRecorder.swift # System audio (meetings)
-│   │   ├── WhisperService.swift      # Whisper.cpp + Core ML
+│   │   ├── WhisperService.swift      # WhisperKit with Core ML
 │   │   ├── ContinuousTranscriber.swift # Real-time transcription
 │   │   ├── MeetingAnalyzer.swift     # Ollama integration
 │   │   ├── TextFormatter.swift       # Rule-based text cleanup
@@ -375,16 +379,14 @@ For the full audit summary, resolved findings, and current security posture, see
 
 ### Using Different Whisper Models
 
-**Easy Way**: Use Settings → Models → Dictation to download and switch models with one click.
+**Recommended Way**: Use Settings → Models → Dictation to download and switch models with one click. WhisperKit handles all downloads, optimization, and Core ML acceleration automatically.
 
-**Manual Way**: Download models from [Hugging Face](https://huggingface.co/ggerganov/whisper.cpp/tree/main):
-
-```bash
-cd ~/.whisper/models
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin
-curl -L -O https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base-encoder.mlmodelc.zip
-unzip ggml-base-encoder.mlmodelc.zip
-```
+Available models:
+- **tiny** - Fastest (75 MB)
+- **base** - Balanced (142 MB)
+- **small** - High accuracy (466 MB)
+- **medium** - Highest accuracy (1.5 GB)
+- **large-v3-turbo** - Optimized inference with high accuracy
 
 ### Customizing Meeting Note Format
 
@@ -418,8 +420,8 @@ MIT License - see [LICENSE](LICENSE) file.
 
 ## 🙏🏾 Acknowledgments
 
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Fast Whisper inference
-- [SwiftWhisper](https://github.com/exPHAT/SwiftWhisper) - Swift bindings
+- [WhisperKit](https://github.com/argmax-ai/WhisperKit) - Fast Whisper inference with native Swift and Core ML
+- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Underlying Whisper implementation
 - [Ollama](https://ollama.ai) - Local LLM infrastructure
 - Inspired by macOS built-in dictation, but faster and fully local
 
