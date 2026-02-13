@@ -74,6 +74,43 @@ This PR addressed 10 findings across four parallel workstreams.
 | **CICD-001** | Added Dependabot for weekly dependency scanning and a `Package.resolved` integrity verification workflow | Resolved |
 | **CICD-002** | Release artifacts now include SHA-256 checksums and a Software Bill of Materials (SBOM) | Resolved |
 
+## Automated Security CI/CD Pipeline (Phases 5-7)
+
+Building on the manual hardening work above, Look Ma No Hands includes a comprehensive automated security pipeline that continuously monitors code, dependencies, and build integrity on every push and pull request.
+
+### Phase 5 — Secret Scanning & Build Verification
+
+**Workflow:** `.github/workflows/security.yml`
+
+| Check | Tool | Purpose |
+|-------|------|---------|
+| **Package.resolved Integrity** | swift package resolve + git diff | Detects dependency tampering or unexpected changes to locked versions |
+| **WhisperKit Revision Verification** | grep + script | Ensures WhisperKit dependency hasn't drifted from pinned revision |
+| **Clean Build** | swift build -c release | Verifies release binary builds without compiler warnings or errors |
+| **Secret Scanning** | Gitleaks | Scans commit history for accidentally committed API keys, tokens, credentials, or other secrets |
+
+### Phase 6 — Dependency & Compliance Scanning
+
+**Workflows:** `.github/workflows/security.yml`, `.github/workflows/license-scan.yml`, Dependabot
+
+| Check | Tool | Purpose | Frequency |
+|-------|------|---------|-----------|
+| **Dependency Vulnerabilities** | OSV-Scanner | Identifies known CVEs in Swift dependencies via Google's Open Source Vulnerabilities database | Every push/PR |
+| **License Compliance** | Custom scanner | Ensures all dependencies use compatible open source licenses | Every push/PR |
+| **Entitlements Verification** | verify-entitlements.sh | Confirms app only requests necessary macOS system permissions | Every push/PR |
+| **Dependency Updates** | Dependabot | Weekly scanning for new package versions with security fixes | Every week |
+
+### Phase 7 — Code Quality & Coverage Analysis
+
+**Workflows:** `.github/workflows/codeql.yml`, `.github/workflows/test-coverage.yml`
+
+| Check | Tool | Purpose |
+|-------|------|---------|
+| **Static Code Analysis** | CodeQL | Detects potential security issues (injection attacks, unsafe data flow, memory safety) |
+| **Test Coverage** | Custom coverage tracking | Monitors test coverage trends and ensures critical security-sensitive code is tested |
+
+All results are available as GitHub workflow artifacts and visible in pull request checks.
+
 ## Current Security Posture
 
 ### What is in place
@@ -84,9 +121,12 @@ This PR addressed 10 findings across four parallel workstreams.
 - **Safe archive extraction** — path-traversal detection and timeout-based zip-bomb protection
 - **Accurate permission reporting** — screen recording permission state reflects reality
 - **Privacy-safe crash reports** — transcription content fully redacted, no metadata leakage
-- **Pinned dependencies** — SwiftWhisper locked to a specific commit; `Package.resolved` integrity verified in CI
-- **Automated dependency scanning** — Dependabot monitors for vulnerabilities weekly
-- **Release provenance** — every release ships with SHA-256 checksums and an SBOM
+- **Pinned dependencies** — WhisperKit locked to specific commit; `Package.resolved` integrity verified in CI
+- **Automated secret scanning** — Gitleaks scans every push and PR for accidentally committed credentials
+- **Automated dependency scanning** — OSV-Scanner monitors for CVEs; Dependabot enables weekly updates
+- **Continuous code analysis** — CodeQL static analysis detects potential security issues in every PR
+- **Entitlements verification** — CI confirms app only requests necessary system permissions
+- **Release provenance** — every release ships with SHA-256 checksums and a Software Bill of Materials (SBOM)
 - **Safe build scripts** — destructive operations guarded, user settings preserved by default
 
 ### Known limitations / future work

@@ -40,7 +40,7 @@
 ## Build & Deploy
 
 ```bash
-./deploy.sh                    # Build + deploy to ~/Applications (recommended)
+./scripts/deploy.sh            # Build + deploy to ~/Applications (recommended)
 swift build -c release         # Manual release build
 swift run LookMaNoHands        # Run from source (debugging)
 open ~/Applications/LookMaNoHands.app  # Launch production app

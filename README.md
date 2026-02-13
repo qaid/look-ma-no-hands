@@ -354,7 +354,14 @@ A comprehensive security audit was completed and all critical, medium, and low-p
 - **Verified app updates** — cryptographic signature verification before installation
 - **Safe archive extraction** — path-traversal and zip-bomb protection
 - **Pinned dependencies** — exact Git revision pinning with CI integrity checks
-- **Automated scanning** — Dependabot monitors dependencies; CI verifies `Package.resolved` on every PR
+- **Automated security scanning** — Comprehensive CI/CD pipeline includes:
+  - Gitleaks secret scanning on every push and PR
+  - OSV-Scanner for dependency vulnerability detection
+  - Package.resolved integrity verification to prevent tampering
+  - Clean build and entitlements verification
+  - CodeQL analysis (enabled in `.github/workflows/codeql.yml`)
+  - License compliance scanning
+  - Test coverage monitoring
 - **Release provenance** — every release includes SHA-256 checksums and a Software Bill of Materials (SBOM)
 - **Privacy-safe crash reports** — transcription content is fully redacted with no metadata leakage
 
@@ -407,7 +414,7 @@ Example customizations:
 ```bash
 swift build -c release
 # Or use the deployment script:
-./deploy.sh
+./scripts/deploy.sh
 ```
 
 ## 👥 Contributing
