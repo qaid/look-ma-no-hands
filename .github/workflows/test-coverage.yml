@@ -1,0 +1,42 @@
+name: Test Coverage
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Generate Coverage Report
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run tests with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Convert coverage to lcov format
+        run: |
+          xcrun llvm-cov export \
+            .build/debug/LookMaNoHandsPackageTests.xctest/Contents/MacOS/LookMaNoHandsPackageTests \
+            -instr-profile .build/debug/codecov/default.profdata \
+            -format="lcov" > coverage.lcov
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage.lcov
+          fail_ci_if_error: false  # Don't block builds initially
+          verbose: true
+
+      - name: Coverage Summary
+        run: |
+          xcrun llvm-cov report \
+            .build/debug/LookMaNoHandsPackageTests.xctest/Contents/MacOS/LookMaNoHandsPackageTests \
+            -instr-profile .build/debug/codecov/default.profdata

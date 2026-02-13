@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
 
 jobs:
   verify-dependencies:
@@ -57,3 +58,63 @@ jobs:
           # Verify binary was created
           test -f .build/release/LookMaNoHands
           echo "✅ Release binary built successfully"
+
+  secret-scan:
+    name: Scan for Secrets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for Gitleaks
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-scan:
+    name: Scan Dependencies for Vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run OSV-Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --lockfile=Package.resolved
+            --format=json
+            --output=osv-results.json
+        continue-on-error: true  # Don't block builds initially
+
+      - name: Upload OSV Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: osv-scan-results
+          path: osv-results.json
+
+      - name: Display Vulnerabilities
+        if: always()
+        run: |
+          if [ -f osv-results.json ]; then
+            echo "=== Dependency Vulnerabilities Found ==="
+            cat osv-results.json
+          fi
+
+  entitlements-check:
+    name: Verify App Entitlements
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build app bundle
+        run: ./deploy.sh
+
+      - name: Verify entitlements
+        run: |
+          chmod +x scripts/verify-entitlements.sh
+          ./scripts/verify-entitlements.sh ~/Applications/"Look Ma No Hands.app"
