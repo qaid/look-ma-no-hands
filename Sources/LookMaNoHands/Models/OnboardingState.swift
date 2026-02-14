@@ -21,6 +21,9 @@ class OnboardingState {
     var hasMicrophonePermission: Bool = false
     var hasAccessibilityPermission: Bool = false
 
+    // Track if this is a permissions-only flow (skips to permissions step)
+    var isPermissionsOnlyFlow: Bool = false
+
     func nextStep() {
         if let nextStep = Step(rawValue: currentStep.rawValue + 1) {
             currentStep = nextStep

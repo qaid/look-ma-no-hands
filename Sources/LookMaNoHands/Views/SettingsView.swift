@@ -1188,12 +1188,21 @@ struct SettingsView: View {
                                 .foregroundColor(.secondary)
                                 .padding(.vertical, 4)
 
-                            Button("View Changes on GitHub") {
-                                if let url = URL(string: update.compareURL) {
-                                    NSWorkspace.shared.open(url)
+                            HStack(spacing: 8) {
+                                Button("View Changes on GitHub") {
+                                    if let url = URL(string: update.compareURL) {
+                                        NSWorkspace.shared.open(url)
+                                    }
                                 }
+                                .controlSize(.small)
+
+                                Button("Copy Command") {
+                                    let pasteboard = NSPasteboard.general
+                                    pasteboard.clearContents()
+                                    pasteboard.setString("git pull && ./scripts/deploy.sh", forType: .string)
+                                }
+                                .controlSize(.small)
                             }
-                            .controlSize(.small)
                         }
                     } else {
                         Image(systemName: "checkmark.circle.fill")

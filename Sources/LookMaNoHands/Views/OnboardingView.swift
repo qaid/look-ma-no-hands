@@ -13,6 +13,7 @@ struct OnboardingView: View {
     let ollamaService: OllamaService
     let onComplete: () -> Void
     let bringToFront: (() -> Void)?
+    let startAtPermissions: Bool  // New parameter to start at permissions step
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -66,12 +67,24 @@ struct OnboardingView: View {
                 .padding(.bottom, 20)
             }
 
-            // Progress indicator (floating on top)
-            ProgressIndicatorView(currentStep: onboardingState.currentStep)
-                .frame(maxWidth: .infinity)
-                .background(Color(NSColor.windowBackgroundColor))
+            // Progress indicator (floating on top) - hide in permissions-only mode
+            if !onboardingState.isPermissionsOnlyFlow {
+                ProgressIndicatorView(currentStep: onboardingState.currentStep)
+                    .frame(maxWidth: .infinity)
+                    .background(Color(NSColor.windowBackgroundColor))
+            }
         }
         .frame(width: 600, height: 520)
+        .onAppear {
+            // If starting at permissions, configure the state accordingly
+            if startAtPermissions {
+                onboardingState.currentStep = .permissions
+                onboardingState.isPermissionsOnlyFlow = true
+                onboardingState.modelDownloaded = true  // Skip model requirement
+                onboardingState.ollamaSkipped = true     // Skip Ollama check
+                onboardingState.selectedModel = Settings.shared.whisperModel  // Use existing model
+            }
+        }
     }
 
     private func completeOnboarding() {
@@ -528,11 +541,13 @@ struct PermissionsStepView: View {
                 .foregroundColor(.orange)
 
             // Title
-            Text("Grant Permissions")
+            Text(onboardingState.isPermissionsOnlyFlow ? "Re-grant Permissions" : "Grant Permissions")
                 .font(.system(size: 22, weight: .bold))
 
             // Description
-            Text("Look Ma No Hands needs permissions to work properly")
+            Text(onboardingState.isPermissionsOnlyFlow
+                 ? "After updating the app, macOS requires you to re-grant permissions"
+                 : "Look Ma No Hands needs permissions to work properly")
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
                 .font(.body)
@@ -831,6 +846,9 @@ struct OnboardingNavigationView: View {
     private var buttonLabel: String {
         if state.currentStep == .complete {
             return state.hasAccessibilityPermission ? "Restart" : "Finish"
+        } else if state.isPermissionsOnlyFlow && state.currentStep == .permissions {
+            // In permissions-only mode, show "Done" instead of "Continue"
+            return state.hasAccessibilityPermission ? "Restart" : "Done"
         } else {
             return "Continue"
         }
@@ -838,19 +856,24 @@ struct OnboardingNavigationView: View {
 
     var body: some View {
         HStack {
-            // Back button
-            Button(action: {
-                state.previousStep()
-            }) {
-                Label("Back", systemImage: "chevron.left")
+            // Back button - hide in permissions-only mode
+            if !state.isPermissionsOnlyFlow {
+                Button(action: {
+                    state.previousStep()
+                }) {
+                    Label("Back", systemImage: "chevron.left")
+                }
+                .disabled(state.currentStep == .welcome)
             }
-            .disabled(state.currentStep == .welcome)
 
             Spacer()
 
             // Continue/Finish/Restart button
             Button(action: {
                 if state.currentStep == .complete {
+                    onComplete()
+                } else if state.isPermissionsOnlyFlow && state.currentStep == .permissions {
+                    // In permissions-only mode, finish after permissions step
                     onComplete()
                 } else {
                     state.nextStep()
@@ -860,7 +883,7 @@ struct OnboardingNavigationView: View {
                     .frame(minWidth: 100)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(!state.canContinue())
+            .disabled(!state.canContinue() && !state.isPermissionsOnlyFlow)
         }
     }
 }
