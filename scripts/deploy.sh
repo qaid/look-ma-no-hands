@@ -20,6 +20,15 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 # Backup the placeholder BuildInfo.swift
 cp "$BUILD_INFO_FILE" "$BUILD_INFO_FILE.backup"
 
+# Set up trap to restore BuildInfo.swift on any exit (success or failure)
+cleanup_build_info() {
+    if [ -f "$BUILD_INFO_FILE.backup" ]; then
+        echo "🔄 Restoring BuildInfo.swift placeholder..."
+        mv "$BUILD_INFO_FILE.backup" "$BUILD_INFO_FILE"
+    fi
+}
+trap cleanup_build_info EXIT
+
 # Inject real build information
 cat > "$BUILD_INFO_FILE" <<EOF
 import Foundation
@@ -39,10 +48,6 @@ echo "📝 Injected build info: commit $COMMIT_SHORT on $BRANCH"
 # Build the release
 echo "🔨 Building Look Ma No Hands..."
 swift build -c release
-
-# Restore the placeholder BuildInfo.swift to keep working tree clean
-echo "🔄 Restoring BuildInfo.swift placeholder..."
-mv "$BUILD_INFO_FILE.backup" "$BUILD_INFO_FILE"
 
 echo "📦 Deploying to ~/Applications..."
 
