@@ -1111,8 +1111,30 @@ struct SettingsView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
-                .foregroundColor(.secondary)
+            VStack(spacing: 4) {
+                Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
+                    .foregroundColor(.secondary)
+
+                // Build information
+                let buildCommit = BuildInfo.commitShortSHA
+                let buildDate = BuildInfo.buildDate
+                let isDev = BuildInfo.commitSHA == "development"
+
+                if isDev {
+                    Text("Development Build")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                } else {
+                    Text("Build: \(buildCommit)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if !buildDate.isEmpty {
+                        Text(buildDate)
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
 
             Text("Fast, local voice dictation for macOS")
                 .multilineTextAlignment(.center)
@@ -1140,22 +1162,38 @@ struct SettingsView: View {
                             HStack {
                                 Image(systemName: "arrow.down.circle.fill")
                                     .foregroundColor(.green)
-                                Text("Update available: \(update.version)")
+                                let commitText = update.commitCount == 1 ? "commit" : "commits"
+                                Text("\(update.commitCount) new \(commitText) available")
                                     .font(.headline)
                             }
 
-                            HStack(spacing: 12) {
-                                Button("Download Update") {
-                                    NSWorkspace.shared.open(update.downloadURL)
-                                }
-
-                                if let url = URL(string: "https://github.com/qaid/look-ma-no-hands/releases/tag/v\(update.version)") {
-                                    Button("View Release Notes") {
-                                        NSWorkspace.shared.open(url)
+                            // Show up to 3 recent commits
+                            VStack(alignment: .leading, spacing: 4) {
+                                ForEach(update.commitSummaries.suffix(3), id: \.sha) { commit in
+                                    HStack(spacing: 6) {
+                                        Text(commit.shortSHA)
+                                            .font(.caption)
+                                            .monospaced()
+                                            .foregroundColor(.secondary)
+                                        Text(commit.message)
+                                            .font(.caption)
+                                            .lineLimit(1)
                                     }
-                                    .controlSize(.small)
                                 }
                             }
+                            .padding(.vertical, 4)
+
+                            Text("To update: git pull && ./scripts/deploy.sh")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .padding(.vertical, 4)
+
+                            Button("View Changes on GitHub") {
+                                if let url = URL(string: update.compareURL) {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                            .controlSize(.small)
                         }
                     } else {
                         Image(systemName: "checkmark.circle.fill")
@@ -1248,6 +1286,11 @@ struct SettingsView: View {
                         settings.lastUpdateCheckDate = Date()
                         self.isCheckingForUpdates = false
                     }
+                }
+            } catch UpdateService.UpdateError.noBuildInfo {
+                await MainActor.run {
+                    self.updateCheckError = "Development build - update checking not available"
+                    self.isCheckingForUpdates = false
                 }
             } catch {
                 await MainActor.run {
