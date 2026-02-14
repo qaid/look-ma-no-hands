@@ -9,6 +9,33 @@ class UpdateService {
     private let repoName = "look-ma-no-hands"
     private let session = URLSession.shared
 
+    // MARK: - File Classification
+
+    private static let nonFunctionalPatterns: [String] = [
+        ".md",                          // All markdown files
+        ".claude/",                     // Claude project directory
+        "CLAUDE.md",                    // Claude config at root
+        ".gitignore",                   // Git config
+        ".gitattributes",               // Git config
+        ".github/ISSUE_TEMPLATE/",      // GitHub templates
+        ".github/PULL_REQUEST_TEMPLATE/", // GitHub templates
+        ".github/",                     // GitHub markdown docs (with .md check)
+        "LICENSE",                      // License files
+        "COPYING",                      // License files
+        ".vscode/",                     // Editor config
+        ".idea/",                       // Editor config
+        ".context/",                    // Conductor workspace context
+    ]
+
+    private static let functionalPatterns: [String] = [
+        "Sources/",                     // Swift source (when .swift extension)
+        "Package.swift",                // Package manifest
+        "scripts/",                     // Build/deploy scripts
+        ".github/workflows/",           // CI/CD (when .yml/.yaml)
+        ".entitlements",                // Entitlements files
+        "Info.plist",                   // Info.plist files
+    ]
+
     // MARK: - Types
 
     struct CommitSummary {
@@ -81,6 +108,100 @@ class UpdateService {
         }
     }
 
+    private struct GitHubFile: Codable {
+        let filename: String
+        let status: String
+        let additions: Int
+        let deletions: Int
+        let changes: Int
+    }
+
+    private struct GitHubCommitDetailResponse: Codable {
+        let sha: String
+        let files: [GitHubFile]
+    }
+
+    private struct CommitClassification {
+        let isFunctional: Bool
+        let functionalFileCount: Int
+        let nonFunctionalFileCount: Int
+    }
+
+    private struct ClassifiedCommit {
+        let commit: GitHubCommit
+        let classification: CommitClassification
+    }
+
+    // MARK: - Private Methods - File Classification
+
+    private func isNonFunctionalFile(_ filename: String) -> Bool {
+        // Check if file ends with .md (any markdown file)
+        if filename.hasSuffix(".md") {
+            return true
+        }
+
+        // Check against non-functional patterns
+        for pattern in Self.nonFunctionalPatterns {
+            if pattern.hasSuffix("/") {
+                // Directory pattern - check if path starts with it
+                if filename.hasPrefix(pattern) {
+                    return true
+                }
+            } else {
+                // Exact match or contains pattern
+                if filename == pattern || filename.contains(pattern) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private func isFunctionalFile(_ filename: String) -> Bool {
+        // First check if it's explicitly non-functional
+        if isNonFunctionalFile(filename) {
+            return false
+        }
+
+        // Check against functional patterns
+        for pattern in Self.functionalPatterns {
+            if pattern.hasSuffix("/") {
+                // Directory pattern
+                if filename.hasPrefix(pattern) {
+                    return true
+                }
+            } else {
+                // Exact match or extension check
+                if filename == pattern || filename.contains(pattern) || filename.hasSuffix(pattern) {
+                    return true
+                }
+            }
+        }
+
+        // Default to functional (safe default - avoid missing important changes)
+        return true
+    }
+
+    private func classifyCommit(files: [GitHubFile]) -> CommitClassification {
+        var functionalCount = 0
+        var nonFunctionalCount = 0
+
+        for file in files {
+            if isFunctionalFile(file.filename) {
+                functionalCount += 1
+            } else {
+                nonFunctionalCount += 1
+            }
+        }
+
+        return CommitClassification(
+            isFunctional: functionalCount > 0,
+            functionalFileCount: functionalCount,
+            nonFunctionalFileCount: nonFunctionalCount
+        )
+    }
+
     // MARK: - Public Methods
 
     /// Get the current app version from the bundle
@@ -101,6 +222,70 @@ class UpdateService {
     /// Check if this is a development build
     func isDevelopmentBuild() -> Bool {
         BuildInfo.commitSHA == "development"
+    }
+
+    // MARK: - Private Methods - Commit Classification
+
+    private func fetchCommitFiles(sha: String) async throws -> [GitHubFile] {
+        let urlString = "https://api.github.com/repos/\(repoOwner)/\(repoName)/commits/\(sha)"
+        guard let url = URL(string: urlString) else {
+            throw UpdateError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw UpdateError.networkError(error.localizedDescription)
+        }
+
+        // Check for rate limiting
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 403 {
+                if let remaining = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining"),
+                   remaining == "0" {
+                    throw UpdateError.apiRateLimited
+                }
+            }
+            if httpResponse.statusCode != 200 {
+                throw UpdateError.networkError("HTTP \(httpResponse.statusCode)")
+            }
+        }
+
+        let decoder = JSONDecoder()
+        do {
+            let commitDetail = try decoder.decode(GitHubCommitDetailResponse.self, from: data)
+            return commitDetail.files
+        } catch {
+            throw UpdateError.parseError(error.localizedDescription)
+        }
+    }
+
+    private func classifyCommits(_ commits: [GitHubCommit]) async throws -> [ClassifiedCommit] {
+        try await withThrowingTaskGroup(of: ClassifiedCommit.self) { group in
+            var results: [ClassifiedCommit] = []
+
+            // Launch parallel tasks to fetch and classify each commit
+            for commit in commits {
+                group.addTask {
+                    let files = try await self.fetchCommitFiles(sha: commit.sha)
+                    let classification = self.classifyCommit(files: files)
+                    return ClassifiedCommit(commit: commit, classification: classification)
+                }
+            }
+
+            // Collect results in order
+            for try await classified in group {
+                results.append(classified)
+            }
+
+            return results
+        }
     }
 
     /// Check GitHub for new commits on main branch. Returns nil if up to date.
@@ -154,8 +339,29 @@ class UpdateService {
             return nil
         }
 
-        // Extract commit summaries
-        let summaries = compareResponse.commits.map { commit in
+        // Classify commits and filter out non-functional ones
+        let functionalCommits: [GitHubCommit]
+        do {
+            let classifiedCommits = try await classifyCommits(compareResponse.commits)
+            functionalCommits = classifiedCommits
+                .filter { $0.classification.isFunctional }
+                .map { $0.commit }
+
+            Logger.shared.info("Classified \(compareResponse.commits.count) commits: \(functionalCommits.count) functional, \(compareResponse.commits.count - functionalCommits.count) non-functional")
+        } catch {
+            // Graceful fallback: if classification fails, show all commits
+            Logger.shared.warning("Failed to classify commits: \(error). Showing all commits.")
+            functionalCommits = compareResponse.commits
+        }
+
+        // If no functional commits, return nil (no update needed)
+        guard !functionalCommits.isEmpty else {
+            Logger.shared.info("No functional commits found. No update notification needed.")
+            return nil
+        }
+
+        // Extract commit summaries from functional commits only
+        let summaries = functionalCommits.map { commit in
             CommitSummary(
                 sha: commit.sha,
                 shortSHA: String(commit.sha.prefix(7)),
@@ -169,8 +375,8 @@ class UpdateService {
         let repoURL = "https://github.com/\(repoOwner)/\(repoName)"
 
         return UpdateInfo(
-            commitCount: compareResponse.aheadBy,
-            latestCommitSHA: compareResponse.commits.last?.sha ?? "",
+            commitCount: functionalCommits.count,
+            latestCommitSHA: functionalCommits.last?.sha ?? "",
             commitSummaries: summaries,
             compareURL: compareURL,
             repoURL: repoURL
