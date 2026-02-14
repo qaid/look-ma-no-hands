@@ -2,7 +2,7 @@
 
 [Project Docs Index]|root:./.claude
 |IMPORTANT:Prefer retrieval-led reasoning over pre-training-led reasoning
-|root:{settings.local.json}
+|root:{settings.local.json,learnings.md}
 |references:{cli-tools.md}
 |agents:{build-orchestrator.md,git-workflow.md,macos-app-designer.md,security-review.md,swiftui-expert.md,ux-review.md,web-research-synthesizer.md}
 |skills/claude-skills-optimizer:{SKILL.md}
@@ -10,6 +10,7 @@
 |skills/git-workflow:{SKILL.md}
 |skills/macos-app-design:{SKILL.md}
 |skills/macos-app-design/references:{macos-design-guide.md}
+|skills/reflect:{SKILL.md}
 |skills/security-review:{SKILL.md}
 |skills/swiftui-expert-skill:{SKILL.md}
 |skills/swiftui-expert-skill/references:{animation-advanced.md,animation-basics.md,animation-transitions.md,image-optimization.md,layout-best-practices.md,liquid-glass.md,list-patterns.md,modern-apis.md,performance-patterns.md,scroll-patterns.md,sheet-navigation-patterns.md,state-management.md,text-formatting.md,view-structure.md}
