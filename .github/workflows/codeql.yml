@@ -3,18 +3,12 @@ name: "CodeQL Advanced Security"
 on:
   push:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.gitignore'
+    paths:
+      - 'Resources/Info.plist'  # Only run on version bumps
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.gitignore'
+    paths:
+      - 'Resources/Info.plist'  # Only run on version bumps
   schedule:
     - cron: '0 12 * * 1'  # Weekly Monday scans (runs full security-extended)
 
