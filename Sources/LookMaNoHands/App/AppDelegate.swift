@@ -105,6 +105,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return  // Skip rest of initialization until onboarding completes
         }
 
+        // Check for missing permissions after app update (permissions were reset)
+        if Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
+            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            let hasAccessibility = AXIsProcessTrusted()
+            let hasMicrophone = (micStatus == .authorized)
+
+            if !hasMicrophone || !hasAccessibility {
+                NSLog("⚠️ Permissions lost detected (likely after app update) - showing permissions onboarding")
+                NSLog("   Microphone: %@, Accessibility: %@",
+                      hasMicrophone ? "granted" : "missing",
+                      hasAccessibility ? "granted" : "missing")
+                showPermissionsOnboarding()
+                return  // Skip rest of initialization until permissions are re-granted
+            }
+        }
+
         // If we just completed onboarding, don't show it again
         if justCompletedOnboarding {
             NSLog("✅ Onboarding was just completed in this session - skipping")
@@ -167,7 +183,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 // Bring onboarding window to front after system permission dialogs close
                 self?.onboardingWindow?.makeKeyAndOrderFront(nil)
                 NSApp.activate(ignoringOtherApps: true)
-            }
+            },
+            startAtPermissions: false
         )
         NSLog("   ✓ Created OnboardingView")
 
@@ -192,6 +209,71 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Ensure window stays on top
         window.orderFrontRegardless()
         NSLog("✅ Onboarding window should now be visible")
+    }
+
+    private func showPermissionsOnboarding() {
+        NSLog("🔐 showPermissionsOnboarding() - Permissions lost after update, showing permissions step")
+
+        // Switch to regular app mode so window appears in Dock and Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
+        NSLog("   ✓ Set activation policy to .regular")
+
+        let onboardingView = OnboardingView(
+            whisperService: whisperService,
+            ollamaService: ollamaService,
+            onComplete: {
+                NSLog("🔐 Permissions onboarding onComplete callback triggered")
+
+                // Called when user clicks "Done" or "Restart"
+                self.onboardingWindow?.close()
+                self.onboardingWindow = nil
+
+                // Mark that we just completed permissions re-grant
+                self.justCompletedOnboarding = true
+
+                // Revert to accessory mode (menu bar only)
+                NSApp.setActivationPolicy(.accessory)
+
+                // Check if accessibility was granted
+                if AXIsProcessTrusted() {
+                    // Restart app to activate accessibility monitoring
+                    NSLog("🔄 Accessibility granted - restarting app")
+                    self.restartApp()
+                } else {
+                    // Continue with normal initialization
+                    self.completeInitialization()
+                }
+            },
+            bringToFront: { [weak self] in
+                // Bring onboarding window to front after system permission dialogs close
+                self?.onboardingWindow?.makeKeyAndOrderFront(nil)
+                NSApp.activate(ignoringOtherApps: true)
+            },
+            startAtPermissions: true
+        )
+        NSLog("   ✓ Created permissions-only OnboardingView")
+
+        let hostingController = NSHostingController(rootView: onboardingView)
+        NSLog("   ✓ Created NSHostingController")
+
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "Re-grant Permissions"
+        window.styleMask = [.titled, .closable]
+        window.center()
+        window.isReleasedWhenClosed = false
+        window.level = .normal  // Use normal level so system permission dialogs appear above
+        NSLog("   ✓ Configured NSWindow")
+
+        self.onboardingWindow = window
+
+        // Bring window to front and activate app
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        NSLog("   ✓ Made window key and front")
+
+        // Ensure window stays on top
+        window.orderFrontRegardless()
+        NSLog("✅ Permissions onboarding window should now be visible")
     }
 
     private func completeInitialization() {
@@ -1417,6 +1499,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "• \(commit.shortSHA): \(commit.message)"
         }.joined(separator: "\n")
 
+        let updateCommand = "git pull && ./scripts/deploy.sh"
+
         alert.informativeText = """
         \(updateInfo.commitCount) new \(commitText) available on main.
 
@@ -1426,10 +1510,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         To update:
         1. Open Terminal
         2. cd to the project directory
-        3. Run: git pull && ./scripts/deploy.sh
+        3. Run: \(updateCommand)
         """
         alert.alertStyle = .informational
         alert.addButton(withTitle: "View Changes on GitHub")
+        alert.addButton(withTitle: "Copy Command")
         alert.addButton(withTitle: "Later")
 
         let response = alert.runModal()
@@ -1438,6 +1523,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let url = URL(string: updateInfo.compareURL) {
                 NSWorkspace.shared.open(url)
             }
+        } else if response == .alertSecondButtonReturn {
+            // Copy the update command to clipboard
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString(updateCommand, forType: .string)
         }
     }
 
