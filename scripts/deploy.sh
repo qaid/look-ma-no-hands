@@ -8,8 +8,41 @@ if [[ "$1" == "--reset-defaults" ]]; then
     echo "🧹 Will reset app defaults (--reset-defaults flag provided)"
 fi
 
+echo "🔨 Preparing build..."
+
+# Capture build information from git
+BUILD_INFO_FILE="Sources/LookMaNoHands/Services/BuildInfo.swift"
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "development")
+COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
+BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+# Backup the placeholder BuildInfo.swift
+cp "$BUILD_INFO_FILE" "$BUILD_INFO_FILE.backup"
+
+# Inject real build information
+cat > "$BUILD_INFO_FILE" <<EOF
+import Foundation
+
+/// Build information injected by deploy.sh at build time.
+/// This file is checked in with placeholder values for development builds.
+struct BuildInfo {
+    static let commitSHA = "$COMMIT_SHA"
+    static let commitShortSHA = "$COMMIT_SHORT"
+    static let buildDate = "$BUILD_DATE"
+    static let branch = "$BRANCH"
+}
+EOF
+
+echo "📝 Injected build info: commit $COMMIT_SHORT on $BRANCH"
+
+# Build the release
 echo "🔨 Building Look Ma No Hands..."
 swift build -c release
+
+# Restore the placeholder BuildInfo.swift to keep working tree clean
+echo "🔄 Restoring BuildInfo.swift placeholder..."
+mv "$BUILD_INFO_FILE.backup" "$BUILD_INFO_FILE"
 
 echo "📦 Deploying to ~/Applications..."
 
