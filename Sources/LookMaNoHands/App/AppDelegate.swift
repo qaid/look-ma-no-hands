@@ -291,6 +291,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(toggleRecording),
             keyEquivalent: ""
         )
+        recordingItem.image = menuIcon("mic.fill")
         self.recordingMenuItem = recordingItem
         menu.addItem(recordingItem)
 
@@ -302,6 +303,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(toggleHotkeyEnabled),
             keyEquivalent: ""
         )
+        toggleItem.image = menuIcon("keyboard")
         toggleItem.state = Settings.shared.hotkeyEnabled ? .on : .off
         self.hotkeyToggleMenuItem = toggleItem
         menu.addItem(toggleItem)
@@ -309,45 +311,55 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // Meeting transcription
-        menu.addItem(NSMenuItem(
+        let meetingItem = NSMenuItem(
             title: "Start Meeting Transcription...",
             action: #selector(openMeetingTranscription),
             keyEquivalent: "m"
-        ))
+        )
+        meetingItem.image = menuIcon("waveform.circle.fill")
+        menu.addItem(meetingItem)
 
         menu.addItem(NSMenuItem.separator())
 
         // Settings
-        menu.addItem(NSMenuItem(
+        let settingsItem = NSMenuItem(
             title: "Settings...",
             action: #selector(openSettings),
             keyEquivalent: ","
-        ))
+        )
+        settingsItem.image = menuIcon("gearshape")
+        menu.addItem(settingsItem)
 
         // Check for Updates
-        menu.addItem(NSMenuItem(
+        let updateItem = NSMenuItem(
             title: "Check for Updates...",
             action: #selector(checkForUpdatesManually),
             keyEquivalent: ""
-        ))
+        )
+        updateItem.image = menuIcon("arrow.down.circle")
+        menu.addItem(updateItem)
 
         menu.addItem(NSMenuItem.separator())
 
         // Developer Reset
-        menu.addItem(NSMenuItem(
+        let resetItem = NSMenuItem(
             title: "Developer Reset",
             action: #selector(developerReset),
             keyEquivalent: ""
-        ))
+        )
+        resetItem.image = menuIcon("arrow.circlepath")
+        menu.addItem(resetItem)
 
         menu.addItem(NSMenuItem.separator())
 
         // Quit
-        menu.addItem(NSMenuItem(
+        let quitItem = NSMenuItem(
             title: "Quit Look Ma No Hands",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
-        ))
+        )
+        quitItem.image = menuIcon("power")
+        menu.addItem(quitItem)
 
         self.statusItem?.menu = menu
     }
@@ -1231,6 +1243,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         image.unlockFocus()
         image.isTemplate = false
+        return image
+    }
+
+    /// Create an NSImage from an SF Symbol name with consistent styling
+    private func menuIcon(_ symbolName: String, pointSize: CGFloat = 16) -> NSImage? {
+        let config = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+        guard let image = NSImage(
+            systemSymbolName: symbolName,
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(config) else {
+            return nil
+        }
+        image.isTemplate = true  // Ensures proper dark mode support
         return image
     }
 
