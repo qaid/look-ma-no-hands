@@ -1325,13 +1325,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             if let updateInfo = try await updateService.checkForUpdates() {
                 Settings.shared.lastUpdateCheckDate = Date()
+                let commitText = updateInfo.commitCount == 1 ? "commit" : "commits"
                 await NotificationService.shared.sendNotification(
                     title: "Update Available",
-                    body: "Look Ma No Hands \(updateInfo.version) is available. Click \"Check for Updates\" in the menu bar to download."
+                    body: "\(updateInfo.commitCount) new \(commitText) on main. Click \"Check for Updates\" in the menu bar for details."
                 )
             } else {
                 Settings.shared.lastUpdateCheckDate = Date()
             }
+        } catch UpdateService.UpdateError.noBuildInfo {
+            // Silently skip update checks for development builds
+            return
         } catch {
             Logger.shared.info("Update check failed: \(error.localizedDescription)", category: .app)
         }
@@ -1349,13 +1353,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 } else {
                     await MainActor.run {
                         Settings.shared.lastUpdateCheckDate = Date()
+                        let buildCommit = updateService.getBuildCommitShort()
                         let alert = NSAlert()
                         alert.messageText = "You're Up to Date"
-                        alert.informativeText = "Look Ma No Hands \(updateService.getCurrentVersion()) is the latest version."
+                        alert.informativeText = "You're running the latest version from main.\n\nVersion: \(updateService.getCurrentVersion())\nBuild: \(buildCommit)"
                         alert.alertStyle = .informational
                         alert.addButton(withTitle: "OK")
                         alert.runModal()
                     }
+                }
+            } catch UpdateService.UpdateError.noBuildInfo {
+                await MainActor.run {
+                    let alert = NSAlert()
+                    alert.messageText = "Development Build"
+                    alert.informativeText = "You're running a development build (built with 'swift run').\n\nUpdate checking is only available for production builds created with './scripts/deploy.sh'."
+                    alert.alertStyle = .informational
+                    alert.addButton(withTitle: "OK")
+                    alert.runModal()
                 }
             } catch {
                 await MainActor.run {
@@ -1365,56 +1379,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Show dialog offering to download update
+    /// Show dialog with commit-based update information
     private func showUpdateDialog(updateInfo: UpdateService.UpdateInfo) {
         let alert = NSAlert()
         alert.messageText = "Update Available"
 
-        let notes = updateInfo.releaseNotes
-        let truncatedNotes = notes.count > 500 ? String(notes.prefix(500)) + "..." : notes
+        let commitText = updateInfo.commitCount == 1 ? "commit" : "commits"
+
+        // Show up to 5 most recent commits
+        let summaryCount = min(updateInfo.commitSummaries.count, 5)
+        let commitSummaries = updateInfo.commitSummaries.suffix(summaryCount).map { commit in
+            "• \(commit.shortSHA): \(commit.message)"
+        }.joined(separator: "\n")
 
         alert.informativeText = """
-        Look Ma No Hands \(updateInfo.version) is available (you have \(updateService.getCurrentVersion())).
+        \(updateInfo.commitCount) new \(commitText) available on main.
 
-        Release Notes:
-        \(truncatedNotes)
+        Recent changes:
+        \(commitSummaries)
+
+        To update:
+        1. Open Terminal
+        2. cd to the project directory
+        3. Run: git pull && ./scripts/deploy.sh
         """
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Download Update")
-        alert.addButton(withTitle: "View on GitHub")
+        alert.addButton(withTitle: "View Changes on GitHub")
         alert.addButton(withTitle: "Later")
 
         let response = alert.runModal()
 
         if response == .alertFirstButtonReturn {
-            downloadAndOpenUpdate(from: updateInfo.downloadURL)
-        } else if response == .alertSecondButtonReturn {
-            if let url = URL(string: "https://github.com/qaid/look-ma-no-hands/releases/tag/v\(updateInfo.version)") {
+            if let url = URL(string: updateInfo.compareURL) {
                 NSWorkspace.shared.open(url)
-            }
-        }
-    }
-
-    /// Download update DMG and open it
-    private func downloadAndOpenUpdate(from url: URL) {
-        Task {
-            do {
-                let localURL = try await updateService.downloadUpdate(from: url)
-
-                await MainActor.run {
-                    NSWorkspace.shared.open(localURL)
-
-                    let alert = NSAlert()
-                    alert.messageText = "Update Downloaded"
-                    alert.informativeText = "The update has been downloaded and opened. Drag the new app to your Applications folder to replace the current version, then restart."
-                    alert.alertStyle = .informational
-                    alert.addButton(withTitle: "OK")
-                    alert.runModal()
-                }
-            } catch {
-                await MainActor.run {
-                    showAlert(title: "Download Failed", message: "Could not download update: \(error.localizedDescription)")
-                }
             }
         }
     }

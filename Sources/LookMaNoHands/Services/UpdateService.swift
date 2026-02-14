@@ -1,6 +1,6 @@
 import Foundation
 
-/// Checks GitHub Releases for new versions and downloads updates
+/// Checks GitHub for new commits on main branch
 class UpdateService {
 
     // MARK: - Configuration
@@ -11,96 +11,73 @@ class UpdateService {
 
     // MARK: - Types
 
+    struct CommitSummary {
+        let sha: String
+        let shortSHA: String
+        let message: String
+        let author: String
+        let date: String
+    }
+
     struct UpdateInfo {
-        let version: String
-        let releaseNotes: String
-        let downloadURL: URL
-        let publishedAt: String
+        let commitCount: Int
+        let latestCommitSHA: String
+        let commitSummaries: [CommitSummary]
+        let compareURL: String
+        let repoURL: String
     }
 
     enum UpdateError: LocalizedError {
         case invalidURL
-        case noReleaseFound
-        case noCompatibleAsset
-        case downloadFailed(String)
+        case noBuildInfo
+        case apiRateLimited
         case networkError(String)
-        case invalidSignature
-        case downloadTooLarge
-        case invalidContentType
+        case parseError(String)
 
         var errorDescription: String? {
             switch self {
             case .invalidURL:
                 return "Invalid GitHub API URL"
-            case .noReleaseFound:
-                return "No releases found"
-            case .noCompatibleAsset:
-                return "No DMG download found for this release"
-            case .downloadFailed(let reason):
-                return "Download failed: \(reason)"
+            case .noBuildInfo:
+                return "Build information not available"
+            case .apiRateLimited:
+                return "GitHub API rate limit exceeded. Try again later."
             case .networkError(let reason):
                 return "Network error: \(reason)"
-            case .invalidSignature:
-                return "Update file signature verification failed"
-            case .downloadTooLarge:
-                return "Download exceeds maximum size limit"
-            case .invalidContentType:
-                return "Downloaded file is not a valid disk image"
+            case .parseError(let reason):
+                return "Failed to parse response: \(reason)"
             }
         }
     }
 
     // MARK: - GitHub API Response
 
-    private struct GitHubRelease: Codable {
-        let tagName: String
-        let name: String?
-        let body: String?
-        let publishedAt: String?
-        let assets: [Asset]
+    private struct GitHubCommit: Codable {
+        let sha: String
+        let commit: CommitDetails
 
-        enum CodingKeys: String, CodingKey {
-            case tagName = "tag_name"
-            case name
-            case body
-            case publishedAt = "published_at"
-            case assets
-        }
+        struct CommitDetails: Codable {
+            let message: String
+            let author: Author
 
-        struct Asset: Codable {
-            let name: String
-            let browserDownloadUrl: String
-
-            enum CodingKeys: String, CodingKey {
-                case name
-                case browserDownloadUrl = "browser_download_url"
+            struct Author: Codable {
+                let name: String
+                let date: String
             }
         }
     }
 
-    // MARK: - Semantic Version
+    private struct GitHubCompareResponse: Codable {
+        let aheadBy: Int
+        let behindBy: Int
+        let status: String
+        let commits: [GitHubCommit]
 
-    struct SemanticVersion: Comparable {
-        let major: Int
-        let minor: Int
-        let patch: Int
-
-        static func < (lhs: SemanticVersion, rhs: SemanticVersion) -> Bool {
-            if lhs.major != rhs.major { return lhs.major < rhs.major }
-            if lhs.minor != rhs.minor { return lhs.minor < rhs.minor }
-            return lhs.patch < rhs.patch
-        }
-
-        /// Parse a version string like "1.0", "1.0.0", or "v1.0.0"
-        static func parse(_ string: String) -> SemanticVersion? {
-            let cleaned = string.hasPrefix("v") ? String(string.dropFirst()) : string
-            let parts = cleaned.split(separator: ".").compactMap { Int($0) }
-            guard parts.count >= 2 else { return nil }
-            return SemanticVersion(
-                major: parts[0],
-                minor: parts[1],
-                patch: parts.count >= 3 ? parts[2] : 0
-            )
+        enum CodingKeys: String, CodingKey {
+            case aheadBy = "ahead_by"
+            case behindBy = "behind_by"
+            case status
+            case commits
         }
     }
 
@@ -111,9 +88,30 @@ class UpdateService {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
     }
 
-    /// Check GitHub for a newer release. Returns nil if up to date.
+    /// Get the short commit SHA from build info
+    func getBuildCommitShort() -> String {
+        BuildInfo.commitShortSHA
+    }
+
+    /// Get the build date
+    func getBuildDate() -> String {
+        BuildInfo.buildDate
+    }
+
+    /// Check if this is a development build
+    func isDevelopmentBuild() -> Bool {
+        BuildInfo.commitSHA == "development"
+    }
+
+    /// Check GitHub for new commits on main branch. Returns nil if up to date.
     func checkForUpdates() async throws -> UpdateInfo? {
-        let urlString = "https://api.github.com/repos/\(repoOwner)/\(repoName)/releases/latest"
+        // Don't check for updates in development builds
+        guard !isDevelopmentBuild() else {
+            throw UpdateError.noBuildInfo
+        }
+
+        let buildSHA = BuildInfo.commitSHA
+        let urlString = "https://api.github.com/repos/\(repoOwner)/\(repoName)/compare/\(buildSHA)...main"
         guard let url = URL(string: urlString) else {
             throw UpdateError.invalidURL
         }
@@ -130,116 +128,52 @@ class UpdateService {
             throw UpdateError.networkError(error.localizedDescription)
         }
 
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-            if httpResponse.statusCode == 404 {
-                throw UpdateError.noReleaseFound
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 403 {
+                // Check if it's a rate limit issue
+                if let remaining = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining"),
+                   remaining == "0" {
+                    throw UpdateError.apiRateLimited
+                }
             }
-            throw UpdateError.networkError("HTTP \(httpResponse.statusCode)")
+            if httpResponse.statusCode != 200 {
+                throw UpdateError.networkError("HTTP \(httpResponse.statusCode)")
+            }
         }
 
         let decoder = JSONDecoder()
-        let release: GitHubRelease
+        let compareResponse: GitHubCompareResponse
         do {
-            release = try decoder.decode(GitHubRelease.self, from: data)
+            compareResponse = try decoder.decode(GitHubCompareResponse.self, from: data)
         } catch {
-            throw UpdateError.networkError("Failed to parse release: \(error.localizedDescription)")
+            throw UpdateError.parseError(error.localizedDescription)
         }
 
-        // Compare versions
-        let currentVersion = getCurrentVersion()
-        guard let current = SemanticVersion.parse(currentVersion),
-              let latest = SemanticVersion.parse(release.tagName) else {
-            // Can't parse versions - treat as no update
+        // If ahead_by is 0, we're up to date
+        guard compareResponse.aheadBy > 0 else {
             return nil
         }
 
-        guard latest > current else {
-            return nil // Up to date
+        // Extract commit summaries
+        let summaries = compareResponse.commits.map { commit in
+            CommitSummary(
+                sha: commit.sha,
+                shortSHA: String(commit.sha.prefix(7)),
+                message: commit.commit.message.split(separator: "\n").first.map(String.init) ?? "",
+                author: commit.commit.author.name,
+                date: commit.commit.author.date
+            )
         }
 
-        // Find DMG asset
-        guard let dmgAsset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }),
-              let downloadURL = URL(string: dmgAsset.browserDownloadUrl) else {
-            throw UpdateError.noCompatibleAsset
-        }
+        let compareURL = "https://github.com/\(repoOwner)/\(repoName)/compare/\(buildSHA)...main"
+        let repoURL = "https://github.com/\(repoOwner)/\(repoName)"
 
         return UpdateInfo(
-            version: release.tagName.hasPrefix("v") ? String(release.tagName.dropFirst()) : release.tagName,
-            releaseNotes: release.body ?? "No release notes available.",
-            downloadURL: downloadURL,
-            publishedAt: release.publishedAt ?? ""
+            commitCount: compareResponse.aheadBy,
+            latestCommitSHA: compareResponse.commits.last?.sha ?? "",
+            commitSummaries: summaries,
+            compareURL: compareURL,
+            repoURL: repoURL
         )
-    }
-
-    /// Download a DMG update to ~/Downloads and return the local file URL
-    func downloadUpdate(from url: URL) async throws -> URL {
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 300  // 5 minute timeout for large downloads
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw UpdateError.downloadFailed(error.localizedDescription)
-        }
-
-        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-            throw UpdateError.downloadFailed("HTTP \(httpResponse.statusCode)")
-        }
-
-        // Security: Validate download size (max 500MB)
-        let maxSize = 500 * 1024 * 1024
-        guard data.count <= maxSize else {
-            throw UpdateError.downloadTooLarge
-        }
-
-        // Security: Validate content type
-        if let mimeType = response.mimeType, mimeType != "application/x-apple-diskimage" {
-            Logger.shared.warning("Unexpected content type: \(mimeType)", category: .update)
-        }
-
-        let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let fileName = url.lastPathComponent
-        let destinationURL = downloadsURL.appendingPathComponent(fileName)
-
-        // Remove existing file if present
-        try? FileManager.default.removeItem(at: destinationURL)
-
-        do {
-            try data.write(to: destinationURL)
-        } catch {
-            throw UpdateError.downloadFailed("Could not save file: \(error.localizedDescription)")
-        }
-
-        // Security: Verify code signature before returning
-        try await verifyDMGSignature(destinationURL)
-
-        return destinationURL
-    }
-
-    // MARK: - Private Methods
-
-    /// Verify the code signature of a downloaded DMG file
-    private func verifyDMGSignature(_ fileURL: URL) async throws {
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
-        task.arguments = ["--verify", "--deep", "--strict", fileURL.path]
-
-        let pipe = Pipe()
-        task.standardError = pipe
-        task.standardOutput = pipe
-
-        try task.run()
-        task.waitUntilExit()
-
-        guard task.terminationStatus == 0 else {
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            let output = String(data: data, encoding: .utf8) ?? "unknown error"
-            Logger.shared.error("codesign verification failed: \(output)", category: .update)
-            throw UpdateError.invalidSignature
-        }
-
-        Logger.shared.info("✅ Update signature verified successfully", category: .update)
     }
 }
