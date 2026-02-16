@@ -66,11 +66,13 @@ struct SettingsView: View {
     @State private var isAddingNewEntry = false
     @State private var newEntryPhrase = ""
     @State private var newEntryReplacement = ""
+    @FocusState private var addEntryFocusedField: AddEntryField?
 
     // Vocabulary state for edit mode
     @State private var editingEntryId: UUID? = nil
     @State private var editingPhrase = ""
     @State private var editingReplacement = ""
+    @FocusState private var editModeFocusedField: EditModeField?
 
     // Vocabulary state for delete confirmation
     @State private var entryToDelete: VocabularyEntry? = nil
@@ -561,6 +563,7 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .frame(maxHeight: 300)
             }
 
             // Tip
@@ -574,8 +577,6 @@ struct SettingsView: View {
             }
             .padding(.top, 4)
 
-            Spacer()
-
             // Add new entry row (if in add mode) - appears before the button
             if isAddingNewEntry {
                 HStack(spacing: 8) {
@@ -588,10 +589,14 @@ struct SettingsView: View {
                     TextField("e.g. work tree", text: $newEntryPhrase)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 160)
+                        .focused($addEntryFocusedField, equals: .phrase)
+                        .onSubmit { addEntryFocusedField = .replacement }
 
                     TextField("e.g. worktree", text: $newEntryReplacement)
                         .textFieldStyle(.roundedBorder)
                         .frame(width: 160)
+                        .focused($addEntryFocusedField, equals: .replacement)
+                        .onSubmit { confirmAddEntry() }
 
                     Spacer()
 
@@ -599,22 +604,26 @@ struct SettingsView: View {
                     Button {
                         confirmAddEntry()
                     } label: {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
+                        Label("Add", systemImage: "checkmark.circle.fill")
                     }
-                    .buttonStyle(.plain)
-                    .help("Save this entry")
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.small)
+                    .help("Save this entry (Enter)")
                     .disabled(newEntryReplacement.isEmpty)
 
                     // Cancel button
                     Button {
                         cancelAddEntry()
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                        Label("Cancel", systemImage: "xmark.circle.fill")
                     }
-                    .buttonStyle(.plain)
-                    .help("Cancel")
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Cancel (Escape)")
+                }
+                .onExitCommand {
+                    cancelAddEntry()
                 }
             }
 
@@ -626,6 +635,8 @@ struct SettingsView: View {
             }
             .controlSize(.small)
             .disabled(isAddingNewEntry)
+
+            Spacer()
         }
         .padding()
         .confirmationDialog(
@@ -1803,10 +1814,14 @@ struct SettingsView: View {
             TextField("e.g. swift ui", text: $editingPhrase)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 160)
+                .focused($editModeFocusedField, equals: .phrase)
+                .onSubmit { editModeFocusedField = .replacement }
 
             TextField("e.g. SwiftUI", text: $editingReplacement)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 160)
+                .focused($editModeFocusedField, equals: .replacement)
+                .onSubmit { saveEditingEntry(entry) }
 
             Spacer()
 
@@ -1814,22 +1829,26 @@ struct SettingsView: View {
             Button {
                 saveEditingEntry(entry)
             } label: {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundColor(.green)
+                Label("Save", systemImage: "checkmark.circle.fill")
             }
-            .buttonStyle(.plain)
-            .help("Save changes")
+            .buttonStyle(.borderedProminent)
+            .tint(.green)
+            .controlSize(.small)
+            .help("Save changes (Enter)")
             .disabled(editingReplacement.isEmpty)
 
             // Cancel button
             Button {
                 cancelEditingEntry()
             } label: {
-                Image(systemName: "xmark.circle.fill")
-                    .foregroundColor(.secondary)
+                Label("Cancel", systemImage: "xmark.circle.fill")
             }
-            .buttonStyle(.plain)
-            .help("Cancel editing")
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .help("Cancel editing (Escape)")
+        }
+        .onExitCommand {
+            cancelEditingEntry()
         }
     }
 
@@ -1837,6 +1856,7 @@ struct SettingsView: View {
         isAddingNewEntry = true
         newEntryPhrase = ""
         newEntryReplacement = ""
+        addEntryFocusedField = .phrase
     }
 
     private func confirmAddEntry() {
@@ -1849,10 +1869,10 @@ struct SettingsView: View {
         )
         settings.customVocabulary.append(newEntry)
 
-        // Reset state
-        isAddingNewEntry = false
+        // Clear fields but stay in add mode for continuous entry
         newEntryPhrase = ""
         newEntryReplacement = ""
+        addEntryFocusedField = .phrase
     }
 
     private func cancelAddEntry() {
@@ -1865,6 +1885,7 @@ struct SettingsView: View {
         editingEntryId = entry.id
         editingPhrase = entry.phrase
         editingReplacement = entry.replacement
+        editModeFocusedField = .phrase
     }
 
     private func saveEditingEntry(_ entry: VocabularyEntry) {
@@ -1885,6 +1906,16 @@ struct SettingsView: View {
         editingEntryId = nil
         editingPhrase = ""
         editingReplacement = ""
+    }
+
+    // MARK: - Focus Fields
+
+    enum AddEntryField {
+        case phrase, replacement
+    }
+
+    enum EditModeField {
+        case phrase, replacement
     }
 }
 
