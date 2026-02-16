@@ -499,15 +499,77 @@ struct SettingsView: View {
 
     private var vocabularyTab: some View {
         VStack(alignment: .leading, spacing: 16) {
-            // Header
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Custom Vocabulary")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                Text("Add words that dictation often gets wrong. Correct spellings are used to hint Whisper, and misheard forms are replaced after transcription. Changes save automatically.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            // Header with Add Word button
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Custom Vocabulary")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    Text("Add words that dictation often gets wrong. Correct spellings are used to hint Whisper, and misheard forms are replaced after transcription. Changes save automatically.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+
+                Button {
+                    startAddingNewEntry()
+                } label: {
+                    Label("Add Word", systemImage: "plus")
+                }
+                .controlSize(.small)
+                .disabled(isAddingNewEntry)
+            }
+
+            // Add new entry row (if in add mode) - appears at top, below header
+            if isAddingNewEntry {
+                HStack(spacing: 8) {
+                    // Disabled toggle for new entries
+                    Toggle("", isOn: .constant(true))
+                        .toggleStyle(.checkbox)
+                        .disabled(true)
+                        .opacity(0.3)
+
+                    TextField("e.g. work tree", text: $newEntryPhrase)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+                        .focused($addEntryFocusedField, equals: .phrase)
+                        .onSubmit { addEntryFocusedField = .replacement }
+
+                    TextField("e.g. worktree", text: $newEntryReplacement)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+                        .focused($addEntryFocusedField, equals: .replacement)
+                        .onSubmit { confirmAddEntry() }
+
+                    Spacer()
+
+                    // Confirm button
+                    Button {
+                        confirmAddEntry()
+                    } label: {
+                        Label("Add", systemImage: "checkmark.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.green)
+                    .controlSize(.small)
+                    .help("Save this entry (Enter)")
+                    .disabled(newEntryReplacement.isEmpty)
+
+                    // Cancel button
+                    Button {
+                        cancelAddEntry()
+                    } label: {
+                        Label("Cancel", systemImage: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Cancel (Escape)")
+                }
+                .onExitCommand {
+                    cancelAddEntry()
+                }
             }
 
             // Vocabulary list (scrollable)
@@ -577,66 +639,6 @@ struct SettingsView: View {
             }
             .padding(.top, 4)
 
-            // Add new entry row (if in add mode) - appears before the button
-            if isAddingNewEntry {
-                HStack(spacing: 8) {
-                    // Disabled toggle for new entries
-                    Toggle("", isOn: .constant(true))
-                        .toggleStyle(.checkbox)
-                        .disabled(true)
-                        .opacity(0.3)
-
-                    TextField("e.g. work tree", text: $newEntryPhrase)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 160)
-                        .focused($addEntryFocusedField, equals: .phrase)
-                        .onSubmit { addEntryFocusedField = .replacement }
-
-                    TextField("e.g. worktree", text: $newEntryReplacement)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 160)
-                        .focused($addEntryFocusedField, equals: .replacement)
-                        .onSubmit { confirmAddEntry() }
-
-                    Spacer()
-
-                    // Confirm button
-                    Button {
-                        confirmAddEntry()
-                    } label: {
-                        Label("Add", systemImage: "checkmark.circle.fill")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.green)
-                    .controlSize(.small)
-                    .help("Save this entry (Enter)")
-                    .disabled(newEntryReplacement.isEmpty)
-
-                    // Cancel button
-                    Button {
-                        cancelAddEntry()
-                    } label: {
-                        Label("Cancel", systemImage: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
-                    .help("Cancel (Escape)")
-                }
-                .onExitCommand {
-                    cancelAddEntry()
-                }
-            }
-
-            // Add Word button
-            Button {
-                startAddingNewEntry()
-            } label: {
-                Label("Add Word", systemImage: "plus")
-            }
-            .controlSize(.small)
-            .disabled(isAddingNewEntry)
-
-            Spacer()
         }
         .padding()
         .confirmationDialog(
