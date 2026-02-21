@@ -254,6 +254,9 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
         static let hotkeyEnabled = "hotkeyEnabled"
         static let toggleHotkeyShortcut = "toggleHotkeyShortcut"
+        static let meetingRetentionDays = "meetingRetentionDays"
+        static let meetingRetentionCount = "meetingRetentionCount"
+        static let meetingTypePrompts = "meetingTypePrompts"
     }
 
     // MARK: - File Paths
@@ -405,6 +408,29 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Days to retain meeting records (0 = forever)
+    @Published var meetingRetentionDays: Int {
+        didSet {
+            UserDefaults.standard.set(meetingRetentionDays, forKey: Keys.meetingRetentionDays)
+        }
+    }
+
+    /// Max number of meeting records to keep (0 = unlimited)
+    @Published var meetingRetentionCount: Int {
+        didSet {
+            UserDefaults.standard.set(meetingRetentionCount, forKey: Keys.meetingRetentionCount)
+        }
+    }
+
+    /// Per-type custom prompt overrides (type.rawValue → prompt string)
+    @Published var meetingTypePrompts: [String: String] {
+        didSet {
+            if let data = try? JSONEncoder().encode(meetingTypePrompts) {
+                UserDefaults.standard.set(data, forKey: Keys.meetingTypePrompts)
+            }
+        }
+    }
+
     /// Date of the last successful update check
     var lastUpdateCheckDate: Date? {
         get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
@@ -497,6 +523,22 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.hotkeyEnabled = UserDefaults.standard.bool(forKey: Keys.hotkeyEnabled)
         } else {
             self.hotkeyEnabled = true
+        }
+
+        // Meeting retention: default 90 days, unlimited count
+        if UserDefaults.standard.object(forKey: Keys.meetingRetentionDays) != nil {
+            self.meetingRetentionDays = UserDefaults.standard.integer(forKey: Keys.meetingRetentionDays)
+        } else {
+            self.meetingRetentionDays = 90
+        }
+        self.meetingRetentionCount = UserDefaults.standard.integer(forKey: Keys.meetingRetentionCount)
+
+        // Per-type prompt overrides
+        if let data = UserDefaults.standard.data(forKey: Keys.meetingTypePrompts),
+           let prompts = try? JSONDecoder().decode([String: String].self, from: data) {
+            self.meetingTypePrompts = prompts
+        } else {
+            self.meetingTypePrompts = [:]
         }
 
         // Onboarding completion defaults to false for new users
@@ -650,5 +692,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         pauseMediaDuringDictation = true
         hotkeyEnabled = true
         toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
+        meetingRetentionDays = 90
+        meetingRetentionCount = 0
+        meetingTypePrompts = [:]
     }
 }

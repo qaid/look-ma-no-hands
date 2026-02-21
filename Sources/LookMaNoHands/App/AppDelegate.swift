@@ -542,7 +542,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             defer: false
         )
 
-        window.title = "Look Ma No Hands - Meeting Transcription"
+        window.title = "Meetings"
         window.center()
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 600, height: 450)
