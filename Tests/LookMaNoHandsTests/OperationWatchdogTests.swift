@@ -2,6 +2,11 @@ import XCTest
 @testable import LookMaNoHands
 
 final class OperationWatchdogTests: XCTestCase {
+    override func tearDown() {
+        OperationWatchdog.shared.cancelAllWatchdogs()
+        super.tearDown()
+    }
+
     func testStartAndCompleteWatchdog() {
         let watchdog = OperationWatchdog.shared
         let id = "unit-test-watchdog"

@@ -32,7 +32,7 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          BINARY=$(swift build --show-bin-path 2>/dev/null)/LookMaNoHandsPackageTests.xctest/Contents/MacOS/LookMaNoHandsPackageTests
+          BINARY=$(find .build -name '*.xctest' -path '*/Contents/MacOS/*' | head -1)
           PROFDATA=$(find .build -name '*.profdata' | head -1)
           if [ -n "$PROFDATA" ] && [ -f "$BINARY" ]; then
             xcrun llvm-cov export \
@@ -44,6 +44,7 @@ jobs:
             echo "Coverage report generated."
           else
             echo "Could not locate profdata or test binary for coverage export."
+            exit 1
           fi
 
       - name: Upload coverage to Codecov

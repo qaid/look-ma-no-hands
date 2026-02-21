@@ -2,6 +2,37 @@ import XCTest
 @testable import LookMaNoHands
 
 final class SettingsTests: XCTestCase {
+    private var originalTriggerKey: TriggerKey?
+    private var originalWhisperModel: WhisperModel?
+    private var originalShowIndicator: Bool?
+    private var originalPauseMediaDuringDictation: Bool?
+
+    override func setUp() {
+        super.setUp()
+        let settings = Settings.shared
+        originalTriggerKey = settings.triggerKey
+        originalWhisperModel = settings.whisperModel
+        originalShowIndicator = settings.showIndicator
+        originalPauseMediaDuringDictation = settings.pauseMediaDuringDictation
+    }
+
+    override func tearDown() {
+        let settings = Settings.shared
+        if let originalTriggerKey {
+            settings.triggerKey = originalTriggerKey
+        }
+        if let originalWhisperModel {
+            settings.whisperModel = originalWhisperModel
+        }
+        if let originalShowIndicator {
+            settings.showIndicator = originalShowIndicator
+        }
+        if let originalPauseMediaDuringDictation {
+            settings.pauseMediaDuringDictation = originalPauseMediaDuringDictation
+        }
+        super.tearDown()
+    }
+
     func testTriggerKeyToHotkey() {
         let custom = Hotkey(keyCode: 2, modifiers: .init(command: true))
         XCTAssertEqual(TriggerKey.capsLock.toHotkey(customHotkey: nil), .capsLock)
