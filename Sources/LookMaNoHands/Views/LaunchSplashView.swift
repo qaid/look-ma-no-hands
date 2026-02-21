@@ -4,8 +4,9 @@ import SwiftUI
 /// Shows app icon, name, and hotkey hint to confirm successful launch
 struct LaunchSplashView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settings = Settings.shared
 
-    private var hotkeyEnabled: Bool { Settings.shared.hotkeyEnabled }
+    private var hotkeyEnabled: Bool { settings.hotkeyEnabled }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -32,7 +33,7 @@ struct LaunchSplashView: View {
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(hotkeyEnabled ? "App ready" : "Hotkey paused")
+            .accessibilityLabel(Self.statusAccessibility(hotkeyEnabled: hotkeyEnabled))
 
             Divider()
                 .padding(.horizontal, 20)
@@ -40,7 +41,7 @@ struct LaunchSplashView: View {
             // Hotkey Hint - reflects actual settings
             VStack(spacing: 4) {
                 if hotkeyEnabled {
-                    Text("Press \(Settings.shared.effectiveHotkey.displayString) to record")
+                    Text("Press \(settings.effectiveHotkey.displayString) to record")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -56,9 +57,10 @@ struct LaunchSplashView: View {
                 }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel(hotkeyEnabled
-                ? "Press \(Settings.shared.effectiveHotkey.displayString) to start recording"
-                : "Dictation hotkey is paused. Use Command Shift D to re-enable")
+            .accessibilityLabel(Self.hintAccessibility(
+                hotkeyEnabled: hotkeyEnabled,
+                hotkeyDisplay: settings.effectiveHotkey.displayString
+            ))
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 24)
@@ -95,5 +97,19 @@ struct LaunchSplashView_Previews: PreviewProvider {
         LaunchSplashView()
             .frame(width: 400, height: 300)
             .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+// MARK: - Test helpers
+
+extension LaunchSplashView {
+    static func statusAccessibility(hotkeyEnabled: Bool) -> String {
+        hotkeyEnabled ? "App ready" : "Hotkey paused"
+    }
+
+    static func hintAccessibility(hotkeyEnabled: Bool, hotkeyDisplay: String) -> String {
+        hotkeyEnabled
+            ? "Press \(hotkeyDisplay) to start recording"
+            : "Dictation hotkey is paused. Use Command Shift D to re-enable"
     }
 }

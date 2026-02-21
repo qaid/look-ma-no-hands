@@ -796,8 +796,12 @@ struct SettingsView: View {
                             .frame(width: 220)
                             .disabled(true)
                     } else {
+                        let pickerModels = Self.ollamaPickerModels(
+                            currentModel: settings.ollamaModel,
+                            availableModels: availableOllamaModels
+                        )
                         Picker("", selection: $settings.ollamaModel) {
-                            ForEach(availableOllamaModels, id: \.self) { model in
+                            ForEach(pickerModels, id: \.self) { model in
                                 Text(model).tag(model)
                             }
                         }
@@ -1935,6 +1939,14 @@ struct FeatureListItem: View {
     }
 }
 
+// MARK: - Test helpers
+
+extension SettingsView {
+    static func ollamaPickerModels(currentModel: String, availableModels: [String]) -> [String] {
+        availableModels.contains(currentModel) ? availableModels : [currentModel] + availableModels
+    }
+}
+
 // MARK: - Supporting Types
 
 enum PermissionState {
@@ -1983,4 +1995,3 @@ enum ConnectionState {
         }
     }
 }
-
