@@ -9,6 +9,7 @@ build/
 
 # Swift Package Manager
 Package.resolved
+.swiftpm/
 
 # Workspace context
 .context/
