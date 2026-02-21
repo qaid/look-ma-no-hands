@@ -377,29 +377,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.recordingMenuItem = recordingItem
         menu.addItem(recordingItem)
 
-        menu.addItem(NSMenuItem.separator())
-
-        // Hotkey toggle control
-        let toggleItem = NSMenuItem(
-            title: "Enable Dictation Hotkey",
-            action: #selector(toggleHotkeyEnabled),
-            keyEquivalent: ""
-        )
-        toggleItem.image = menuIcon("keyboard")
-        toggleItem.state = Settings.shared.hotkeyEnabled ? .on : .off
-        self.hotkeyToggleMenuItem = toggleItem
-        menu.addItem(toggleItem)
-
-        menu.addItem(NSMenuItem.separator())
-
         // Meeting transcription
         let meetingItem = NSMenuItem(
             title: "Start Meeting Transcription...",
             action: #selector(openMeetingTranscription),
             keyEquivalent: "m"
         )
-        meetingItem.image = menuIcon("waveform.circle.fill")
+        meetingItem.image = menuIcon("person.2.fill")
         menu.addItem(meetingItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        // Hotkey toggle control
+        let toggleItem = NSMenuItem(
+            title: "Dictation Hotkey",
+            action: #selector(toggleHotkeyEnabled),
+            keyEquivalent: ""
+        )
+        toggleItem.image = menuIcon("keyboard")
+        toggleItem.attributedTitle = hotkeyToggleAttributedTitle(enabled: Settings.shared.hotkeyEnabled)
+        self.hotkeyToggleMenuItem = toggleItem
+        menu.addItem(toggleItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -423,7 +421,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
-        // Developer Reset
+        #if DEBUG
+        // Developer Reset (debug builds only)
         let resetItem = NSMenuItem(
             title: "Developer Reset",
             action: #selector(developerReset),
@@ -433,6 +432,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(resetItem)
 
         menu.addItem(NSMenuItem.separator())
+        #endif
 
         // Quit
         let quitItem = NSMenuItem(
@@ -824,7 +824,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func hotkeyEnabledStateDidChange() {
         let enabled = Settings.shared.hotkeyEnabled
         keyboardMonitor.setEnabled(enabled)
-        hotkeyToggleMenuItem?.state = enabled ? .on : .off
+        hotkeyToggleMenuItem?.attributedTitle = hotkeyToggleAttributedTitle(enabled: enabled)
         updateMenuBarIconForHotkeyState(enabled: enabled)
 
         // Show splash screen feedback for all toggle sources
@@ -1326,6 +1326,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         image.unlockFocus()
         image.isTemplate = false
         return image
+    }
+
+    /// Build an attributed title for the Dictation Hotkey menu item with a trailing on/off badge
+    private func hotkeyToggleAttributedTitle(enabled: Bool) -> NSAttributedString {
+        let labelFont = NSFont.menuFont(ofSize: 0)
+        let badgeFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
+
+        let badgeText = enabled ? "on" : "off"
+        let badgeColor: NSColor = enabled ? .systemGreen : .secondaryLabelColor
+
+        // Tab stop at a fixed width so the badge sits at a consistent trailing position
+        let paragraphStyle = NSMutableParagraphStyle()
+        paragraphStyle.tabStops = [NSTextTab(textAlignment: .right, location: 200)]
+
+        let full = NSMutableAttributedString(
+            string: "Dictation Hotkey\t",
+            attributes: [.font: labelFont, .paragraphStyle: paragraphStyle]
+        )
+        full.append(NSAttributedString(
+            string: badgeText,
+            attributes: [.font: badgeFont, .foregroundColor: badgeColor, .paragraphStyle: paragraphStyle]
+        ))
+        return full
     }
 
     /// Create an NSImage from an SF Symbol name with consistent styling

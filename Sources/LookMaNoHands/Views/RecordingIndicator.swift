@@ -58,7 +58,7 @@ struct WaveformBarsView: View {
 struct WaveformLineView: View {
     @Binding var frequencyBands: [Float]
     @Environment(\.colorScheme) var colorScheme
-    var width: CGFloat = 260
+    var width: CGFloat? = nil
     var height: CGFloat = 34
 
     var body: some View {

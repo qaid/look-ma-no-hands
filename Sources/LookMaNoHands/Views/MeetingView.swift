@@ -239,6 +239,10 @@ struct MeetingView: View {
         }
         .onAppear {
             checkStatus()
+            if meetingState.status == .missingPermissions {
+                CGRequestScreenCaptureAccess()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { checkStatus() }
+            }
         }
         .onDisappear {
             // Mark state as inactive to prevent timer callbacks
@@ -297,12 +301,12 @@ struct MeetingView: View {
             } label: {
                 Image(systemName: meetingState.isRecording ? "stop.circle.fill" : "record.circle")
                     .font(.system(size: 32))
-                    .foregroundColor(.red)
+                    .foregroundColor(meetingState.status == .missingModel ? .secondary : .red)
             }
             .buttonStyle(.plain)
-            .disabled(!meetingState.canRecord)
+            .disabled(meetingState.status == .missingModel)
             .keyboardShortcut(.space, modifiers: [])
-            .help(meetingState.isRecording ? "Stop recording" : "Start recording")
+            .help(meetingState.isRecording ? "Stop recording" : (meetingState.status == .missingPermissions ? "Grant screen recording permission" : "Start recording"))
 
             // Waveform or Recording Bars
             if meetingState.isRecording {
@@ -339,9 +343,8 @@ struct MeetingView: View {
     }
 
     private var liveWaveformView: some View {
-        WaveformBarsView(frequencyBands: $meetingState.frequencyBands)
+        WaveformLineView(frequencyBands: $meetingState.frequencyBands, height: 50)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
     }
 
     private var recordingBarsView: some View {
@@ -1011,10 +1014,23 @@ struct MeetingView: View {
             Task {
                 await stopRecording()
             }
+        } else if meetingState.status == .missingPermissions {
+            promptForScreenRecordingPermission()
         } else if meetingState.canRecord {
             Task {
                 await startRecording()
             }
+        }
+    }
+
+    private func promptForScreenRecordingPermission() {
+        // CGRequestScreenCaptureAccess() shows the macOS permission dialog on first request,
+        // or opens System Settings > Privacy & Security > Screen Recording if already denied.
+        CGRequestScreenCaptureAccess()
+
+        // Re-check after a short delay to update status if permission was just granted
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            checkStatus()
         }
     }
 
