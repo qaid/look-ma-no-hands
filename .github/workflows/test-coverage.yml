@@ -32,8 +32,14 @@ jobs:
 
       - name: Generate coverage report
         run: |
-          BINARY=$(find .build -name '*.xctest' -path '*/Contents/MacOS/*' | head -1)
-          PROFDATA=$(find .build -name '*.profdata' | head -1)
+          TEST_BUNDLE=$(find .build -type d -name '*.xctest' | head -1)
+          if [ -n "$TEST_BUNDLE" ]; then
+            TEST_NAME=$(basename "$TEST_BUNDLE" .xctest)
+            BINARY="$TEST_BUNDLE/Contents/MacOS/$TEST_NAME"
+          else
+            BINARY=""
+          fi
+          PROFDATA=$(find .build -type f -name '*.profdata' | head -1)
           if [ -n "$PROFDATA" ] && [ -f "$BINARY" ]; then
             xcrun llvm-cov export \
               "$BINARY" \
