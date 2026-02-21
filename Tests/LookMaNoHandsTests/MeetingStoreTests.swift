@@ -105,5 +105,86 @@ final class MeetingStoreTests: XCTestCase {
         XCTAssertTrue(store.meetings.contains { $0.id == midMeeting.id })
         XCTAssertTrue(store.meetings.contains { $0.id == newMeeting.id })
     }
-}
 
+    func testLoadAllMeetingsSkipsInvalidMetadata() throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let valid = MeetingRecord(
+            id: UUID(),
+            title: "Valid",
+            createdAt: Date(),
+            duration: 10,
+            meetingType: .general,
+            source: .recorded,
+            segmentCount: 1
+        )
+
+        // Valid record
+        try writeRecord(valid, transcript: "ok", to: root)
+
+        // Invalid metadata directory
+        let invalidDir = root.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: invalidDir, withIntermediateDirectories: true)
+        try "not json".write(to: invalidDir.appendingPathComponent("metadata.json"), atomically: true, encoding: .utf8)
+
+        let store = MeetingStore(rootDirectory: root)
+        XCTAssertEqual(store.meetings.count, 1)
+        XCTAssertEqual(store.meetings.first?.id, valid.id)
+    }
+
+    func testPruneOrphansRemovesDirectoryWithoutMetadata() throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let orphanDir = root.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: orphanDir, withIntermediateDirectories: true)
+        try "orphan transcript".write(to: orphanDir.appendingPathComponent("transcript.txt"), atomically: true, encoding: .utf8)
+
+        _ = MeetingStore(rootDirectory: root)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: orphanDir.path))
+    }
+
+    func testTranscriptTextThrowsWhenMissing() throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let record = MeetingRecord(
+            id: UUID(),
+            title: "No Transcript",
+            createdAt: Date(),
+            duration: 10,
+            meetingType: .general,
+            source: .recorded,
+            segmentCount: 1
+        )
+
+        let dir = root.appendingPathComponent(record.id.uuidString)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let data = try JSONEncoder().encode(record)
+        try data.write(to: dir.appendingPathComponent("metadata.json"), options: .atomic)
+
+        let store = MeetingStore(rootDirectory: root)
+        XCTAssertThrowsError(try store.transcriptText(for: record))
+    }
+
+    func testNotesTextReturnsNilWhenMissing() throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let record = MeetingRecord(
+            id: UUID(),
+            title: "No Notes",
+            createdAt: Date(),
+            duration: 10,
+            meetingType: .general,
+            source: .recorded,
+            segmentCount: 1
+        )
+
+        try writeRecord(record, transcript: "ok", to: root)
+        let store = MeetingStore(rootDirectory: root)
+        XCTAssertNil(try store.notesText(for: record))
+    }
+}

@@ -20,20 +20,35 @@ permissions:
   contents: read
 
 jobs:
-  coverage:
-    name: Generate Coverage Report
+  test:
+    name: Run Tests
     runs-on: macos-14
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Note on test coverage
+      - name: Run tests with coverage
+        run: swift test --enable-code-coverage
+
+      - name: Generate coverage report
         run: |
-          echo "ℹ️  Test coverage reporting is configured."
-          echo "Tests are currently being set up for this project."
-          echo "Once tests are available, coverage will be automatically reported to Codecov."
-          echo ""
-          echo "Next steps:"
-          echo "1. Create test files in Tests/LookMaNoHandsTests/"
-          echo "2. Ensure Xcode is installed (XCTest framework requirement)"
-          echo "3. Run: swift test --enable-code-coverage"
+          BINARY=$(swift build --show-bin-path 2>/dev/null)/LookMaNoHandsPackageTests.xctest/Contents/MacOS/LookMaNoHandsPackageTests
+          PROFDATA=$(find .build -name '*.profdata' | head -1)
+          if [ -n "$PROFDATA" ] && [ -f "$BINARY" ]; then
+            xcrun llvm-cov export \
+              "$BINARY" \
+              --instr-profile="$PROFDATA" \
+              --format=lcov \
+              --ignore-filename-regex='.build|Tests' \
+              > coverage.lcov
+            echo "Coverage report generated."
+          else
+            echo "Could not locate profdata or test binary for coverage export."
+          fi
+
+      - name: Upload coverage to Codecov
+        if: ${{ hashFiles('coverage.lcov') != '' }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.lcov
+          fail_ci_if_error: false
