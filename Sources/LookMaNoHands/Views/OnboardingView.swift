@@ -172,8 +172,6 @@ struct WelcomeStepView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             // App icon
             Image(systemName: "mic.circle.fill")
                 .resizable()
@@ -235,8 +233,6 @@ struct OllamaStepView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             // Icon
             Image(systemName: "brain.head.profile")
                 .resizable()
@@ -350,8 +346,6 @@ struct WhisperModelStepView: View {
 
     var body: some View {
         VStack(spacing: 18) {
-            Spacer()
-
             // Icon
             Image(systemName: "waveform.circle.fill")
                 .resizable()
@@ -531,8 +525,6 @@ struct PermissionsStepView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             // Icon
             Image(systemName: "lock.shield.fill")
                 .resizable()
@@ -741,8 +733,6 @@ struct CompletionStepView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Spacer()
-
             // Icon
             Image(systemName: needsRestart ? "arrow.clockwise.circle.fill" : "checkmark.circle.fill")
                 .resizable()
