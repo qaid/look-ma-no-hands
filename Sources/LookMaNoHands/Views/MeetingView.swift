@@ -301,10 +301,10 @@ struct MeetingView: View {
             } label: {
                 Image(systemName: meetingState.isRecording ? "stop.circle.fill" : "record.circle")
                     .font(.system(size: 32))
-                    .foregroundColor(meetingState.status == .missingModel ? .secondary : .red)
+                    .foregroundColor(recordButtonColor)
             }
             .buttonStyle(.plain)
-            .disabled(meetingState.status == .missingModel)
+            .disabled(!meetingState.canRecord && meetingState.status != .missingPermissions)
             .keyboardShortcut(.space, modifiers: [])
             .help(meetingState.isRecording ? "Stop recording" : (meetingState.status == .missingPermissions ? "Grant screen recording permission" : "Start recording"))
 
@@ -345,6 +345,19 @@ struct MeetingView: View {
     private var liveWaveformView: some View {
         WaveformLineView(frequencyBands: $meetingState.frequencyBands, height: 50)
             .frame(maxWidth: .infinity)
+    }
+
+    private var recordButtonColor: Color {
+        if meetingState.isRecording {
+            return .red
+        }
+        if meetingState.status == .missingPermissions {
+            return .red
+        }
+        if !meetingState.canRecord {
+            return .secondary
+        }
+        return .red
     }
 
     private var recordingBarsView: some View {
