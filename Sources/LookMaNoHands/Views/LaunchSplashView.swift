@@ -4,12 +4,16 @@ import SwiftUI
 /// Shows app icon, name, and hotkey hint to confirm successful launch
 struct LaunchSplashView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var settings = Settings.shared
+
+    private var hotkeyEnabled: Bool { settings.hotkeyEnabled }
 
     var body: some View {
         VStack(spacing: 12) {
             // App Icon - using hands-up emoji to match app icon
             Text("🙌🏾")
                 .font(.system(size: 56))
+                .opacity(hotkeyEnabled ? 1.0 : 0.4)
                 .accessibilityLabel("Look Ma No Hands app icon")
 
             // App Name
@@ -20,29 +24,43 @@ struct LaunchSplashView: View {
             // Status Indicator
             HStack(spacing: 6) {
                 Circle()
-                    .fill(.green)
+                    .fill(hotkeyEnabled ? Color.green : Color.red)
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
 
-                Text("Ready")
+                Text(hotkeyEnabled ? "Ready" : "Hotkey Paused")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("App ready")
+            .accessibilityLabel(Self.statusAccessibility(hotkeyEnabled: hotkeyEnabled))
 
             Divider()
                 .padding(.horizontal, 20)
 
             // Hotkey Hint - reflects actual settings
             VStack(spacing: 4) {
-                Text("Press \(Settings.shared.effectiveHotkey.displayString) to record")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                if hotkeyEnabled {
+                    Text("Press \(settings.effectiveHotkey.displayString) to record")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Dictation hotkey is paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Text("Use Cmd+Shift+D to re-enable")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Press \(Settings.shared.effectiveHotkey.displayString) to start recording")
+            .accessibilityLabel(Self.hintAccessibility(
+                hotkeyEnabled: hotkeyEnabled,
+                hotkeyDisplay: settings.effectiveHotkey.displayString
+            ))
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 24)
@@ -79,5 +97,19 @@ struct LaunchSplashView_Previews: PreviewProvider {
         LaunchSplashView()
             .frame(width: 400, height: 300)
             .background(Color(nsColor: .windowBackgroundColor))
+    }
+}
+
+// MARK: - Test helpers
+
+extension LaunchSplashView {
+    static func statusAccessibility(hotkeyEnabled: Bool) -> String {
+        hotkeyEnabled ? "App ready" : "Hotkey paused"
+    }
+
+    static func hintAccessibility(hotkeyEnabled: Bool, hotkeyDisplay: String) -> String {
+        hotkeyEnabled
+            ? "Press \(hotkeyDisplay) to start recording"
+            : "Dictation hotkey is paused. Use Command Shift D to re-enable"
     }
 }

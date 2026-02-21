@@ -470,7 +470,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.whisperModel = .base
         }
         
-        self.ollamaModel = UserDefaults.standard.string(forKey: Keys.ollamaModel) ?? "qwen3:8b"
+        self.ollamaModel = UserDefaults.standard.string(forKey: Keys.ollamaModel) ?? "qwen2.5:3b"
 
         self.meetingPrompt = UserDefaults.standard.string(forKey: Keys.meetingPrompt) ?? Settings.defaultMeetingPrompt
 
@@ -680,7 +680,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         triggerKey = .capsLock
         customHotkey = nil
         whisperModel = .base
-        ollamaModel = "qwen3:8b"
+        ollamaModel = "qwen2.5:3b"
         meetingPrompt = Settings.defaultMeetingPrompt
         showIndicator = true
         indicatorPosition = .followCursor

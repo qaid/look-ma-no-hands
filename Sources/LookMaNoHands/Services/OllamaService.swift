@@ -17,7 +17,7 @@ class OllamaService {
     
     // MARK: - Initialization
     
-    init(modelName: String = "qwen3:8b") {
+    init(modelName: String = "qwen2.5:3b") {
         self.modelName = modelName
     }
     
@@ -72,6 +72,32 @@ class OllamaService {
         return try await generate(prompt: prompt)
     }
     
+    /// Unload the current model from memory to free system resources.
+    /// Uses Ollama's keep_alive: 0 mechanism to evict the model immediately.
+    func unloadModel() async {
+        guard let url = URL(string: "\(baseURL)/api/generate") else { return }
+
+        let requestBody: [String: Any] = [
+            "model": modelName,
+            "prompt": "",
+            "keep_alive": 0
+        ]
+
+        guard let jsonData = try? JSONSerialization.data(withJSONObject: requestBody) else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.httpBody = jsonData
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (_, _) = try await session.data(for: request)
+            print("OllamaService: Model '\(modelName)' unloaded from memory")
+        } catch {
+            print("OllamaService: Failed to unload model - \(error)")
+        }
+    }
+
     /// Generate text from a prompt
     /// - Parameter prompt: The prompt to send to the model
     /// - Returns: Generated text

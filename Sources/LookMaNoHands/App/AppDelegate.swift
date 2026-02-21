@@ -1331,24 +1331,61 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Build an attributed title for the Dictation Hotkey menu item with a trailing on/off badge
     private func hotkeyToggleAttributedTitle(enabled: Bool) -> NSAttributedString {
         let labelFont = NSFont.menuFont(ofSize: 0)
-        let badgeFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
-
         let badgeText = enabled ? "on" : "off"
-        let badgeColor: NSColor = enabled ? .systemGreen : .secondaryLabelColor
-
-        // Tab stop at a fixed width so the badge sits at a consistent trailing position
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.tabStops = [NSTextTab(textAlignment: .right, location: 200)]
+        let badgeColor: NSColor = enabled ? .systemGreen : .systemGray
 
         let full = NSMutableAttributedString(
-            string: "Dictation Hotkey\t",
-            attributes: [.font: labelFont, .paragraphStyle: paragraphStyle]
+            string: "Dictation Hotkey",
+            attributes: [.font: labelFont]
         )
+
+        // A single space kerned to exactly 24 pt gives the gap between label and pill
         full.append(NSAttributedString(
-            string: badgeText,
-            attributes: [.font: badgeFont, .foregroundColor: badgeColor, .paragraphStyle: paragraphStyle]
+            string: " ",
+            attributes: [.font: labelFont, .kern: 24 as NSNumber]
         ))
+
+        // Render the badge as a pill image and embed it via NSTextAttachment
+        let badgeImage = makeBadgePillImage(text: badgeText, backgroundColor: badgeColor)
+        let attachment = NSTextAttachment()
+        attachment.image = badgeImage
+        // Vertically center the pill relative to the label's cap height
+        attachment.bounds = CGRect(
+            x: 0,
+            y: (labelFont.capHeight - badgeImage.size.height) / 2,
+            width: badgeImage.size.width,
+            height: badgeImage.size.height
+        )
+
+        full.append(NSAttributedString(attachment: attachment))
         return full
+    }
+
+    /// Renders a capsule-shaped badge image with white text on a solid background.
+    private func makeBadgePillImage(text: String, backgroundColor: NSColor) -> NSImage {
+        let badgeFont = NSFont.systemFont(ofSize: 10, weight: .semibold)
+        let textAttrs: [NSAttributedString.Key: Any] = [
+            .font: badgeFont,
+            .foregroundColor: NSColor.white
+        ]
+
+        let textSize = (text as NSString).size(withAttributes: textAttrs)
+        let hPad: CGFloat = 6
+        let vPad: CGFloat = 2
+        let badgeSize = CGSize(
+            width: ceil(textSize.width + hPad * 2),
+            height: ceil(textSize.height + vPad * 2)
+        )
+
+        return NSImage(size: badgeSize, flipped: false) { rect in
+            let path = NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2)
+            backgroundColor.setFill()
+            path.fill()
+
+            let textRect = CGRect(x: hPad, y: vPad, width: textSize.width, height: textSize.height)
+            text.draw(in: textRect, withAttributes: textAttrs)
+            return true
+        }
     }
 
     /// Create an NSImage from an SF Symbol name with consistent styling

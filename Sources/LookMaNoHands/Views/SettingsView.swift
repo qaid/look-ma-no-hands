@@ -790,18 +790,18 @@ struct SettingsView: View {
                     Text("Model")
                         .frame(width: 80, alignment: .trailing)
 
-                    if availableOllamaModels.isEmpty && ollamaStatus != .connected {
+                    if availableOllamaModels.isEmpty {
                         TextField("", text: $settings.ollamaModel)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 220)
                             .disabled(true)
                     } else {
+                        let pickerModels = Self.ollamaPickerModels(
+                            currentModel: settings.ollamaModel,
+                            availableModels: availableOllamaModels
+                        )
                         Picker("", selection: $settings.ollamaModel) {
-                            // Include current model so it's always selectable
-                            if !availableOllamaModels.contains(settings.ollamaModel) {
-                                Text(settings.ollamaModel).tag(settings.ollamaModel)
-                            }
-                            ForEach(availableOllamaModels, id: \.self) { model in
+                            ForEach(pickerModels, id: \.self) { model in
                                 Text(model).tag(model)
                             }
                         }
@@ -1939,6 +1939,14 @@ struct FeatureListItem: View {
     }
 }
 
+// MARK: - Test helpers
+
+extension SettingsView {
+    static func ollamaPickerModels(currentModel: String, availableModels: [String]) -> [String] {
+        availableModels.contains(currentModel) ? availableModels : [currentModel] + availableModels
+    }
+}
+
 // MARK: - Supporting Types
 
 enum PermissionState {
@@ -1987,4 +1995,3 @@ enum ConnectionState {
         }
     }
 }
-
