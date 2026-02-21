@@ -120,8 +120,9 @@ class AudioRecorder {
                 vDSP_rmsqv(ptr.baseAddress!, 1, &rms, vDSP_Length(bandSamples.count))
             }
 
-            // Amplification (50x) for good visibility
-            let amplified = min(rms * 50.0, 1.0)
+            // Amplification: moderate gain so typical speech sits around 0.4–0.7
+            // rather than constantly peaking at 1.0
+            let amplified = min(rms * 15.0, 1.0)
             bands.append(amplified)
         }
 

@@ -17,10 +17,6 @@ struct WaveformBarsView: View {
 
             for (index, level) in frequencyBands.enumerated() {
                 let x = CGFloat(index) * (barWidth + barSpacing)
-                // IMPROVED: Balanced scaling to show dynamic range without constant peaking
-                // Audio is already amplified 50x in AudioRecorder, so values are often near 1.0
-                // Use power of 2.5 to compress high values more than low values
-                // This creates more perceptual dynamic range
                 let normalizedLevel = pow(CGFloat(level), 2.5)
                 let barHeight = max(normalizedLevel * size.height, 3.0) // Minimum 3pt
                 let y = (size.height - barHeight) / 2
@@ -242,12 +238,18 @@ class RecordingIndicatorState: ObservableObject {
             return
         }
 
-        // Smooth transition: 70% old + 30% new
+        // Asymmetric smoothing: fast attack (show new peaks quickly) but fast
+        // decay too (don't hold high values once audio quiets).
         // IMPORTANT: Create new array instead of modifying in place
         // so @Published detects the change
         var smoothedBands: [Float] = []
         for i in 0..<newBands.count {
-            let smoothed = frequencyBands[i] * 0.7 + newBands[i] * 0.3
+            let old = frequencyBands[i]
+            let new = newBands[i]
+            // Attack: blend 60% old + 40% new; Decay: blend 35% old + 65% new
+            let smoothed = new >= old
+                ? old * 0.6 + new * 0.4   // rising — moderate follow
+                : old * 0.35 + new * 0.65  // falling — drop back down quickly
             smoothedBands.append(smoothed)
         }
 

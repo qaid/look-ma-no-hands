@@ -19,7 +19,9 @@ struct MeetingAnalyzeTab: View {
     @State private var analysisProgress: Double = 0
     @State private var streamedNotes = ""
     @State private var analysisTask: Task<Void, Never>?
-    @State private var showTranscript = false
+    @State private var showTranscript = true
+    @State private var showPrompt = false
+    @State private var hasProcessed = false
     @State private var lastProgressUpdate = Date()
     @State private var statusMessage = ""
     @State private var showPromptChangedAlert = false
@@ -45,12 +47,12 @@ struct MeetingAnalyzeTab: View {
         VStack(spacing: 12) {
             Image(systemName: "doc.text.magnifyingglass")
                 .font(.system(size: 48))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             Text("No Meeting Selected")
                 .font(.system(size: 18, weight: .semibold))
             Text("Select a meeting from the Library tab to analyze it.")
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -60,57 +62,64 @@ struct MeetingAnalyzeTab: View {
     // MARK: - Analyze View
 
     private func analyzeView(for meeting: MeetingRecord) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header
+        VStack(alignment: .leading, spacing: 0) {
+            // Fixed header area — never scrolls
+            VStack(alignment: .leading, spacing: 0) {
                 headerView(for: meeting)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 20)
+                    .padding(.bottom, 16)
 
                 Divider()
 
-                // Meeting type picker
                 typePicker
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
 
                 Divider()
+            }
 
-                // Prompt editor
-                promptEditor
+            // Scrollable content area — fills remaining space without growing the window
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Transcript — bounded scrollable pane
+                    transcriptSection
+                        .padding(.horizontal, 24)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
 
-                // Process button
-                processButton
-
-                // Progress bar
-                if isAnalyzing {
-                    ProgressView(value: analysisProgress)
-                        .padding(.top, 4)
-                }
-
-                // Status
-                if !statusMessage.isEmpty {
-                    Text(statusMessage)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                }
-
-                // Notes output
-                if !notes.isEmpty || !streamedNotes.isEmpty {
                     Divider()
-                    notesView
-                }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 8)
 
-                // Transcript (collapsible)
-                if !transcript.isEmpty {
-                    Divider()
-                    transcriptView
-                }
+                    // Prompt — bounded, collapsed by default
+                    promptSection
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 8)
 
-                // Export bar
-                if !notes.isEmpty {
-                    Divider()
-                    exportBar(for: meeting)
+                    // Status
+                    if !statusMessage.isEmpty {
+                        Text(statusMessage)
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 24)
+                            .padding(.top, 4)
+                    }
+
+                    // Notes — bounded scrollable pane, shown after processing
+                    if !notes.isEmpty {
+                        Divider()
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 8)
+
+                        notesSection
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
+                    }
                 }
             }
-            .padding(24)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .alert("Change Meeting Type?", isPresented: $showPromptChangedAlert) {
             Button("Change Type") {
                 if let newType = pendingTypeChange {
@@ -129,7 +138,7 @@ struct MeetingAnalyzeTab: View {
         HStack(spacing: 8) {
             Image(systemName: meeting.meetingType.icon)
                 .font(.system(size: 20))
-                .foregroundColor(.accentColor)
+                .foregroundStyle(.tint)
 
             Text(meeting.title)
                 .font(.system(size: 16, weight: .semibold))
@@ -139,10 +148,10 @@ struct MeetingAnalyzeTab: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(meeting.createdAt, style: .date)
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
                 Text("\(meeting.segmentCount) segments")
                     .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -153,7 +162,7 @@ struct MeetingAnalyzeTab: View {
         HStack(spacing: 8) {
             Text("Meeting type:")
                 .font(.system(size: 13))
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
 
             Picker("", selection: $selectedType) {
                 ForEach(MeetingType.allCases) { type in
@@ -174,6 +183,9 @@ struct MeetingAnalyzeTab: View {
             }
 
             Spacer()
+
+            // CTAs inline with meeting type selector, above transcript (#207)
+            actionRow
         }
     }
 
@@ -183,87 +195,79 @@ struct MeetingAnalyzeTab: View {
         pendingTypeChange = nil
     }
 
-    // MARK: - Prompt Editor
+    // MARK: - Action Row
 
-    private var promptEditor: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Prompt")
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
-                Button("Reset to default") {
-                    customPrompt = selectedType.defaultPrompt
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(.accentColor)
-            }
+    // Minimum button width that can accommodate both the "Re-process" label and
+    // the "Cancel" label (with spinner), so the button never changes size when
+    // toggling between the two states.
+    private let processButtonMinWidth: CGFloat = 110
 
-            TextEditor(text: $customPrompt)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(minHeight: 120, maxHeight: 200)
-                .scrollContentBackground(.hidden)
-                .padding(8)
-                .background(Color(nsColor: .textBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                )
-        }
-    }
-
-    // MARK: - Process Button
-
-    private var processButton: some View {
-        HStack {
+    @ViewBuilder
+    private var actionRow: some View {
+        if isAnalyzing {
+            // Cancel button with inline spinner to indicate background work (#current)
             Button {
-                if isAnalyzing {
-                    cancelAnalysis()
-                } else {
-                    runAnalysis()
-                }
+                cancelAnalysis()
             } label: {
-                HStack(spacing: 8) {
-                    if isAnalyzing {
-                        ProgressView().scaleEffect(0.7).progressViewStyle(.circular)
-                    } else {
-                        Image(systemName: "sparkles")
-                    }
-                    Text(isAnalyzing ? "Cancel" : "Process with Ollama")
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.6)
+                        .frame(width: 14, height: 14)
+                    Text("Cancel")
                 }
+                .frame(minWidth: processButtonMinWidth)
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut(.escape, modifiers: [])
+        } else {
+            // Process / Re-process
+            Button {
+                runAnalysis()
+            } label: {
+                Label(
+                    hasProcessed ? "Re-process" : "Process",
+                    systemImage: "sparkles"
+                )
+                .frame(minWidth: processButtonMinWidth)
             }
             .buttonStyle(.borderedProminent)
             .disabled(transcript.isEmpty)
             .keyboardShortcut("n", modifiers: .command)
-
-            Spacer()
         }
+
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(notes, forType: .string)
+            statusMessage = "Notes copied to clipboard"
+        } label: {
+            Label("Copy Notes", systemImage: "doc.on.doc")
+        }
+        .buttonStyle(.bordered)
+        .disabled(notes.isEmpty)
+
+        Button {
+            if let meeting = selectedMeeting { saveNotes(for: meeting) }
+        } label: {
+            Label("Save Notes...", systemImage: "square.and.arrow.down")
+        }
+        .buttonStyle(.bordered)
+        .disabled(notes.isEmpty)
+
+        Button {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(transcript, forType: .string)
+            statusMessage = "Transcript copied to clipboard"
+        } label: {
+            Label("Copy Transcript", systemImage: "doc.text")
+        }
+        .buttonStyle(.bordered)
+        .disabled(transcript.isEmpty)
     }
 
-    // MARK: - Notes View
+    // MARK: - Transcript Section
 
-    private var notesView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Notes")
-                .font(.system(size: 14, weight: .semibold))
-
-            let displayNotes = isAnalyzing ? streamedNotes : notes
-            if displayNotes.isEmpty {
-                Text("Generating…")
-                    .font(.system(size: 14))
-                    .foregroundColor(.secondary)
-            } else {
-                Text(displayNotes)
-                    .font(.system(size: 14))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-    }
-
-    // MARK: - Transcript View
-
-    private var transcriptView: some View {
+    private var transcriptSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
                 withAnimation { showTranscript.toggle() }
@@ -271,7 +275,7 @@ struct MeetingAnalyzeTab: View {
                 HStack(spacing: 6) {
                     Image(systemName: showTranscript ? "chevron.down" : "chevron.right")
                         .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                     Text("Transcript")
                         .font(.system(size: 14, weight: .semibold))
                 }
@@ -279,45 +283,116 @@ struct MeetingAnalyzeTab: View {
             .buttonStyle(.plain)
 
             if showTranscript {
-                Text(transcript)
-                    .font(.system(size: 13))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundColor(.secondary)
+                ScrollView {
+                    Text(transcript)
+                        .font(.system(size: 13))
+                        .textSelection(.enabled)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+                .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 180)
+                .background(Color(nsColor: .textBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
     }
 
-    // MARK: - Export Bar
+    // MARK: - Prompt Section
 
-    private func exportBar(for meeting: MeetingRecord) -> some View {
-        HStack(spacing: 12) {
+    private var promptSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(notes, forType: .string)
-                statusMessage = "Notes copied to clipboard"
+                withAnimation { showPrompt.toggle() }
             } label: {
-                Label("Copy Notes", systemImage: "doc.on.doc")
+                HStack(spacing: 6) {
+                    Image(systemName: showPrompt ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                    Text("Prompt")
+                        .font(.system(size: 14, weight: .semibold))
+                }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
 
-            Button {
-                saveNotes(for: meeting)
-            } label: {
-                Label("Save Notes...", systemImage: "square.and.arrow.down")
+            if showPrompt {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Spacer()
+                        Button("Reset to default") {
+                            customPrompt = selectedType.defaultPrompt
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tint)
+                    }
+
+                    TextEditor(text: $customPrompt)
+                        .font(.system(size: 12, design: .monospaced))
+                        .frame(minHeight: 100, maxHeight: 160)
+                        .scrollContentBackground(.hidden)
+                        .padding(8)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                }
             }
-            .buttonStyle(.bordered)
+        }
+    }
 
-            Button {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(transcript, forType: .string)
-                statusMessage = "Transcript copied to clipboard"
-            } label: {
-                Label("Copy Transcript", systemImage: "doc.text")
+    // MARK: - Notes Section
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Notes")
+                    .font(.system(size: 14, weight: .semibold))
+                if hasProcessed {
+                    Text("Processed")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor)
+                        .clipShape(Capsule())
+                }
             }
-            .buttonStyle(.bordered)
 
-            Spacer()
+            ScrollView {
+                Group {
+                    if let attributed = try? AttributedString(
+                        markdown: notes,
+                        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+                    ) {
+                        Text(attributed)
+                            .font(.system(size: 13))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(12)
+                    } else {
+                        Text(notes)
+                            .font(.system(size: 13))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(12)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 400)
+            .background(Color(nsColor: .textBackgroundColor))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.gray.opacity(0.25), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }
 
@@ -329,6 +404,9 @@ struct MeetingAnalyzeTab: View {
         customPrompt = Settings.shared.meetingTypePrompts[meeting.meetingType.rawValue] ?? meeting.meetingType.defaultPrompt
         transcript = (try? store.transcriptText(for: meeting)) ?? ""
         notes = (try? store.notesText(for: meeting)).flatMap { $0 } ?? ""
+        hasProcessed = !notes.isEmpty
+        showTranscript = true
+        showPrompt = false
         streamedNotes = ""
         statusMessage = ""
     }
@@ -376,7 +454,11 @@ struct MeetingAnalyzeTab: View {
                     streamedNotes = ""
                     analysisProgress = 1.0
                     isAnalyzing = false
+                    hasProcessed = true
                     statusMessage = "Notes generated successfully"
+                    // Collapse transcript and prompt so the notes section is prominent
+                    showTranscript = false
+                    showPrompt = false
                 }
 
                 // Persist notes to disk
