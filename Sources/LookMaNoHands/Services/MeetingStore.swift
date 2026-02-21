@@ -19,7 +19,7 @@ class MeetingStore {
 
     // MARK: - Storage Root
 
-    private static var meetingsDirectory: URL {
+    private static func defaultMeetingsDirectory() -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport
             .appendingPathComponent("LookMaNoHands")
@@ -28,13 +28,17 @@ class MeetingStore {
         return dir
     }
 
+    private let rootDirectory: URL
+
     private func meetingDirectory(for record: MeetingRecord) -> URL {
-        Self.meetingsDirectory.appendingPathComponent(record.id.uuidString)
+        rootDirectory.appendingPathComponent(record.id.uuidString)
     }
 
     // MARK: - Initialization
 
-    init() {
+    init(rootDirectory: URL? = nil) {
+        self.rootDirectory = rootDirectory ?? Self.defaultMeetingsDirectory()
+        try? FileManager.default.createDirectory(at: self.rootDirectory, withIntermediateDirectories: true)
         loadAllMeetings()
         pruneOrphans()
         applyRetentionPolicy()
@@ -246,7 +250,7 @@ class MeetingStore {
     }
 
     private func loadAllMeetings() {
-        let root = Self.meetingsDirectory
+        let root = rootDirectory
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: nil
@@ -268,7 +272,7 @@ class MeetingStore {
 
     /// Remove meeting folders that have no metadata.json (partial writes / crashes)
     private func pruneOrphans() {
-        let root = Self.meetingsDirectory
+        let root = rootDirectory
         guard let contents = try? FileManager.default.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: nil
