@@ -54,6 +54,10 @@ class MeetingAnalyzer {
 
         print("MeetingAnalyzer: Analysis complete, generated \(structuredNotes.count) characters")
 
+        // Free the model from memory — meeting analysis is a one-shot operation and the
+        // model (often 5 GB+) should not stay resident after completion.
+        await ollamaService.unloadModel()
+
         return structuredNotes
     }
 
@@ -104,6 +108,10 @@ class MeetingAnalyzer {
         }
 
         print("MeetingAnalyzer: Streaming analysis complete, generated \(structuredNotes.count) characters")
+
+        // Free the model from memory — meeting analysis is a one-shot operation and the
+        // model (often 5 GB+) should not stay resident after completion.
+        await ollamaService.unloadModel()
 
         return structuredNotes
     }

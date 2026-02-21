@@ -790,17 +790,13 @@ struct SettingsView: View {
                     Text("Model")
                         .frame(width: 80, alignment: .trailing)
 
-                    if availableOllamaModels.isEmpty && ollamaStatus != .connected {
+                    if availableOllamaModels.isEmpty {
                         TextField("", text: $settings.ollamaModel)
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 220)
                             .disabled(true)
                     } else {
                         Picker("", selection: $settings.ollamaModel) {
-                            // Include current model so it's always selectable
-                            if !availableOllamaModels.contains(settings.ollamaModel) {
-                                Text(settings.ollamaModel).tag(settings.ollamaModel)
-                            }
                             ForEach(availableOllamaModels, id: \.self) { model in
                                 Text(model).tag(model)
                             }

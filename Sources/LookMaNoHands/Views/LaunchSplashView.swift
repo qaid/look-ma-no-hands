@@ -5,11 +5,14 @@ import SwiftUI
 struct LaunchSplashView: View {
     @Environment(\.colorScheme) private var colorScheme
 
+    private var hotkeyEnabled: Bool { Settings.shared.hotkeyEnabled }
+
     var body: some View {
         VStack(spacing: 12) {
             // App Icon - using hands-up emoji to match app icon
             Text("🙌🏾")
                 .font(.system(size: 56))
+                .opacity(hotkeyEnabled ? 1.0 : 0.4)
                 .accessibilityLabel("Look Ma No Hands app icon")
 
             // App Name
@@ -20,29 +23,42 @@ struct LaunchSplashView: View {
             // Status Indicator
             HStack(spacing: 6) {
                 Circle()
-                    .fill(.green)
+                    .fill(hotkeyEnabled ? Color.green : Color.red)
                     .frame(width: 8, height: 8)
                     .accessibilityHidden(true)
 
-                Text("Ready")
+                Text(hotkeyEnabled ? "Ready" : "Hotkey Paused")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("App ready")
+            .accessibilityLabel(hotkeyEnabled ? "App ready" : "Hotkey paused")
 
             Divider()
                 .padding(.horizontal, 20)
 
             // Hotkey Hint - reflects actual settings
             VStack(spacing: 4) {
-                Text("Press \(Settings.shared.effectiveHotkey.displayString) to record")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                if hotkeyEnabled {
+                    Text("Press \(Settings.shared.effectiveHotkey.displayString) to record")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                } else {
+                    Text("Dictation hotkey is paused")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Text("Use Cmd+Shift+D to re-enable")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .multilineTextAlignment(.center)
+                }
             }
             .accessibilityElement(children: .combine)
-            .accessibilityLabel("Press \(Settings.shared.effectiveHotkey.displayString) to start recording")
+            .accessibilityLabel(hotkeyEnabled
+                ? "Press \(Settings.shared.effectiveHotkey.displayString) to start recording"
+                : "Dictation hotkey is paused. Use Command Shift D to re-enable")
         }
         .padding(.vertical, 20)
         .padding(.horizontal, 24)
