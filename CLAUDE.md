@@ -4,7 +4,7 @@
 |IMPORTANT:Prefer retrieval-led reasoning over pre-training-led reasoning
 |root:{settings.local.json,learnings.md}
 |references:{cli-tools.md}
-|agents:{build-orchestrator.md,git-workflow.md,macos-app-designer.md,security-review.md,swiftui-expert.md,ux-review.md,web-research-synthesizer.md}
+|agents:{build-orchestrator.md,git-workflow.md,macos-app-designer.md,security-review.md,swiftui-expert.md,test-runner.md,ux-review.md,web-research-synthesizer.md}
 |skills/claude-skills-optimizer:{SKILL.md}
 |skills/claude-skills-optimizer/references:{optimization-checklist.md,vercel-findings.md}
 |skills/git-workflow:{SKILL.md}
@@ -46,6 +46,17 @@ swift build -c release         # Manual release build
 swift run LookMaNoHands        # Run from source (debugging)
 open ~/Applications/LookMaNoHands.app  # Launch production app
 ```
+
+## Testing
+
+```bash
+swift test                                  # Run all tests
+swift test --filter ClassName               # Run one test class
+swift test --filter ClassName/methodName    # Run one test method
+swift test --enable-code-coverage           # Run with coverage
+```
+
+See `docs/test-inventory.md` for the full list of test classes.
 
 ## Project-Specific Rules
 

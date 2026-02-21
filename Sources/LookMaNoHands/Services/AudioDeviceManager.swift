@@ -19,6 +19,15 @@ class AudioDeviceManager: ObservableObject {
 
     @Published var availableDevices: [AudioInputDevice] = []
     @Published var selectedDevice: AudioInputDevice = .systemDefault
+    private static let isRunningTests = NSClassFromString("XCTestCase") != nil
+        || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+    private static let shouldLog = !isRunningTests
+
+    private func log(_ message: String) {
+        guard Self.shouldLog else { return }
+        print(message)
+    }
 
     // MARK: - Initialization
 
@@ -49,7 +58,7 @@ class AudioDeviceManager: ObservableObject {
         )
 
         guard result == kAudioHardwareNoError else {
-            print("AudioDeviceManager: Error getting device list size")
+            log("AudioDeviceManager: Error getting device list size")
             availableDevices = devices
             return
         }
@@ -67,7 +76,7 @@ class AudioDeviceManager: ObservableObject {
         )
 
         guard result == kAudioHardwareNoError else {
-            print("AudioDeviceManager: Error getting device list")
+            log("AudioDeviceManager: Error getting device list")
             availableDevices = devices
             return
         }
@@ -84,7 +93,7 @@ class AudioDeviceManager: ObservableObject {
         }
 
         availableDevices = devices
-        print("AudioDeviceManager: Found \(devices.count - 1) input devices")
+        log("AudioDeviceManager: Found \(devices.count - 1) input devices")
     }
 
     // MARK: - Device Selection
@@ -93,7 +102,7 @@ class AudioDeviceManager: ObservableObject {
     /// Note: This doesn't change the system default, it just marks our preference
     func selectDevice(_ device: AudioInputDevice) {
         selectedDevice = device
-        print("AudioDeviceManager: Selected device: \(device.name)")
+        log("AudioDeviceManager: Selected device: \(device.name)")
     }
 
     /// Get the AVAudioEngine input node configuration for the selected device
@@ -110,7 +119,7 @@ class AudioDeviceManager: ObservableObject {
         // For now, we'll use the system default and rely on users setting it in System Preferences
         _ = audioEngine.inputNode  // Reference to ensure engine is configured
 
-        print("AudioDeviceManager: Configured audio engine (device selection via system default)")
+        log("AudioDeviceManager: Configured audio engine (device selection via system default)")
     }
 
     // MARK: - Helper Methods

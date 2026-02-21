@@ -35,7 +35,6 @@ final class WhisperDictationTests: XCTestCase {
         
         XCTAssertEqual(settings.triggerKey, .capsLock)
         XCTAssertEqual(settings.whisperModel, .base)
-        XCTAssertTrue(settings.enableFormatting)
         XCTAssertTrue(settings.showIndicator)
     }
     

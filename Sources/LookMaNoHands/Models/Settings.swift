@@ -91,6 +91,31 @@ class Settings: ObservableObject {
     // MARK: - Singleton
 
     static let shared = Settings()
+    private static let isRunningTests = NSClassFromString("XCTestCase") != nil
+        || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
+    private static let shouldLog = !isRunningTests
+
+    private func log(_ message: String) {
+        Self.log(message)
+    }
+
+    private func log(_ format: String, _ args: CVarArg...) {
+        guard Self.shouldLog else { return }
+        let message = String(format: format, arguments: args)
+        NSLog("%@", message)
+    }
+
+    private static func log(_ message: String) {
+        guard shouldLog else { return }
+        NSLog("%@", message)
+    }
+
+    private static func log(_ format: String, _ args: CVarArg...) {
+        guard shouldLog else { return }
+        let message = String(format: format, arguments: args)
+        NSLog("%@", message)
+    }
 
     // MARK: - Default Values
 
@@ -544,19 +569,19 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
             self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
-            NSLog("📖 Settings: Loaded hasCompletedOnboarding from UserDefaults: %@", self.hasCompletedOnboarding ? "true" : "false")
+            log("📖 Settings: Loaded hasCompletedOnboarding from UserDefaults: %@", self.hasCompletedOnboarding ? "true" : "false")
         } else {
             self.hasCompletedOnboarding = false
-            NSLog("📖 Settings: No saved onboarding status - defaulting to false (first launch)")
+            log("📖 Settings: No saved onboarding status - defaulting to false (first launch)")
         }
 
         // Toggle shortcut defaults to Cmd+Shift+D (keyCode 2 = D)
         self.toggleHotkeyShortcut = Self.loadToggleHotkeyFromFile()
 
         if self.toggleHotkeyShortcut != nil {
-            NSLog("🔧 Settings: Loaded toggle hotkey from file")
+            log("🔧 Settings: Loaded toggle hotkey from file")
         } else {
-            NSLog("🔧 Settings: No saved toggle hotkey - defaulting to Cmd+Shift+D")
+            log("🔧 Settings: No saved toggle hotkey - defaulting to Cmd+Shift+D")
             self.toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
         }
     }
@@ -573,22 +598,22 @@ Now produce the complete meeting notes following the format above. Ensure every 
             do {
                 let data = try Data(contentsOf: fileURL)
                 let vocabulary = try JSONDecoder().decode([VocabularyEntry].self, from: data)
-                NSLog("📚 Loaded \(vocabulary.count) vocabulary entries from \(fileURL.path)")
+            Self.log("📚 Loaded \(vocabulary.count) vocabulary entries from \(fileURL.path)")
                 return vocabulary
             } catch {
-                NSLog("⚠️ Failed to load vocabulary from file: \(error.localizedDescription)")
+            Self.log("⚠️ Failed to load vocabulary from file: \(error.localizedDescription)")
             }
         }
 
         // Migration: Check UserDefaults for legacy data
         if let vocabData = UserDefaults.standard.data(forKey: Keys.customVocabulary),
            let vocab = try? JSONDecoder().decode([VocabularyEntry].self, from: vocabData) {
-            NSLog("🔄 Migrating \(vocab.count) vocabulary entries from UserDefaults to file")
+        Self.log("🔄 Migrating \(vocab.count) vocabulary entries from UserDefaults to file")
 
             // Save to file
             if let data = try? JSONEncoder().encode(vocab) {
                 try? data.write(to: fileURL, options: .atomic)
-                NSLog("✅ Migration complete: vocabulary saved to \(fileURL.path)")
+                Self.log("✅ Migration complete: vocabulary saved to \(fileURL.path)")
             }
 
             // Remove from UserDefaults after successful migration
@@ -597,7 +622,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
             return vocab
         }
 
-        NSLog("📚 No existing vocabulary found, starting with empty list")
+        Self.log("📚 No existing vocabulary found, starting with empty list")
         return []
     }
 
@@ -611,35 +636,35 @@ Now produce the complete meeting notes following the format above. Ensure every 
             do {
                 let data = try Data(contentsOf: fileURL)
                 let hotkey = try JSONDecoder().decode(Hotkey.self, from: data)
-                NSLog("🔧 Loaded toggle hotkey from \(fileURL.path)")
+            Self.log("🔧 Loaded toggle hotkey from \(fileURL.path)")
                 return hotkey
             } catch {
-                NSLog("⚠️ Failed to load toggle hotkey from file: \(error.localizedDescription)")
+                Self.log("⚠️ Failed to load toggle hotkey from file: \(error.localizedDescription)")
             }
         }
 
         // Migration: Check UserDefaults for legacy data
         if let hotkeyData = UserDefaults.standard.data(forKey: Keys.toggleHotkeyShortcut),
            let hotkey = try? JSONDecoder().decode(Hotkey.self, from: hotkeyData) {
-            NSLog("🔄 Migrating toggle hotkey from UserDefaults to file")
+            Self.log("🔄 Migrating toggle hotkey from UserDefaults to file")
 
             // Save to file
             if let data = try? JSONEncoder().encode(hotkey) {
                 do {
                     try data.write(to: fileURL, options: .atomic)
-                    NSLog("✅ Migration complete: toggle hotkey saved to \(fileURL.path)")
+                    Self.log("✅ Migration complete: toggle hotkey saved to \(fileURL.path)")
 
                     // Remove from UserDefaults only after successful migration
                     UserDefaults.standard.removeObject(forKey: Keys.toggleHotkeyShortcut)
                 } catch {
-                    NSLog("⚠️ Failed to write toggle hotkey during migration: \(error.localizedDescription)")
+                    Self.log("⚠️ Failed to write toggle hotkey during migration: \(error.localizedDescription)")
                 }
             }
 
             return hotkey
         }
 
-        NSLog("🔧 No existing toggle hotkey found, will use default")
+        Self.log("🔧 No existing toggle hotkey found, will use default")
         return nil
     }
 
@@ -650,9 +675,9 @@ Now produce the complete meeting notes following the format above. Ensure every 
         do {
             let data = try JSONEncoder().encode(customVocabulary)
             try data.write(to: fileURL, options: .atomic)
-            NSLog("💾 Saved \(customVocabulary.count) vocabulary entries to \(fileURL.path)")
+            log("💾 Saved \(customVocabulary.count) vocabulary entries to \(fileURL.path)")
         } catch {
-            NSLog("❌ Failed to save vocabulary to file: \(error.localizedDescription)")
+            log("❌ Failed to save vocabulary to file: \(error.localizedDescription)")
         }
     }
 
@@ -664,14 +689,14 @@ Now produce the complete meeting notes following the format above. Ensure every 
             do {
                 let data = try JSONEncoder().encode(hotkey)
                 try data.write(to: fileURL, options: .atomic)
-                NSLog("🔧 Saved toggle hotkey to \(fileURL.path)")
+                log("🔧 Saved toggle hotkey to \(fileURL.path)")
             } catch {
-                NSLog("❌ Failed to save toggle hotkey to file: \(error.localizedDescription)")
+                log("❌ Failed to save toggle hotkey to file: \(error.localizedDescription)")
             }
         } else {
             // Remove file if hotkey is nil (cleanup)
             try? FileManager.default.removeItem(at: fileURL)
-            NSLog("🔧 Removed toggle hotkey file")
+            log("🔧 Removed toggle hotkey file")
         }
     }
 
