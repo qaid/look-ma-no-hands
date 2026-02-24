@@ -556,7 +556,6 @@ struct MeetingAnalyzeTab: View {
         }
     }
 
-#if DEBUG
     static func resolveModelSelection(models: [String], defaultModel: String) -> (selected: String, available: [String]) {
         let selected: String
         if models.contains(defaultModel) {
@@ -566,7 +565,6 @@ struct MeetingAnalyzeTab: View {
         }
         return (selected, models)
     }
-#endif
 
 #if DEBUG
     var modelSelectionSnapshot: (selected: String, available: [String]) {
