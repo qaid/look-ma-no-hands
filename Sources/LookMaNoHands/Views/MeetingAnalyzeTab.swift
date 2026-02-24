@@ -435,6 +435,7 @@ struct MeetingAnalyzeTab: View {
 
         // Load available Ollama models for the picker
         selectedModel = Settings.shared.ollamaModel
+        availableModels = []
         modelLoadTask?.cancel()
         modelLoadTask = Task {
             if let models = try? await OllamaService().listModels(), !models.isEmpty {
