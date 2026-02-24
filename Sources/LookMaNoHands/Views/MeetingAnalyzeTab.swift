@@ -26,6 +26,9 @@ struct MeetingAnalyzeTab: View {
     @State private var statusMessage = ""
     @State private var showPromptChangedAlert = false
     @State private var pendingTypeChange: MeetingType?
+    @State private var selectedModel: String = ""
+    @State private var availableModels: [String] = []
+    @State private var modelLoadTask: Task<Void, Never>?
 
     private let analyzer = MeetingAnalyzer()
 
@@ -180,6 +183,26 @@ struct MeetingAnalyzeTab: View {
                 } else {
                     applyTypeChange(newType)
                 }
+            }
+
+            Text("Model:")
+                .font(.system(size: 13))
+                .foregroundStyle(.secondary)
+                .padding(.leading, 8)
+
+            if availableModels.isEmpty {
+                TextField("", text: $selectedModel)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 180)
+            } else {
+                Picker("", selection: $selectedModel) {
+                    ForEach(availableModels, id: \.self) { model in
+                        Text(model).tag(model)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 180)
             }
 
             Spacer()
@@ -409,6 +432,20 @@ struct MeetingAnalyzeTab: View {
         showPrompt = false
         streamedNotes = ""
         statusMessage = ""
+
+        // Load available Ollama models for the picker
+        selectedModel = Settings.shared.ollamaModel
+        modelLoadTask?.cancel()
+        modelLoadTask = Task {
+            if let models = try? await OllamaService().listModels(), !models.isEmpty {
+                await MainActor.run {
+                    availableModels = models
+                    if !models.contains(selectedModel) {
+                        selectedModel = models.first ?? Settings.shared.ollamaModel
+                    }
+                }
+            }
+        }
     }
 
     private func runAnalysis() {
@@ -425,6 +462,7 @@ struct MeetingAnalyzeTab: View {
 
         let promptToUse = customPrompt
         let transcriptToUse = transcript
+        let modelToUse = selectedModel.isEmpty ? nil : selectedModel
 
         analysisTask = Task {
             let estimatedLength = max(500, min(5000, Int(Double(transcriptToUse.count) * 0.20)))
@@ -432,7 +470,8 @@ struct MeetingAnalyzeTab: View {
             do {
                 let result = try await analyzer.analyzeMeetingStreaming(
                     transcript: transcriptToUse,
-                    customPrompt: promptToUse
+                    customPrompt: promptToUse,
+                    model: modelToUse
                 ) { receivedChars, chunk in
                     guard !Task.isCancelled else { return }
                     await MainActor.run {

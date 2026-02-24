@@ -20,8 +20,9 @@ class MeetingAnalyzer {
     /// - Parameters:
     ///   - transcript: The raw transcript text
     ///   - customPrompt: Optional custom prompt (defaults to Settings.meetingPrompt)
+    ///   - model: Optional Ollama model name (defaults to Settings.shared.ollamaModel)
     /// - Returns: Structured meeting notes in markdown format
-    func analyzeMeeting(transcript: String, customPrompt: String? = nil) async throws -> String {
+    func analyzeMeeting(transcript: String, customPrompt: String? = nil, model: String? = nil) async throws -> String {
         guard !transcript.isEmpty else {
             throw AnalysisError.emptyTranscript
         }
@@ -39,7 +40,7 @@ class MeetingAnalyzer {
 """
 
         // Set the model name first
-        ollamaService.modelName = Settings.shared.ollamaModel
+        ollamaService.modelName = model ?? Settings.shared.ollamaModel
 
         print("MeetingAnalyzer: Starting analysis with \(ollamaService.modelName) model...")
 
@@ -65,11 +66,13 @@ class MeetingAnalyzer {
     /// - Parameters:
     ///   - transcript: The raw transcript text
     ///   - customPrompt: Optional custom prompt (defaults to Settings.meetingPrompt)
+    ///   - model: Optional Ollama model name (defaults to Settings.shared.ollamaModel)
     ///   - onProgress: Callback invoked with (character count, chunk text) for each chunk
     /// - Returns: Structured meeting notes in markdown format
     func analyzeMeetingStreaming(
         transcript: String,
         customPrompt: String? = nil,
+        model: String? = nil,
         onProgress: @escaping (Int, String) async -> Void
     ) async throws -> String {
         guard !transcript.isEmpty else {
@@ -89,7 +92,7 @@ class MeetingAnalyzer {
 """
 
         // Set the model name first
-        ollamaService.modelName = Settings.shared.ollamaModel
+        ollamaService.modelName = model ?? Settings.shared.ollamaModel
 
         print("MeetingAnalyzer: Starting streaming analysis with \(ollamaService.modelName) model...")
 
