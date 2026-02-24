@@ -31,6 +31,21 @@ struct MeetingAnalyzeTab: View {
     @State private var modelLoadTask: Task<Void, Never>?
 
     private let analyzer = MeetingAnalyzer()
+    private let modelListProvider: () async throws -> [String]
+
+    init(
+        store: MeetingStore,
+        selectedMeeting: Binding<MeetingRecord?>,
+        modelListProvider: @escaping () async throws -> [String] = { try await OllamaService().listModels() },
+        initialSelectedModel: String = "",
+        initialAvailableModels: [String] = []
+    ) {
+        self.store = store
+        self._selectedMeeting = selectedMeeting
+        self.modelListProvider = modelListProvider
+        _selectedModel = State(initialValue: initialSelectedModel)
+        _availableModels = State(initialValue: initialAvailableModels)
+    }
 
     // MARK: - Body
 
@@ -421,7 +436,8 @@ struct MeetingAnalyzeTab: View {
 
     // MARK: - Analysis
 
-    private func loadMeeting() {
+    @MainActor
+    func loadMeeting() {
         guard let meeting = selectedMeeting else { return }
         selectedType = meeting.meetingType
         customPrompt = Settings.shared.meetingTypePrompts[meeting.meetingType.rawValue] ?? meeting.meetingType.defaultPrompt
@@ -433,19 +449,21 @@ struct MeetingAnalyzeTab: View {
         streamedNotes = ""
         statusMessage = ""
 
+        modelLoadTask?.cancel()
+        modelLoadTask = Task {
+            await loadModels()
+        }
+    }
+
+    @MainActor
+    func loadModels() async {
         // Load available Ollama models for the picker
         selectedModel = Settings.shared.ollamaModel
         availableModels = []
-        modelLoadTask?.cancel()
-        modelLoadTask = Task {
-            if let models = try? await OllamaService().listModels(), !models.isEmpty {
-                await MainActor.run {
-                    availableModels = models
-                    if !models.contains(selectedModel) {
-                        selectedModel = models.first ?? Settings.shared.ollamaModel
-                    }
-                }
-            }
+        if let models = try? await modelListProvider(), !models.isEmpty {
+            let resolved = Self.resolveModelSelection(models: models, defaultModel: selectedModel)
+            availableModels = resolved.available
+            selectedModel = resolved.selected
         }
     }
 
@@ -537,4 +555,22 @@ struct MeetingAnalyzeTab: View {
             try? notes.write(to: url, atomically: true, encoding: .utf8)
         }
     }
+
+#if DEBUG
+    static func resolveModelSelection(models: [String], defaultModel: String) -> (selected: String, available: [String]) {
+        let selected: String
+        if models.contains(defaultModel) {
+            selected = defaultModel
+        } else {
+            selected = models.first ?? defaultModel
+        }
+        return (selected, models)
+    }
+#endif
+
+#if DEBUG
+    var modelSelectionSnapshot: (selected: String, available: [String]) {
+        (selectedModel, availableModels)
+    }
+#endif
 }
