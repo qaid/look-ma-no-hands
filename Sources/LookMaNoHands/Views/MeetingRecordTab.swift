@@ -259,23 +259,6 @@ struct MeetingRecordTab: View {
                 }
                 .buttonStyle(.plain)
 
-                Spacer()
-
-                if liveState.isRecording || !liveState.userNotes.isEmpty {
-                    Button {
-                        liveState.isNotesSidebarVisible.toggle()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "note.text").font(.system(size: 12))
-                            Text(liveState.isNotesSidebarVisible ? "Hide Notes" : "Show Notes")
-                                .font(.system(size: 13))
-                        }
-                        .foregroundColor(.orange)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut("j", modifiers: .command)
-                }
-
                 Button {
                     showClearConfirmation = true
                 } label: {
@@ -296,6 +279,23 @@ struct MeetingRecordTab: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text("This will permanently delete \(liveState.segments.count) transcript segments and \(liveState.userNotes.count) notes.")
+                }
+
+                Spacer()
+
+                if liveState.isRecording || !liveState.userNotes.isEmpty {
+                    Button {
+                        liveState.isNotesSidebarVisible.toggle()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "note.text").font(.system(size: 12))
+                            Text(liveState.isNotesSidebarVisible ? "Hide Notes" : "Show Notes")
+                                .font(.system(size: 13))
+                        }
+                        .foregroundColor(.orange)
+                    }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut("j", modifiers: .command)
                 }
             }
             .padding(.bottom, 8)

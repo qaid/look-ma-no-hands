@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 /// Analyze tab — select a meeting, choose type, run LLM, view and export notes
@@ -413,26 +414,14 @@ struct MeetingAnalyzeTab: View {
             }
 
             ScrollView {
-                Group {
-                    if let attributed = try? AttributedString(
-                        markdown: notes,
-                        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-                    ) {
-                        Text(attributed)
-                            .font(.system(size: 13))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(12)
-                    } else {
-                        Text(notes)
-                            .font(.system(size: 13))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(12)
+                Markdown(notes)
+                    .markdownTheme(.gitHub)
+                    .markdownTextStyle {
+                        FontSize(13)
                     }
-                }
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
             }
             .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 400)
             .background(Color(nsColor: .textBackgroundColor))

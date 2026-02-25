@@ -15,13 +15,15 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.14.1")
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "0.14.1"),
+        .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1")
     ],
     targets: [
         .executableTarget(
             name: "LookMaNoHands",
             dependencies: [
-                .product(name: "WhisperKit", package: "WhisperKit")
+                .product(name: "WhisperKit", package: "WhisperKit"),
+                .product(name: "MarkdownUI", package: "swift-markdown-ui")
             ],
             path: "Sources/LookMaNoHands",
             resources: [
