@@ -163,7 +163,13 @@ struct MeetingAnalyzeTab: View {
 
             if isEditingTitle {
                 TextField("Meeting title", text: $editingTitleText, onCommit: {
-                    try? store.renameMeeting(meeting, to: editingTitleText)
+                    if let updated = Self.resolveRenamedMeeting(
+                        store: store,
+                        meeting: meeting,
+                        newTitle: editingTitleText
+                    ) {
+                        selectedMeeting = updated
+                    }
                     isEditingTitle = false
                 })
                 .font(.system(size: 16, weight: .semibold))
@@ -596,6 +602,26 @@ struct MeetingAnalyzeTab: View {
             selected = models.first ?? defaultModel
         }
         return (selected, models)
+    }
+
+    static func resolveRenamedMeeting(
+        store: MeetingStore,
+        meeting: MeetingRecord,
+        newTitle: String
+    ) -> MeetingRecord? {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            try store.renameMeeting(meeting, to: trimmed)
+        } catch {
+            return nil
+        }
+        if let updated = store.meetings.first(where: { $0.id == meeting.id }) {
+            return updated
+        }
+        var fallback = meeting
+        fallback.title = trimmed
+        return fallback
     }
 
 #if DEBUG
