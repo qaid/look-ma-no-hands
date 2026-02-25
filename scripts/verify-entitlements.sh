@@ -32,25 +32,48 @@ plutil -lint /tmp/entitlements.plist || {
 echo ""
 echo "=== Required Entitlements Check ==="
 
-# Required: Microphone access (for dictation)
-if ! grep -q "com.apple.security.device.microphone" /tmp/entitlements.plist; then
-    echo "❌ Missing required entitlement: com.apple.security.device.microphone"
+# Required: Microphone access (hardened runtime key for AVAudioEngine)
+if ! grep -q "com.apple.security.device.audio-input" /tmp/entitlements.plist; then
+    echo "❌ Missing required entitlement: com.apple.security.device.audio-input"
+    rm /tmp/entitlements.plist
     exit 1
 fi
-echo "✅ Microphone entitlement present"
+echo "✅ Audio input entitlement present"
 
-# Required: Accessibility (for text insertion)
+# Required: Apple Events for NSAppleScript (media control, app quit)
 if ! grep -q "com.apple.security.automation.apple-events" /tmp/entitlements.plist; then
     echo "⚠️  Warning: Missing com.apple.security.automation.apple-events"
 fi
 
-echo ""
-echo "=== Forbidden Entitlements Check ==="
+# Expected: Network client for Ollama and GitHub update checks
+if ! grep -q "com.apple.security.network.client" /tmp/entitlements.plist; then
+    echo "⚠️  Warning: Missing com.apple.security.network.client (needed for Ollama + update checks)"
+else
+    echo "✅ Network client entitlement present (Ollama + GitHub updates)"
+fi
 
-# Forbidden: Network client (app should NOT make network requests except updates)
-# Note: Update service is exception - validate in code review
-if grep -q "com.apple.security.network.client" /tmp/entitlements.plist; then
-    echo "⚠️  Network client entitlement present (verify this is intentional)"
+# Expected: WhisperKit / Core ML JIT compilation
+if ! grep -q "com.apple.security.cs.allow-unsigned-executable-memory" /tmp/entitlements.plist; then
+    echo "⚠️  Warning: Missing com.apple.security.cs.allow-unsigned-executable-memory (needed for WhisperKit)"
+else
+    echo "✅ Unsigned executable memory entitlement present (WhisperKit/Core ML)"
+fi
+
+# Expected: WhisperKit dynamically compiled Core ML models
+if ! grep -q "com.apple.security.cs.disable-library-validation" /tmp/entitlements.plist; then
+    echo "⚠️  Warning: Missing com.apple.security.cs.disable-library-validation (needed for WhisperKit Core ML models)"
+else
+    echo "✅ Library validation disabled (WhisperKit Core ML models)"
+fi
+
+echo ""
+echo "=== Hardened Runtime Check (release builds) ==="
+
+# Check hardened runtime flag (set by --options runtime during Developer ID signing)
+if codesign -dv "$APP_PATH" 2>&1 | grep -q "flags=0x10000(runtime)"; then
+    echo "✅ Hardened runtime enabled"
+else
+    echo "ℹ️  Hardened runtime not enabled (expected for ad-hoc / local dev builds)"
 fi
 
 echo ""

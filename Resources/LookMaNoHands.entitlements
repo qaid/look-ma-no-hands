@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- WhisperKit / Core ML JIT compilation requires unsigned executable memory -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- AVAudioEngine microphone recording for dictation and meeting mode -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- NSAppleScript for media control and app quit -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <!-- URLSession to localhost Ollama and GitHub update checks -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- WhisperKit loads dynamically compiled Core ML models at runtime -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+</dict>
+</plist>

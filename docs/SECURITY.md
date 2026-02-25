@@ -128,14 +128,14 @@ All results are available as GitHub workflow artifacts and visible in pull reque
 - **Entitlements verification** — CI confirms app only requests necessary system permissions
 - **Release provenance** — every release ships with SHA-256 checksums and a Software Bill of Materials (SBOM)
 - **Safe build scripts** — destructive operations guarded, user settings preserved by default
+- **Notarized releases** — distributed DMGs are signed with a Developer ID, notarized by Apple, and stapled so Gatekeeper trusts them without warnings (see [docs/NOTARIZATION.md](NOTARIZATION.md))
 
 ### Known limitations / future work
 
 | Item | Issue | Notes |
 |------|-------|-------|
-| App notarization and hardened runtime | [#124](https://github.com/qaid/look-ma-no-hands/issues/124) | Requires Apple Developer Program membership; ad-hoc signing works for local use |
 | Update signature checks accept ad-hoc signatures | — | Production distribution should verify a specific Developer ID |
-| No App Sandbox | — | Disabled because Accessibility and ScreenCaptureKit APIs require it; entitlements file is prepared for when hardened runtime is enabled |
+| No App Sandbox | — | Disabled because Accessibility and ScreenCaptureKit APIs require it; entitlements file covers all required permissions for hardened runtime |
 
 ## Reporting a Vulnerability
 

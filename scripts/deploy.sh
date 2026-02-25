@@ -96,7 +96,7 @@ cp ".build/release/LookMaNoHands" "$APP_PATH/Contents/MacOS/LookMaNoHands"
 chmod +x "$APP_PATH/Contents/MacOS/LookMaNoHands"
 
 # Code sign the app to bind Info.plist (without --deep to avoid invalidating the signature)
-codesign --force --sign - "$APP_PATH"
+codesign --force --sign - --entitlements Resources/LookMaNoHands.entitlements "$APP_PATH"
 
 # Update Launch Services to recognize the new bundle name
 echo "🔄 Updating Launch Services database..."

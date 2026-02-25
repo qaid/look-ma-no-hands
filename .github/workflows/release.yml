@@ -19,8 +19,47 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      - name: Import Developer ID certificate
+        # Skip gracefully when secrets are not configured (e.g. forks)
+        if: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION != '' }}
+        env:
+          CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create a temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+
+          # Import certificate
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm /tmp/cert.p12
+
+          # Allow codesign to access the keychain without a prompt
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Extract signing identity name and export it for subsequent steps
+          IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "DEVELOPER_ID_APPLICATION=$IDENTITY" >> "$GITHUB_ENV"
+          echo "Signing identity: $IDENTITY"
+
       - name: Build DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: ./scripts/create-dmg.sh "${{ steps.version.outputs.VERSION }}"
+
+      - name: Verify notarization
+        if: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION != '' }}
+        run: |
+          spctl --assess --type open --context context:primary-signature \
+            "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
+          xcrun stapler validate "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
+          echo "✅ Notarization staple verified"
 
       - name: Create ZIP archive
         run: |
@@ -72,3 +111,8 @@ jobs:
             build/sbom.cyclonedx.json
             build/sbom.spdx.json
           generate_release_notes: true
+
+      - name: Cleanup keychain
+        if: always()
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true

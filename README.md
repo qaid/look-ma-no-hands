@@ -417,6 +417,8 @@ swift build -c release
 ./scripts/deploy.sh
 ```
 
+Official releases are built via CI, signed with a Developer ID certificate, notarized by Apple, and stapled — so macOS Gatekeeper trusts them without warnings. See [docs/NOTARIZATION.md](docs/NOTARIZATION.md) for setup instructions if you want to produce your own notarized builds.
+
 ## 👥 Contributing
 
 Contributions welcome! Please read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first.

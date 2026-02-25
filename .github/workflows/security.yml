@@ -121,6 +121,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate entitlements file
+        run: plutil -lint Resources/LookMaNoHands.entitlements
+
       - name: Build app bundle
         run: ./scripts/deploy.sh
 
