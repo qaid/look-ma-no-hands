@@ -1,0 +1,15 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+    patch:
+      default:
+        target: 50%
+        threshold: 10%
+
+ignore:
+  - "Sources/LookMaNoHands/Views/**"
+  - "Sources/LookMaNoHands/App/AppDelegate.swift"
+  - "Sources/LookMaNoHands/App/LookMaNoHandsApp.swift"
