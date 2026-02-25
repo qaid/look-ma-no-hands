@@ -27,6 +27,11 @@ struct MeetingLibraryTab: View {
     @State private var showDeleteConfirmation = false
     @State private var recordToDelete: MeetingRecord?
 
+    // Selection mode
+    @State private var isSelectionMode = false
+    @State private var selectedIDs: Set<UUID> = []
+    @State private var showBulkDeleteConfirmation = false
+
     // MARK: - Body
 
     var body: some View {
@@ -41,6 +46,13 @@ struct MeetingLibraryTab: View {
                 emptyState
             } else {
                 meetingList
+            }
+
+            if isSelectionMode {
+                Divider()
+                selectionBar
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
             }
 
             Divider()
@@ -75,6 +87,18 @@ struct MeetingLibraryTab: View {
         } message: {
             Text("This will permanently delete the meeting and all associated files.")
         }
+        .confirmationDialog(
+            "Delete \(selectedIDs.count) Meeting\(selectedIDs.count == 1 ? "" : "s")?",
+            isPresented: $showBulkDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete \(selectedIDs.count) Meeting\(selectedIDs.count == 1 ? "" : "s")", role: .destructive) {
+                bulkDelete()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete the selected meetings and all associated files.")
+        }
     }
 
     // MARK: - Toolbar
@@ -96,6 +120,16 @@ struct MeetingLibraryTab: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .frame(width: 130)
+
+            Button(isSelectionMode ? "Done" : "Edit") {
+                isSelectionMode.toggle()
+                if !isSelectionMode {
+                    selectedIDs.removeAll()
+                }
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+            .disabled(store.meetings.isEmpty)
         }
     }
 
@@ -111,10 +145,25 @@ struct MeetingLibraryTab: View {
 
     private var meetingList: some View {
         List(filteredMeetings) { record in
-            MeetingLibraryRow(record: record, store: store)
-                .contentShape(Rectangle())
-                .onTapGesture { onMeetingSelected(record) }
-                .contextMenu {
+            HStack(spacing: 8) {
+                if isSelectionMode {
+                    Image(systemName: selectedIDs.contains(record.id) ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 18))
+                        .foregroundColor(selectedIDs.contains(record.id) ? .accentColor : .secondary)
+                }
+
+                MeetingLibraryRow(record: record, store: store)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if isSelectionMode {
+                    toggleSelection(record.id)
+                } else {
+                    onMeetingSelected(record)
+                }
+            }
+            .contextMenu {
+                if !isSelectionMode {
                     Button("Open in Analyze") { onMeetingSelected(record) }
                     Divider()
                     Button("Export Transcript...") { exportTranscript(for: record) }
@@ -127,6 +176,7 @@ struct MeetingLibraryTab: View {
                         showDeleteConfirmation = true
                     }
                 }
+            }
         }
         .listStyle(.inset)
     }
@@ -333,6 +383,139 @@ struct MeetingLibraryTab: View {
                 }
             }
         }
+    }
+
+    // MARK: - Selection Bar
+
+    private var selectedRecords: [MeetingRecord] {
+        filteredMeetings.filter { selectedIDs.contains($0.id) }
+    }
+
+    private var selectedHaveNotes: Bool {
+        selectedRecords.contains { $0.notesFilename != nil }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 12) {
+            Button {
+                if selectedIDs.count == filteredMeetings.count {
+                    selectedIDs.removeAll()
+                } else {
+                    selectedIDs = Set(filteredMeetings.map(\.id))
+                }
+            } label: {
+                Text(selectedIDs.count == filteredMeetings.count ? "Deselect All" : "Select All")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.plain)
+            .foregroundColor(.accentColor)
+
+            Spacer()
+
+            Text("\(selectedIDs.count) selected")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            Button {
+                bulkExportTranscripts()
+            } label: {
+                Label("Export Transcripts", systemImage: "doc.on.doc")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(selectedIDs.isEmpty)
+
+            Button {
+                bulkExportNotes()
+            } label: {
+                Label("Export Notes", systemImage: "note.text")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(selectedIDs.isEmpty || !selectedHaveNotes)
+
+            Button {
+                showBulkDeleteConfirmation = true
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(.system(size: 12))
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .tint(.red)
+            .disabled(selectedIDs.isEmpty)
+        }
+    }
+
+    // MARK: - Selection Helpers
+
+    private func toggleSelection(_ id: UUID) {
+        if selectedIDs.contains(id) {
+            selectedIDs.remove(id)
+        } else {
+            selectedIDs.insert(id)
+        }
+    }
+
+    // MARK: - Bulk Actions
+
+    private func bulkExportTranscripts() {
+        let records = selectedRecords
+        guard !records.isEmpty else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        panel.message = "Choose a folder to export \(records.count) transcript\(records.count == 1 ? "" : "s")"
+        panel.begin { response in
+            guard response == .OK, let folder = panel.url else { return }
+            for record in records {
+                guard let text = try? store.transcriptText(for: record) else { continue }
+                let filename = sanitizeFilename(record.title) + "-transcript.txt"
+                let dest = folder.appendingPathComponent(filename)
+                try? text.write(to: dest, atomically: true, encoding: .utf8)
+            }
+        }
+    }
+
+    private func bulkExportNotes() {
+        let records = selectedRecords.filter { $0.notesFilename != nil }
+        guard !records.isEmpty else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Export Here"
+        panel.message = "Choose a folder to export \(records.count) note\(records.count == 1 ? "" : "s")"
+        panel.begin { response in
+            guard response == .OK, let folder = panel.url else { return }
+            for record in records {
+                guard let text = try? store.notesText(for: record) else { continue }
+                let filename = sanitizeFilename(record.title) + "-notes.md"
+                let dest = folder.appendingPathComponent(filename)
+                try? text.write(to: dest, atomically: true, encoding: .utf8)
+            }
+        }
+    }
+
+    private func bulkDelete() {
+        let records = selectedRecords
+        for record in records {
+            try? store.delete(record)
+        }
+        selectedIDs.removeAll()
+    }
+
+    private func sanitizeFilename(_ name: String) -> String {
+        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        return name.components(separatedBy: illegal).joined(separator: "-")
     }
 
     // MARK: - Export Helpers
