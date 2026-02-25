@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 /// Analyze tab — select a meeting, choose type, run LLM, view and export notes
@@ -29,6 +30,8 @@ struct MeetingAnalyzeTab: View {
     @State private var selectedModel: String = ""
     @State private var availableModels: [String] = []
     @State private var modelLoadTask: Task<Void, Never>?
+    @State private var isEditingTitle = false
+    @State private var editingTitleText = ""
 
     private let analyzer = MeetingAnalyzer()
     private let modelListProvider: () async throws -> [String]
@@ -158,8 +161,28 @@ struct MeetingAnalyzeTab: View {
                 .font(.system(size: 20))
                 .foregroundStyle(.tint)
 
-            Text(meeting.title)
+            if isEditingTitle {
+                TextField("Meeting title", text: $editingTitleText, onCommit: {
+                    if let updated = Self.resolveRenamedMeeting(
+                        store: store,
+                        meeting: meeting,
+                        newTitle: editingTitleText
+                    ) {
+                        selectedMeeting = updated
+                    }
+                    isEditingTitle = false
+                })
                 .font(.system(size: 16, weight: .semibold))
+                .textFieldStyle(.plain)
+                .frame(maxWidth: 300)
+            } else {
+                Text(meeting.title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .onTapGesture(count: 2) {
+                        editingTitleText = meeting.title
+                        isEditingTitle = true
+                    }
+            }
 
             if meeting.userNotesFilename != nil {
                 Text("has notes")
@@ -187,53 +210,68 @@ struct MeetingAnalyzeTab: View {
     // MARK: - Type Picker
 
     private var typePicker: some View {
-        HStack(spacing: 8) {
-            Text("Meeting type:")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 10) {
+            // Configuration
+            HStack(spacing: 12) {
+                HStack(spacing: 6) {
+                    Text("TYPE")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .tracking(0.5)
 
-            Picker("", selection: $selectedType) {
-                ForEach(MeetingType.allCases) { type in
-                    Label(type.displayName, systemImage: type.icon).tag(type)
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .onChange(of: selectedType) { oldType, newType in
-                let defaultPrompt = Settings.shared.meetingTypePrompts[oldType.rawValue] ?? oldType.defaultPrompt
-                if customPrompt != defaultPrompt {
-                    pendingTypeChange = newType
-                    selectedType = oldType  // revert until confirmed
-                    showPromptChangedAlert = true
-                } else {
-                    applyTypeChange(newType)
-                }
-            }
-
-            Text("Model:")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 8)
-
-            if availableModels.isEmpty {
-                TextField("", text: $selectedModel)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 180)
-            } else {
-                Picker("", selection: $selectedModel) {
-                    ForEach(availableModels, id: \.self) { model in
-                        Text(model).tag(model)
+                    Picker("", selection: $selectedType) {
+                        ForEach(MeetingType.allCases) { type in
+                            Label(type.displayName, systemImage: type.icon).tag(type)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
+                    .onChange(of: selectedType) { oldType, newType in
+                        let defaultPrompt = Settings.shared.meetingTypePrompts[oldType.rawValue] ?? oldType.defaultPrompt
+                        if customPrompt != defaultPrompt {
+                            pendingTypeChange = newType
+                            selectedType = oldType  // revert until confirmed
+                            showPromptChangedAlert = true
+                        } else {
+                            applyTypeChange(newType)
+                        }
                     }
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 180)
+
+                Rectangle()
+                    .fill(Color(nsColor: .separatorColor).opacity(0.3))
+                    .frame(width: 1, height: 20)
+
+                HStack(spacing: 6) {
+                    Text("MODEL")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .tracking(0.5)
+
+                    if availableModels.isEmpty {
+                        TextField("", text: $selectedModel)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 160)
+                    } else {
+                        Picker("", selection: $selectedModel) {
+                            ForEach(availableModels, id: \.self) { model in
+                                Text(model).tag(model)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .frame(width: 160)
+                    }
+                }
+
+                Spacer()
             }
 
-            Spacer()
-
-            // CTAs inline with meeting type selector, above transcript (#207)
-            actionRow
+            // Actions
+            HStack(spacing: 8) {
+                actionRow
+                Spacer()
+            }
         }
     }
 
@@ -245,15 +283,9 @@ struct MeetingAnalyzeTab: View {
 
     // MARK: - Action Row
 
-    // Minimum button width that can accommodate both the "Re-process" label and
-    // the "Cancel" label (with spinner), so the button never changes size when
-    // toggling between the two states.
-    private let processButtonMinWidth: CGFloat = 110
-
     @ViewBuilder
     private var actionRow: some View {
         if isAnalyzing {
-            // Cancel button with inline spinner to indicate background work (#current)
             Button {
                 cancelAnalysis()
             } label: {
@@ -264,12 +296,11 @@ struct MeetingAnalyzeTab: View {
                         .frame(width: 14, height: 14)
                     Text("Cancel")
                 }
-                .frame(minWidth: processButtonMinWidth)
+                .frame(minWidth: 100)
             }
             .buttonStyle(.bordered)
             .keyboardShortcut(.escape, modifiers: [])
         } else {
-            // Process / Re-process
             Button {
                 runAnalysis()
             } label: {
@@ -277,40 +308,48 @@ struct MeetingAnalyzeTab: View {
                     hasProcessed ? "Re-process" : "Process",
                     systemImage: "sparkles"
                 )
-                .frame(minWidth: processButtonMinWidth)
+                .frame(minWidth: 100)
             }
             .buttonStyle(.borderedProminent)
             .disabled(transcript.isEmpty)
             .keyboardShortcut("n", modifiers: .command)
         }
 
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(notes, forType: .string)
-            statusMessage = "Notes copied to clipboard"
-        } label: {
-            Label("Copy Notes", systemImage: "doc.on.doc")
-        }
-        .buttonStyle(.bordered)
-        .disabled(notes.isEmpty)
+        Divider()
+            .frame(height: 20)
 
-        Button {
-            if let meeting = selectedMeeting { saveNotes(for: meeting) }
-        } label: {
-            Label("Save Notes...", systemImage: "square.and.arrow.down")
-        }
-        .buttonStyle(.bordered)
-        .disabled(notes.isEmpty)
+        HStack(spacing: 4) {
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(notes, forType: .string)
+                statusMessage = "Notes copied to clipboard"
+            } label: {
+                Image(systemName: "doc.on.doc")
+            }
+            .buttonStyle(.bordered)
+            .disabled(notes.isEmpty)
+            .help("Copy notes to clipboard")
 
-        Button {
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(transcript, forType: .string)
-            statusMessage = "Transcript copied to clipboard"
-        } label: {
-            Label("Copy Transcript", systemImage: "doc.text")
+            Button {
+                if let meeting = selectedMeeting { saveNotes(for: meeting) }
+            } label: {
+                Image(systemName: "square.and.arrow.down")
+            }
+            .buttonStyle(.bordered)
+            .disabled(notes.isEmpty)
+            .help("Export notes to file")
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(transcript, forType: .string)
+                statusMessage = "Transcript copied to clipboard"
+            } label: {
+                Image(systemName: "doc.text")
+            }
+            .buttonStyle(.bordered)
+            .disabled(transcript.isEmpty)
+            .help("Copy transcript to clipboard")
         }
-        .buttonStyle(.bordered)
-        .disabled(transcript.isEmpty)
     }
 
     // MARK: - Transcript Section
@@ -322,7 +361,7 @@ struct MeetingAnalyzeTab: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: showTranscript ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text("Transcript")
                         .font(.system(size: 14, weight: .semibold))
@@ -359,7 +398,7 @@ struct MeetingAnalyzeTab: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: showPrompt ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.secondary)
                     Text("Prompt")
                         .font(.system(size: 14, weight: .semibold))
@@ -413,26 +452,14 @@ struct MeetingAnalyzeTab: View {
             }
 
             ScrollView {
-                Group {
-                    if let attributed = try? AttributedString(
-                        markdown: notes,
-                        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-                    ) {
-                        Text(attributed)
-                            .font(.system(size: 13))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(12)
-                    } else {
-                        Text(notes)
-                            .font(.system(size: 13))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(12)
+                Markdown(notes)
+                    .markdownTheme(.gitHub)
+                    .markdownTextStyle {
+                        FontSize(13)
                     }
-                }
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
             }
             .frame(maxWidth: .infinity, minHeight: 160, maxHeight: 400)
             .background(Color(nsColor: .textBackgroundColor))
@@ -458,6 +485,7 @@ struct MeetingAnalyzeTab: View {
         showPrompt = false
         streamedNotes = ""
         statusMessage = ""
+        isEditingTitle = false
 
         modelLoadTask?.cancel()
         modelLoadTask = Task {
@@ -574,6 +602,26 @@ struct MeetingAnalyzeTab: View {
             selected = models.first ?? defaultModel
         }
         return (selected, models)
+    }
+
+    static func resolveRenamedMeeting(
+        store: MeetingStore,
+        meeting: MeetingRecord,
+        newTitle: String
+    ) -> MeetingRecord? {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        do {
+            try store.renameMeeting(meeting, to: trimmed)
+        } catch {
+            return nil
+        }
+        if let updated = store.meetings.first(where: { $0.id == meeting.id }) {
+            return updated
+        }
+        var fallback = meeting
+        fallback.title = trimmed
+        return fallback
     }
 
 #if DEBUG

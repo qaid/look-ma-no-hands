@@ -282,6 +282,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let meetingRetentionDays = "meetingRetentionDays"
         static let meetingRetentionCount = "meetingRetentionCount"
         static let meetingTypePrompts = "meetingTypePrompts"
+        static let meetingWindowWasOpen = "meetingWindowWasOpen"
     }
 
     // MARK: - File Paths
@@ -456,6 +457,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether the meeting window was open when the app last quit
+    @Published var meetingWindowWasOpen: Bool {
+        didSet {
+            UserDefaults.standard.set(meetingWindowWasOpen, forKey: Keys.meetingWindowWasOpen)
+        }
+    }
+
     /// Date of the last successful update check
     var lastUpdateCheckDate: Date? {
         get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
@@ -565,6 +573,9 @@ Now produce the complete meeting notes following the format above. Ensure every 
         } else {
             self.meetingTypePrompts = [:]
         }
+
+        // Meeting window state restoration
+        self.meetingWindowWasOpen = UserDefaults.standard.bool(forKey: Keys.meetingWindowWasOpen)
 
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
@@ -720,5 +731,6 @@ Now produce the complete meeting notes following the format above. Ensure every 
         meetingRetentionDays = 90
         meetingRetentionCount = 0
         meetingTypePrompts = [:]
+        meetingWindowWasOpen = false
     }
 }

@@ -225,6 +225,20 @@ class MeetingStore {
         }
     }
 
+    /// Rename a meeting's title and persist to disk
+    func renameMeeting(_ record: MeetingRecord, to newTitle: String) throws {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        var updated = record
+        updated.title = trimmed
+        let dir = meetingDirectory(for: record)
+        let metaData = try JSONEncoder().encode(updated)
+        try metaData.write(to: dir.appendingPathComponent("metadata.json"), options: .atomic)
+        if let idx = meetings.firstIndex(where: { $0.id == record.id }) {
+            meetings[idx] = updated
+        }
+    }
+
     /// Delete a meeting record and its folder from disk
     func delete(_ record: MeetingRecord) throws {
         let dir = meetingDirectory(for: record)

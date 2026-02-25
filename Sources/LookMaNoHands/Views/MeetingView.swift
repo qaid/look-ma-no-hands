@@ -25,8 +25,8 @@ extension Color {
 
 enum MeetingTab: String, CaseIterable {
     case record = "Record"
-    case library = "Library"
     case analyze = "Analyze"
+    case library = "Library"
 
     var icon: String {
         switch self {
@@ -78,6 +78,15 @@ struct MeetingView: View {
             }
             .tag(MeetingTab.record)
 
+            MeetingAnalyzeTab(
+                store: store,
+                selectedMeeting: $selectedMeeting
+            )
+            .tabItem {
+                Label(MeetingTab.analyze.rawValue, systemImage: MeetingTab.analyze.icon)
+            }
+            .tag(MeetingTab.analyze)
+
             MeetingLibraryTab(
                 store: store,
                 whisperService: whisperService
@@ -89,15 +98,6 @@ struct MeetingView: View {
                 Label(MeetingTab.library.rawValue, systemImage: MeetingTab.library.icon)
             }
             .tag(MeetingTab.library)
-
-            MeetingAnalyzeTab(
-                store: store,
-                selectedMeeting: $selectedMeeting
-            )
-            .tabItem {
-                Label(MeetingTab.analyze.rawValue, systemImage: MeetingTab.analyze.icon)
-            }
-            .tag(MeetingTab.analyze)
         }
         .frame(minWidth: 700, minHeight: 500)
     }

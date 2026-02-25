@@ -71,6 +71,8 @@ class LiveMeetingState {
     }
     var isNotesSidebarVisible = false
     var noteInputText = ""
+    /// Timestamp captured the moment the note input gains focus (not at submission)
+    var noteFocusTimestamp: TimeInterval?
 
     private var timelineEntriesCache: [TimelineEntry] = []
     private var isTimelineDirty = true
