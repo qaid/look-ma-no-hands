@@ -52,7 +52,9 @@ class LiveMeetingState {
     var isRecording = false
     var isPaused = false
     var currentTranscript = ""
-    var segments: [TranscriptSegment] = []
+    var segments: [TranscriptSegment] = [] {
+        didSet { isTimelineDirty = true }
+    }
     var recordingSessions: [RecordingSession] = []
     var selectedSessionIndex: Int? = nil
     var structuredNotes: String?
@@ -64,12 +66,21 @@ class LiveMeetingState {
     var isActive = true
 
     // User notes (inline note-taking during recording)
-    var userNotes: [UserNote] = []
+    var userNotes: [UserNote] = [] {
+        didSet { isTimelineDirty = true }
+    }
     var isNotesSidebarVisible = false
     var noteInputText = ""
 
+    private var timelineEntriesCache: [TimelineEntry] = []
+    private var isTimelineDirty = true
+
     var timelineEntries: [TimelineEntry] {
-        TimelineEntry.merge(segments: segments, notes: userNotes)
+        if isTimelineDirty {
+            timelineEntriesCache = TimelineEntry.merge(segments: segments, notes: userNotes)
+            isTimelineDirty = false
+        }
+        return timelineEntriesCache
     }
 
     // Streaming progress
