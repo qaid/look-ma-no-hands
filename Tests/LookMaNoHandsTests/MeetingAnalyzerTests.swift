@@ -63,4 +63,44 @@ final class MeetingAnalyzerTests: XCTestCase {
         XCTAssertTrue(mockService.unloadCalled)
         XCTAssertGreaterThanOrEqual(progressCalls, 1)
     }
+
+    // MARK: - Prompt Augmentation
+
+    func testBuildFullPromptIncludesNoteInstructionWhenMarkersPresent() {
+        let transcript = "Hello team\n\n[USER NOTE @ 01:30] Check timeline\n\nLet's continue"
+        let prompt = "Analyze this meeting"
+
+        let fullPrompt = MeetingAnalyzer.buildFullPrompt(prompt: prompt, transcript: transcript)
+
+        XCTAssertTrue(fullPrompt.contains("## My Notes"))
+        XCTAssertTrue(fullPrompt.contains("[USER NOTE @"))
+        XCTAssertTrue(fullPrompt.contains("Analyze this meeting"))
+        XCTAssertTrue(fullPrompt.contains(transcript))
+    }
+
+    func testBuildFullPromptOmitsNoteInstructionWhenNoMarkers() {
+        let transcript = "Hello team\n\nLet's continue"
+        let prompt = "Analyze this meeting"
+
+        let fullPrompt = MeetingAnalyzer.buildFullPrompt(prompt: prompt, transcript: transcript)
+
+        XCTAssertFalse(fullPrompt.contains("## My Notes"))
+        XCTAssertTrue(fullPrompt.contains("Analyze this meeting"))
+        XCTAssertTrue(fullPrompt.contains(transcript))
+    }
+
+    func testPromptAugmentationPassedToOllama() async throws {
+        let mockService = MockOllamaService(modelName: "default")
+        let analyzer = MeetingAnalyzer(ollamaService: mockService)
+
+        _ = try await analyzer.analyzeMeeting(
+            transcript: "Discussion\n\n[USER NOTE @ 02:00] Important point",
+            customPrompt: "Summarize",
+            model: "test:1"
+        )
+
+        XCTAssertNotNil(mockService.lastPrompt)
+        XCTAssertTrue(mockService.lastPrompt!.contains("## My Notes"))
+        XCTAssertTrue(mockService.lastPrompt!.contains("[USER NOTE @ 02:00] Important point"))
+    }
 }

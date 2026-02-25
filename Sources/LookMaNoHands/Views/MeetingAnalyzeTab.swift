@@ -161,6 +161,16 @@ struct MeetingAnalyzeTab: View {
             Text(meeting.title)
                 .font(.system(size: 16, weight: .semibold))
 
+            if meeting.userNotesFilename != nil {
+                Text("has notes")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.orange)
+                    .clipShape(Capsule())
+            }
+
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {

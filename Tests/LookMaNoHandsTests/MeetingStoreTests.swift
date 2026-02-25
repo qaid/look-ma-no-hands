@@ -187,4 +187,63 @@ final class MeetingStoreTests: XCTestCase {
         let store = MeetingStore(rootDirectory: root)
         XCTAssertNil(try store.notesText(for: record))
     }
+
+    func testSaveRecordedMeetingWithUserNotes() async throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = MeetingStore(rootDirectory: root)
+        let segments = [
+            TranscriptSegment(text: "Hello team", startTime: 10, endTime: 15, timestamp: Date()),
+            TranscriptSegment(text: "Let's begin", startTime: 30, endTime: 35, timestamp: Date())
+        ]
+        let notes = [
+            UserNote(text: "Ask about deadline", timestamp: 20)
+        ]
+
+        let record = try await store.saveRecordedMeeting(
+            segments: segments,
+            userNotes: notes,
+            duration: 60,
+            type: .general
+        )
+
+        // Verify transcript contains note markers
+        let transcript = try store.transcriptText(for: record)
+        XCTAssertTrue(transcript.contains("[USER NOTE @ 00:20] Ask about deadline"))
+        XCTAssertTrue(transcript.contains("Hello team"))
+        XCTAssertTrue(transcript.contains("Let's begin"))
+
+        // Verify user-notes.json exists and is valid
+        XCTAssertEqual(record.userNotesFilename, "user-notes.json")
+        let loadedNotes = try store.userNotes(for: record)
+        XCTAssertNotNil(loadedNotes)
+        XCTAssertEqual(loadedNotes?.count, 1)
+        XCTAssertEqual(loadedNotes?.first?.text, "Ask about deadline")
+    }
+
+    func testSaveRecordedMeetingWithoutNotes() async throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = MeetingStore(rootDirectory: root)
+        let segments = [
+            TranscriptSegment(text: "Hello team", startTime: 0, endTime: 5, timestamp: Date())
+        ]
+
+        let record = try await store.saveRecordedMeeting(
+            segments: segments,
+            duration: 30,
+            type: .general
+        )
+
+        // Verify no user notes file
+        XCTAssertNil(record.userNotesFilename)
+        XCTAssertNil(try store.userNotes(for: record))
+
+        // Verify transcript is plain (no note markers)
+        let transcript = try store.transcriptText(for: record)
+        XCTAssertFalse(transcript.contains("[USER NOTE"))
+        XCTAssertEqual(transcript, "Hello team")
+    }
 }

@@ -14,6 +14,27 @@ class MeetingAnalyzer {
         self.ollamaService = ollamaService
     }
 
+    // MARK: - Prompt Building
+
+    /// Instruction suffix appended when transcript contains user notes
+    static let noteInstructionSuffix = """
+
+IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These are the user's own observations, questions, and action items captured during the meeting. In your output, include a dedicated "## My Notes" section that lists each user note with its timestamp, preserving the user's original wording. Do not mix user notes into the main analysis prose.
+"""
+
+    /// Build the full prompt, appending note instructions only when the transcript contains user note markers
+    static func buildFullPrompt(prompt: String, transcript: String) -> String {
+        let hasNotes = transcript.contains("[USER NOTE @")
+        let effectivePrompt = hasNotes ? prompt + noteInstructionSuffix : prompt
+        return """
+\(effectivePrompt)
+
+# Transcript
+
+\(transcript)
+"""
+    }
+
     // MARK: - Analysis
 
     /// Analyze a meeting transcript and generate structured notes
@@ -27,17 +48,8 @@ class MeetingAnalyzer {
             throw AnalysisError.emptyTranscript
         }
 
-        // Get prompt (custom or default)
         let prompt = customPrompt ?? Settings.shared.meetingPrompt
-
-        // Build the full prompt with transcript
-        let fullPrompt = """
-\(prompt)
-
-# Transcript
-
-\(transcript)
-"""
+        let fullPrompt = Self.buildFullPrompt(prompt: prompt, transcript: transcript)
 
         // Set the model name first
         ollamaService.modelName = model ?? Settings.shared.ollamaModel
@@ -79,17 +91,8 @@ class MeetingAnalyzer {
             throw AnalysisError.emptyTranscript
         }
 
-        // Get prompt (custom or default)
         let prompt = customPrompt ?? Settings.shared.meetingPrompt
-
-        // Build the full prompt with transcript
-        let fullPrompt = """
-\(prompt)
-
-# Transcript
-
-\(transcript)
-"""
+        let fullPrompt = Self.buildFullPrompt(prompt: prompt, transcript: transcript)
 
         // Set the model name first
         ollamaService.modelName = model ?? Settings.shared.ollamaModel

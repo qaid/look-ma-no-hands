@@ -19,6 +19,7 @@ struct MeetingRecord: Identifiable, Codable {
     var transcriptFilename: String    // always "transcript.txt"
     var notesFilename: String?        // "notes.md" — nil until LLM run
     var audioFilename: String?        // for imported audio copy
+    var userNotesFilename: String?    // "user-notes.json" — nil when no inline notes
     var segmentCount: Int
 
     init(
@@ -31,6 +32,7 @@ struct MeetingRecord: Identifiable, Codable {
         transcriptFilename: String = "transcript.txt",
         notesFilename: String? = nil,
         audioFilename: String? = nil,
+        userNotesFilename: String? = nil,
         segmentCount: Int
     ) {
         self.id = id
@@ -42,6 +44,7 @@ struct MeetingRecord: Identifiable, Codable {
         self.transcriptFilename = transcriptFilename
         self.notesFilename = notesFilename
         self.audioFilename = audioFilename
+        self.userNotesFilename = userNotesFilename
         self.segmentCount = segmentCount
     }
 }

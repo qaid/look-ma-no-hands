@@ -63,6 +63,15 @@ class LiveMeetingState {
     var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
     var isActive = true
 
+    // User notes (inline note-taking during recording)
+    var userNotes: [UserNote] = []
+    var isNotesSidebarVisible = false
+    var noteInputText = ""
+
+    var timelineEntries: [TimelineEntry] {
+        TimelineEntry.merge(segments: segments, notes: userNotes)
+    }
+
     // Streaming progress
     var generationProgress: Double = 0.0
     var estimatedTotalChars: Int = 0

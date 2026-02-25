@@ -49,6 +49,7 @@ class MeetingStore {
     /// Save a freshly recorded meeting to disk and insert into the list
     func saveRecordedMeeting(
         segments: [TranscriptSegment],
+        userNotes: [UserNote] = [],
         duration: TimeInterval,
         type: MeetingType
     ) async throws -> MeetingRecord {
@@ -57,23 +58,62 @@ class MeetingStore {
         formatter.dateFormat = "MMM d, yyyy h:mm a"
         let title = "\(type.displayName) - \(formatter.string(from: Date()))"
 
+        let hasNotes = !userNotes.isEmpty
+
         let record = MeetingRecord(
             id: id,
             title: title,
             duration: duration,
             meetingType: type,
             source: .recorded,
+            userNotesFilename: hasNotes ? "user-notes.json" : nil,
             segmentCount: segments.count
         )
 
-        let transcript = segments.map { $0.text }.joined(separator: "\n\n")
+        let transcript = Self.buildMergedTranscript(segments: segments, userNotes: userNotes)
         try await writeRecord(record, transcript: transcript)
+
+        // Write user-notes.json alongside transcript when notes exist
+        if hasNotes {
+            let dir = meetingDirectory(for: record)
+            let notesData = try JSONEncoder().encode(userNotes)
+            try notesData.write(to: dir.appendingPathComponent("user-notes.json"), options: .atomic)
+        }
 
         await MainActor.run {
             meetings.insert(record, at: 0)
         }
         applyRetentionPolicy()
         return record
+    }
+
+    /// Build a merged transcript that interleaves user notes at their timestamp positions
+    static func buildMergedTranscript(segments: [TranscriptSegment], userNotes: [UserNote]) -> String {
+        guard !userNotes.isEmpty else {
+            return segments.map { $0.text }.joined(separator: "\n\n")
+        }
+
+        let entries = TimelineEntry.merge(segments: segments, notes: userNotes)
+        var lines: [String] = []
+        for entry in entries {
+            switch entry {
+            case .segment(let seg, _):
+                lines.append(seg.text)
+            case .note(let note):
+                let mm = Int(note.timestamp) / 60
+                let ss = Int(note.timestamp) % 60
+                lines.append("[USER NOTE @ \(String(format: "%02d:%02d", mm, ss))] \(note.text)")
+            }
+        }
+        return lines.joined(separator: "\n\n")
+    }
+
+    /// Read user notes for a meeting (nil if no inline notes were captured)
+    func userNotes(for record: MeetingRecord) throws -> [UserNote]? {
+        guard let filename = record.userNotesFilename else { return nil }
+        let url = meetingDirectory(for: record).appendingPathComponent(filename)
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode([UserNote].self, from: data)
     }
 
     /// Import a plain text / markdown / SRT transcript file
