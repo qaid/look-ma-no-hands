@@ -15,17 +15,19 @@ struct MeetingLibraryTab: View {
 
     @State private var searchText = ""
     @State private var typeFilter: MeetingType? = nil
-    @State private var showImportTranscriptPanel = false
-    @State private var showImportAudioPanel = false
     @State private var importProgress: Double = 0
     @State private var importStatusMessage = ""
     @State private var showImportProgress = false
     @State private var importType: MeetingType = .general
     @State private var showImportTypeSheet = false
-    @State private var pendingImportURL: URL?
     @State private var pendingImportIsAudio = false
     @State private var showDeleteConfirmation = false
     @State private var recordToDelete: MeetingRecord?
+
+    // Rename
+    @State private var recordToRename: MeetingRecord?
+    @State private var renameText = ""
+    @State private var showRenameAlert = false
 
     // Selection mode
     @State private var isSelectionMode = false
@@ -37,8 +39,9 @@ struct MeetingLibraryTab: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbarView
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 24)
                 .padding(.vertical, 10)
+                .animation(.default, value: isSelectionMode)
 
             Divider()
 
@@ -47,25 +50,6 @@ struct MeetingLibraryTab: View {
             } else {
                 meetingList
             }
-
-            if isSelectionMode {
-                Divider()
-                selectionBar
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-            }
-
-            Divider()
-
-            importBar
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-
-            Divider()
-
-            retentionSettingsView
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
         }
         .sheet(isPresented: $showImportProgress) {
             importProgressSheet
@@ -99,38 +83,269 @@ struct MeetingLibraryTab: View {
         } message: {
             Text("This will permanently delete the selected meetings and all associated files.")
         }
+        .alert("Rename Meeting", isPresented: $showRenameAlert) {
+            TextField("Meeting title", text: $renameText)
+            Button("Rename") {
+                if let record = recordToRename {
+                    try? store.renameMeeting(record, to: renameText)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter a new title for this meeting.")
+        }
     }
 
     // MARK: - Toolbar
 
+    @ViewBuilder
     private var toolbarView: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
+        if isSelectionMode {
+            selectionToolbar
+        } else {
+            normalToolbar
+        }
+    }
 
-            TextField("Search meetings", text: $searchText)
-                .textFieldStyle(.plain)
+    private var normalToolbar: some View {
+        VStack(spacing: 10) {
+            // Row 1: Search + utility actions
+            HStack(spacing: 8) {
+                // Select toggle
+                Button {
+                    isSelectionMode = true
+                } label: {
+                    Image(systemName: "checkmark.circle")
+                        .font(.system(size: 16))
+                        .frame(width: 26, height: 26)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .disabled(store.meetings.isEmpty)
+                .help("Select meetings")
 
-            Picker("Filter by type", selection: $typeFilter) {
-                Text("All types").tag(MeetingType?.none)
-                ForEach(MeetingType.allCases) { type in
-                    Label(type.displayName, systemImage: type.icon).tag(Optional(type))
+                // Search field with clear button
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.tertiary)
+
+                    TextField("Search meetings...", text: $searchText)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
+                        )
+                }
+
+                Divider()
+                    .frame(height: 22)
+
+                // Import menu
+                Menu {
+                    Button {
+                        pendingImportIsAudio = false
+                        showImportTypeSheet = true
+                    } label: {
+                        Label("Import Transcript...", systemImage: "doc.badge.plus")
+                    }
+                    .disabled(store.isImportingAudio)
+
+                    Button {
+                        pendingImportIsAudio = true
+                        showImportTypeSheet = true
+                    } label: {
+                        Label("Import Audio...", systemImage: "waveform.badge.plus")
+                    }
+                    .disabled(store.isRecording || store.isImportingAudio)
+                } label: {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 16))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(.secondary)
+                }
+                .menuIndicator(.hidden)
+                .help("Import a transcript or audio file")
+
+                // Settings menu
+                Menu {
+                    Section("Retention") {
+                        Picker("Keep", selection: retentionDaysBinding) {
+                            Text("Forever").tag(0)
+                            Text("30 days").tag(30)
+                            Text("90 days").tag(90)
+                            Text("180 days").tag(180)
+                            Text("1 year").tag(365)
+                        }
+                    }
+                    Section("Max count") {
+                        Picker("Max count", selection: retentionCountBinding) {
+                            Text("Unlimited").tag(0)
+                            Text("10 meetings").tag(10)
+                            Text("25 meetings").tag(25)
+                            Text("50 meetings").tag(50)
+                            Text("100 meetings").tag(100)
+                        }
+                    }
+                    Divider()
+                    Text("\(store.meetings.count) meetings stored")
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16))
+                        .frame(width: 28, height: 28)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(.secondary)
+                }
+                .menuIndicator(.hidden)
+                .help("Retention settings")
+            }
+
+            // Row 2: Type filter pills
+            if !store.meetings.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        filterPill("All", icon: "tray.full", isActive: typeFilter == nil) {
+                            withAnimation(.easeInOut(duration: 0.15)) { typeFilter = nil }
+                        }
+                        ForEach(MeetingType.allCases) { type in
+                            filterPill(type.displayName, icon: type.icon, isActive: typeFilter == type) {
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    typeFilter = (typeFilter == type) ? nil : type
+                                }
+                            }
+                        }
+                    }
                 }
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .frame(width: 130)
+        }
+    }
 
-            Button(isSelectionMode ? "Done" : "Edit") {
-                isSelectionMode.toggle()
-                if !isSelectionMode {
+    private func filterPill(_ label: String, icon: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 10))
+                Text(label)
+                    .font(.system(size: 12, weight: isActive ? .semibold : .regular))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background {
+                Capsule()
+                    .fill(isActive ? Color.accentColor.opacity(0.12) : Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(
+                                isActive ? Color.accentColor.opacity(0.35) : Color(nsColor: .separatorColor).opacity(0.3),
+                                lineWidth: 0.5
+                            )
+                    )
+            }
+            .foregroundStyle(isActive ? Color.accentColor : .secondary)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var selectionToolbar: some View {
+        HStack(spacing: 10) {
+            Button("Cancel") {
+                isSelectionMode = false
+                selectedIDs.removeAll()
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 14))
+            .foregroundColor(.accentColor)
+
+            Button {
+                if selectedIDs.count == filteredMeetings.count {
                     selectedIDs.removeAll()
+                } else {
+                    selectedIDs = Set(filteredMeetings.map(\.id))
                 }
+            } label: {
+                Text(selectedIDs.count == filteredMeetings.count && !selectedIDs.isEmpty ? "Deselect All" : "Select All")
+                    .font(.system(size: 14))
             }
             .buttonStyle(.plain)
             .foregroundColor(.accentColor)
-            .disabled(store.meetings.isEmpty)
+
+            Spacer()
+
+            Text(selectedIDs.isEmpty ? "Select items" : "\(selectedIDs.count) selected")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+
+            Spacer()
+
+            // Export menu
+            Menu {
+                Button("Export Transcripts...") { bulkExportTranscripts() }
+                Button("Export Notes...") { bulkExportNotes() }
+                    .disabled(!selectedHaveNotes)
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 16))
+                    .foregroundColor(selectedIDs.isEmpty ? .secondary.opacity(0.5) : .secondary)
+            }
+            .menuIndicator(.hidden)
+            .disabled(selectedIDs.isEmpty)
+            .help("Export selected meetings")
+
+            // Delete
+            Button {
+                showBulkDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash")
+                    .font(.system(size: 16))
+                    .foregroundColor(selectedIDs.isEmpty ? .secondary.opacity(0.5) : .red)
+            }
+            .buttonStyle(.plain)
+            .disabled(selectedIDs.isEmpty)
+            .help("Delete selected meetings")
         }
+    }
+
+    // MARK: - Retention Bindings
+
+    private var retentionDaysBinding: Binding<Int> {
+        Binding(
+            get: { Settings.shared.meetingRetentionDays },
+            set: {
+                Settings.shared.meetingRetentionDays = $0
+                store.applyRetentionPolicy()
+            }
+        )
+    }
+
+    private var retentionCountBinding: Binding<Int> {
+        Binding(
+            get: { Settings.shared.meetingRetentionCount },
+            set: {
+                Settings.shared.meetingRetentionCount = $0
+                store.applyRetentionPolicy()
+            }
+        )
     }
 
     // MARK: - Meeting List
@@ -165,6 +380,11 @@ struct MeetingLibraryTab: View {
             .contextMenu {
                 if !isSelectionMode {
                     Button("Open in Analyze") { onMeetingSelected(record) }
+                    Button("Rename...") {
+                        recordToRename = record
+                        renameText = record.title
+                        showRenameAlert = true
+                    }
                     Divider()
                     Button("Export Transcript...") { exportTranscript(for: record) }
                     if record.notesFilename != nil {
@@ -190,88 +410,13 @@ struct MeetingLibraryTab: View {
                 .foregroundColor(.secondary)
             Text(searchText.isEmpty && typeFilter == nil ? "No meetings yet" : "No meetings match your filters")
                 .font(.system(size: 16, weight: .medium))
-            Text("Meetings are saved automatically when you stop recording,\nor import transcript and audio files below.")
+            Text("Meetings are saved automatically when you stop recording,\nor use the import button in the toolbar above.")
                 .font(.system(size: 13))
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(40)
-    }
-
-    // MARK: - Import Bar
-
-    private var importBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                pendingImportIsAudio = false
-                showImportTypeSheet = true
-            } label: {
-                Label("Import Transcript...", systemImage: "doc.badge.plus")
-            }
-            .buttonStyle(.bordered)
-            .disabled(store.isImportingAudio)
-
-            Button {
-                pendingImportIsAudio = true
-                showImportTypeSheet = true
-            } label: {
-                Label("Import Audio...", systemImage: "waveform.badge.plus")
-            }
-            .buttonStyle(.bordered)
-            .disabled(store.isRecording || store.isImportingAudio)
-            .help(store.isRecording ? "Stop recording before importing audio" : "Import an audio file for transcription")
-
-            Spacer()
-        }
-    }
-
-    // MARK: - Retention Settings
-
-    private var retentionSettingsView: some View {
-        HStack(spacing: 16) {
-            Text("Retention:")
-                .font(.system(size: 13))
-                .foregroundColor(.secondary)
-
-            Picker("Keep", selection: Binding(
-                get: { Settings.shared.meetingRetentionDays },
-                set: {
-                    Settings.shared.meetingRetentionDays = $0
-                    store.applyRetentionPolicy()
-                }
-            )) {
-                Text("Forever").tag(0)
-                Text("30 days").tag(30)
-                Text("90 days").tag(90)
-                Text("180 days").tag(180)
-                Text("1 year").tag(365)
-            }
-            .pickerStyle(.menu)
-            .frame(width: 100)
-
-            Picker("Max count", selection: Binding(
-                get: { Settings.shared.meetingRetentionCount },
-                set: {
-                    Settings.shared.meetingRetentionCount = $0
-                    store.applyRetentionPolicy()
-                }
-            )) {
-                Text("Unlimited").tag(0)
-                Text("10 meetings").tag(10)
-                Text("25 meetings").tag(25)
-                Text("50 meetings").tag(50)
-                Text("100 meetings").tag(100)
-            }
-            .pickerStyle(.menu)
-            .frame(width: 120)
-
-            Spacer()
-
-            Text("\(store.meetings.count) meetings stored")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-        }
     }
 
     // MARK: - Import Type Sheet
@@ -371,7 +516,7 @@ struct MeetingLibraryTab: View {
                     ) { progress, chunk in
                         await MainActor.run {
                             importProgress = progress
-                            importStatusMessage = chunk.prefix(80) + (chunk.count > 80 ? "…" : "")
+                            importStatusMessage = chunk.prefix(80) + (chunk.count > 80 ? "..." : "")
                         }
                     }
                     await MainActor.run { showImportProgress = false }
@@ -385,7 +530,7 @@ struct MeetingLibraryTab: View {
         }
     }
 
-    // MARK: - Selection Bar
+    // MARK: - Selection Helpers
 
     private var selectedRecords: [MeetingRecord] {
         filteredMeetings.filter { selectedIDs.contains($0.id) }
@@ -394,64 +539,6 @@ struct MeetingLibraryTab: View {
     private var selectedHaveNotes: Bool {
         selectedRecords.contains { $0.notesFilename != nil }
     }
-
-    private var selectionBar: some View {
-        HStack(spacing: 12) {
-            Button {
-                if selectedIDs.count == filteredMeetings.count {
-                    selectedIDs.removeAll()
-                } else {
-                    selectedIDs = Set(filteredMeetings.map(\.id))
-                }
-            } label: {
-                Text(selectedIDs.count == filteredMeetings.count ? "Deselect All" : "Select All")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.plain)
-            .foregroundColor(.accentColor)
-
-            Spacer()
-
-            Text("\(selectedIDs.count) selected")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
-
-            Spacer()
-
-            Button {
-                bulkExportTranscripts()
-            } label: {
-                Label("Export Transcripts", systemImage: "doc.on.doc")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(selectedIDs.isEmpty)
-
-            Button {
-                bulkExportNotes()
-            } label: {
-                Label("Export Notes", systemImage: "note.text")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(selectedIDs.isEmpty || !selectedHaveNotes)
-
-            Button {
-                showBulkDeleteConfirmation = true
-            } label: {
-                Label("Delete", systemImage: "trash")
-                    .font(.system(size: 12))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .tint(.red)
-            .disabled(selectedIDs.isEmpty)
-        }
-    }
-
-    // MARK: - Selection Helpers
 
     private func toggleSelection(_ id: UUID) {
         if selectedIDs.contains(id) {
@@ -567,14 +654,14 @@ private struct MeetingLibraryRow: View {
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
 
-                    Text("·")
+                    Text("\u{00B7}")
                         .foregroundColor(.secondary)
 
                     Text(formatDuration(record.duration))
                         .font(.system(size: 11))
                         .foregroundColor(.secondary)
 
-                    Text("·")
+                    Text("\u{00B7}")
                         .foregroundColor(.secondary)
 
                     Text("\(record.segmentCount) segments")

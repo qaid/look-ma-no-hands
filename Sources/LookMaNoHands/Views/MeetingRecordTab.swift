@@ -29,6 +29,12 @@ struct MeetingRecordTab: View {
     @State private var scrollProxy: ScrollViewProxy?
     @FocusState private var isNoteInputFocused: Bool
 
+    // Note-above indicator state
+    @State private var showNoteAboveIndicator = false
+    @State private var lastSubmittedNoteID: UUID?
+    @State private var noteAboveCount = 0
+    @State private var scrollViewHeight: CGFloat = 0
+
     // MARK: - Init
 
     init(
@@ -74,13 +80,6 @@ struct MeetingRecordTab: View {
             transcriptView
                 .padding(.horizontal, 24)
                 .padding(.vertical, 16)
-
-            Divider()
-
-            bottomActionsView
-                .padding(.horizontal, 24)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
         }
         .onAppear {
             checkStatus()
@@ -103,7 +102,7 @@ struct MeetingRecordTab: View {
     private var headerView: some View {
         HStack(spacing: 12) {
             Image(systemName: "mic.fill")
-                .font(.system(size: 14))
+                .font(.system(size: 16))
                 .foregroundColor(.secondary)
 
             Text(liveState.meetingTitle)
@@ -129,7 +128,7 @@ struct MeetingRecordTab: View {
     private var typePicker: some View {
         HStack(spacing: 8) {
             Text("Meeting type:")
-                .font(.system(size: 13))
+                .font(.system(size: 14))
                 .foregroundColor(.secondary)
 
             Picker("", selection: $selectedType) {
@@ -157,7 +156,7 @@ struct MeetingRecordTab: View {
                     .foregroundColor(recordButtonColor)
             }
             .buttonStyle(.plain)
-            .disabled(!liveState.canRecord && liveState.status != .missingPermissions)
+            .disabled(liveState.status == .completed || (!liveState.canRecord && liveState.status != .missingPermissions))
             .disabled(store.isImportingAudio)
             .help(liveState.isRecording ? "Stop recording" : "Start recording")
 
@@ -166,7 +165,7 @@ struct MeetingRecordTab: View {
                 .keyboardShortcut(.space, modifiers: [])
                 .frame(width: 0, height: 0)
                 .opacity(0)
-                .disabled(isNoteInputFocused || store.isImportingAudio || (!liveState.canRecord && liveState.status != .missingPermissions))
+                .disabled(isNoteInputFocused || store.isImportingAudio || liveState.status == .completed || (!liveState.canRecord && liveState.status != .missingPermissions))
 
             if liveState.isRecording {
                 WaveformLineView(frequencyBands: Binding(
@@ -174,13 +173,13 @@ struct MeetingRecordTab: View {
                     set: { _ in }
                 ), height: 50)
                     .frame(maxWidth: .infinity)
-            } else if !liveState.recordingSessions.isEmpty {
-                recordingBarsView
+            } else if liveState.status == .completed {
+                completedVisualizationState
             } else {
                 emptyVisualizationState
             }
 
-            if liveState.isRecording || !liveState.recordingSessions.isEmpty {
+            if liveState.isRecording {
                 Text(formatTime(totalDuration))
                     .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundColor(.secondary)
@@ -204,31 +203,36 @@ struct MeetingRecordTab: View {
     private var recordButtonColor: Color {
         if store.isImportingAudio { return .secondary }
         if liveState.isRecording { return .red }
+        if liveState.status == .completed { return .secondary }
         if liveState.status == .missingPermissions { return .red }
         if !liveState.canRecord { return .secondary }
         return .red
     }
 
-    private var recordingBarsView: some View {
-        HStack(spacing: 8) {
-            ForEach(Array(liveState.recordingSessions.enumerated()), id: \.offset) { index, session in
-                recordingBar(for: session, at: index)
+    private var completedVisualizationState: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.green)
+                Text("Recording saved")
+                    .font(.system(size: 14, weight: .medium))
+                Text(formatTime(totalDuration))
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
+
+            Spacer()
+
+            Button {
+                resetForNewRecording()
+            } label: {
+                Label("New Recording", systemImage: "plus.circle")
+                    .font(.system(size: 13))
+            }
+            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    private func recordingBar(for session: RecordingSession, at index: Int) -> some View {
-        let isSelected = liveState.selectedSessionIndex == index
-        return RoundedRectangle(cornerRadius: 6)
-            .fill(isSelected ? Color.blue : Color(nsColor: .controlBackgroundColor))
-            .frame(maxWidth: .infinity, minHeight: 40)
-            .overlay(
-                Text(formatTime(session.duration))
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(isSelected ? .white : .secondary)
-            )
-            .onTapGesture { selectRecordingSession(at: index) }
     }
 
     private var totalDuration: TimeInterval {
@@ -246,15 +250,10 @@ struct MeetingRecordTab: View {
                 Button { showTranscript.toggle() } label: {
                     HStack(spacing: 8) {
                         Image(systemName: showTranscript ? "chevron.down" : "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.secondary)
-                        Image(systemName: "doc.text").font(.system(size: 14))
+                        Image(systemName: "doc.text").font(.system(size: 16))
                         Text("Transcription").font(.system(size: 15, weight: .medium))
-                        if !liveState.segments.isEmpty {
-                            Text("\(liveState.segments.count) segments")
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
-                        }
                     }
                 }
                 .buttonStyle(.plain)
@@ -262,9 +261,9 @@ struct MeetingRecordTab: View {
                 Button {
                     showClearConfirmation = true
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "trash").font(.system(size: 12))
-                        Text("Clear").font(.system(size: 13))
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash").font(.system(size: 14))
+                        Text("Clear").font(.system(size: 14))
                     }
                     .foregroundColor(.secondary)
                 }
@@ -287,12 +286,12 @@ struct MeetingRecordTab: View {
                     Button {
                         liveState.isNotesSidebarVisible.toggle()
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "note.text").font(.system(size: 12))
-                            Text(liveState.isNotesSidebarVisible ? "Hide Notes" : "Show Notes")
-                                .font(.system(size: 13))
+                        HStack(spacing: 6) {
+                            Image(systemName: "pencil.line").font(.system(size: 14))
+                            Text("Jot Notes")
+                                .font(.system(size: 14))
                         }
-                        .foregroundColor(.orange)
+                        .foregroundColor(liveState.isNotesSidebarVisible ? .orange : .secondary)
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut("j", modifiers: .command)
@@ -310,7 +309,7 @@ struct MeetingRecordTab: View {
                             .frame(width: 240)
                     }
                 }
-                .frame(height: 200)
+                .frame(minHeight: 200, maxHeight: .infinity)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
@@ -355,7 +354,7 @@ struct MeetingRecordTab: View {
                                         .frame(width: 60, alignment: .leading)
 
                                     HStack(spacing: 6) {
-                                        Image(systemName: "note.text")
+                                        Image(systemName: "pencil.line")
                                             .font(.system(size: 12))
                                             .foregroundColor(.orange)
                                         Text(note.text)
@@ -368,6 +367,28 @@ struct MeetingRecordTab: View {
                                 .padding(.horizontal, 8)
                                 .background(Color.orange.opacity(0.08))
                                 .cornerRadius(6)
+                                .id("note-\(note.id.uuidString)")
+                                .background(
+                                    Group {
+                                        if note.id == lastSubmittedNoteID {
+                                            GeometryReader { noteGeo in
+                                                Color.clear
+                                                    .onChange(of: noteGeo.frame(in: .named("transcriptScroll")).minY) { _, minY in
+                                                        if showNoteAboveIndicator && minY >= -20 && minY < scrollViewHeight {
+                                                            withAnimation(.easeOut(duration: 0.2)) {
+                                                                showNoteAboveIndicator = false
+                                                                noteAboveCount = 0
+                                                            }
+                                                        }
+                                                    }
+                                            }
+                                        }
+                                    }
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .scale(scale: 0.97, anchor: .leading).combined(with: .opacity),
+                                    removal: .opacity
+                                ))
                             }
                         }
                         Color.clear.frame(height: 1).id("timeline-bottom")
@@ -375,11 +396,51 @@ struct MeetingRecordTab: View {
                 }
                 .padding(.top, 8)
             }
+            .coordinateSpace(name: "transcriptScroll")
+            .background(
+                GeometryReader { geo in
+                    Color.clear.onAppear { scrollViewHeight = geo.size.height }
+                        .onChange(of: geo.size.height) { _, h in scrollViewHeight = h }
+                }
+            )
+            .overlay(alignment: .top) {
+                if showNoteAboveIndicator {
+                    NoteAboveIndicator(count: noteAboveCount) {
+                        if let id = lastSubmittedNoteID {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
+                                proxy.scrollTo("note-\(id.uuidString)", anchor: .center)
+                            }
+                            withAnimation(.easeOut(duration: 0.2).delay(0.5)) {
+                                showNoteAboveIndicator = false
+                                noteAboveCount = 0
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .move(edge: .top).combined(with: .opacity)
+                    ))
+                }
+            }
+            .animation(.spring(response: 0.3, dampingFraction: 0.72), value: showNoteAboveIndicator)
             .onChange(of: liveState.segments.count) { _, _ in
-                withAnimation { proxy.scrollTo("timeline-bottom", anchor: .bottom) }
+                if !isNoteInputFocused {
+                    withAnimation { proxy.scrollTo("timeline-bottom", anchor: .bottom) }
+                    if showNoteAboveIndicator {
+                        withAnimation(.easeOut(duration: 0.15).delay(0.3)) {
+                            showNoteAboveIndicator = false
+                            noteAboveCount = 0
+                        }
+                    }
+                }
             }
             .onChange(of: liveState.userNotes.count) { _, _ in
-                withAnimation { proxy.scrollTo("timeline-bottom", anchor: .bottom) }
+                if !isNoteInputFocused {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                        proxy.scrollTo("timeline-bottom", anchor: .bottom)
+                    }
+                }
             }
             .onAppear { scrollProxy = proxy }
         }
@@ -389,29 +450,6 @@ struct MeetingRecordTab: View {
 
     private var notesSidebarPane: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack(spacing: 6) {
-                Image(systemName: "note.text")
-                    .font(.system(size: 12))
-                    .foregroundColor(.orange)
-                Text("My Notes")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.orange)
-                Spacer()
-                if !liveState.userNotes.isEmpty {
-                    Text("\(liveState.userNotes.count)")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Capsule().fill(Color.orange))
-                }
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-
-            Divider()
-
             // Notes list
             ScrollView {
                 VStack(spacing: 6) {
@@ -436,36 +474,77 @@ struct MeetingRecordTab: View {
 
             Divider()
 
-            // Input area — always visible at bottom
-            VStack(spacing: 6) {
-                TextField("Jot a note...", text: $liveState.noteInputText, axis: .vertical)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .lineLimit(1...3)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .stroke(Color.orange.opacity(0.5), lineWidth: 1)
-                    )
-                    .focused($isNoteInputFocused)
-                    .onSubmit {
-                        // Cmd+Return submits (plain Return creates newline in multiline)
-                        submitNote()
-                    }
+            // Input area with timestamp badge
+            noteInputArea
+        }
+    }
 
-                Button {
-                    submitNote()
-                } label: {
-                    Text("Add Note")
-                        .font(.system(size: 12, weight: .medium))
-                        .frame(maxWidth: .infinity)
+    private var noteInputArea: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            // Timestamp badge — visible when field is focused
+            if let stamp = liveState.noteFocusTimestamp {
+                HStack(spacing: 4) {
+                    Image(systemName: "pencil.line")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.orange)
+                    Text("@ \(formatTimestamp(stamp))")
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.orange)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.orange)
-                .disabled(liveState.noteInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .keyboardShortcut(.return, modifiers: .command)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(
+                    Capsule()
+                        .fill(Color.orange.opacity(0.12))
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.orange.opacity(0.35), lineWidth: 0.75)
+                        )
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.85, anchor: .leading).combined(with: .opacity),
+                    removal: .opacity
+                ))
             }
-            .padding(8)
+
+            TextField("Jot a note...", text: $liveState.noteInputText, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .lineLimit(1...3)
+                .padding(8)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(
+                            isNoteInputFocused ? Color.orange.opacity(0.8) : Color.orange.opacity(0.4),
+                            lineWidth: isNoteInputFocused ? 1.5 : 1
+                        )
+                        .animation(.easeOut(duration: 0.12), value: isNoteInputFocused)
+                )
+                .focused($isNoteInputFocused)
+                .onSubmit { submitNote() }
+
+            Button { submitNote() } label: {
+                Text("Add Note")
+                    .font(.system(size: 12, weight: .medium))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
+            .disabled(liveState.noteInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .keyboardShortcut(.return, modifiers: .command)
+        }
+        .padding(8)
+        .animation(.spring(response: 0.25, dampingFraction: 0.75), value: liveState.noteFocusTimestamp != nil)
+        .onChange(of: isNoteInputFocused) { _, focused in
+            if focused {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.75)) {
+                    liveState.noteFocusTimestamp = totalDuration
+                }
+            } else if liveState.noteInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    liveState.noteFocusTimestamp = nil
+                }
+            }
         }
     }
 
@@ -473,57 +552,21 @@ struct MeetingRecordTab: View {
         let text = liveState.noteInputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
 
-        let note = UserNote(
-            text: text,
-            timestamp: totalDuration
-        )
+        let stamp = liveState.noteFocusTimestamp ?? totalDuration
+        let note = UserNote(text: text, timestamp: stamp)
         liveState.userNotes.append(note)
         liveState.noteInputText = ""
-    }
+        liveState.noteFocusTimestamp = nil
 
-    // MARK: - Bottom Actions
+        // Unfocus note input so transcript auto-scrolling resumes,
+        // giving the user visual confirmation that live transcription continues.
+        isNoteInputFocused = false
 
-    private var mergedTranscriptText: String {
-        MeetingStore.buildMergedTranscript(segments: liveState.segments, userNotes: liveState.userNotes)
-    }
-
-    private var bottomActionsView: some View {
-        HStack(spacing: 12) {
-            Button {
-                let text = mergedTranscriptText
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(text, forType: .string)
-                liveState.statusMessage = "Transcript copied"
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.on.doc").font(.system(size: 16))
-                    Text("Copy").font(.system(size: 15))
-                }
-                .frame(width: 120, height: 32)
-            }
-            .buttonStyle(.bordered)
-            .disabled(liveState.segments.isEmpty && liveState.userNotes.isEmpty)
-
-            Button {
-                saveTranscript()
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.and.arrow.down").font(.system(size: 16))
-                    Text("Export").font(.system(size: 15))
-                }
-                .frame(width: 120, height: 32)
-            }
-            .buttonStyle(.bordered)
-            .disabled(liveState.segments.isEmpty && liveState.userNotes.isEmpty)
-
-            Spacer()
-
-            if !liveState.statusMessage.isEmpty {
-                Text(liveState.statusMessage)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
+        // Show "note above" indicator since transcript has scrolled past insertion point
+        lastSubmittedNoteID = note.id
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+            noteAboveCount += 1
+            showNoteAboveIndicator = true
         }
     }
 
@@ -594,7 +637,7 @@ struct MeetingRecordTab: View {
 
         liveState.isRecording = false
         liveState.status = .completed
-        liveState.statusMessage = "\(liveState.segments.count) segments"
+        liveState.statusMessage = "Recording complete"
 
         store.isRecording = false
         appDelegate?.isMeetingRecording = false
@@ -653,33 +696,27 @@ struct MeetingRecordTab: View {
         liveState.segments.removeAll()
         liveState.userNotes.removeAll()
         liveState.noteInputText = ""
+        liveState.noteFocusTimestamp = nil
         liveState.isNotesSidebarVisible = false
         liveState.recordingSessions.removeAll()
         liveState.elapsedTime = 0
         liveState.sessionStartDate = nil
         liveState.statusMessage = "Ready to start"
         liveState.status = .ready
+        showNoteAboveIndicator = false
+        noteAboveCount = 0
+        lastSubmittedNoteID = nil
         continuousTranscriber.clearSegments()
     }
 
-    private func saveTranscript() {
-        let text = mergedTranscriptText
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "meeting-transcript.txt"
-        panel.allowedContentTypes = [.plainText]
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            try? text.write(to: url, atomically: true, encoding: .utf8)
-        }
-    }
-
-    private func selectRecordingSession(at index: Int) {
-        liveState.selectedSessionIndex = liveState.selectedSessionIndex == index ? nil : index
+    private func resetForNewRecording() {
+        clearTranscript()
     }
 
     // MARK: - Status Check
 
     private func checkStatus() {
+        if liveState.status == .completed { return }
         if !whisperService.isModelLoaded {
             liveState.status = .missingModel
             return
@@ -726,5 +763,33 @@ struct MeetingRecordTab: View {
 
     private func formatTimestamp(_ seconds: TimeInterval) -> String {
         String(format: "%02d:%02d", Int(seconds) / 60, Int(seconds) % 60)
+    }
+}
+
+// MARK: - Note Above Indicator
+
+@available(macOS 13.0, *)
+private struct NoteAboveIndicator: View {
+    let count: Int
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(count == 1 ? "1 note above" : "\(count) notes above")
+                    .font(.system(size: 12, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color.orange)
+                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }

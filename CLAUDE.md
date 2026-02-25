@@ -14,6 +14,7 @@
 |skills/security-review:{SKILL.md}
 |skills/swiftui-expert-skill:{SKILL.md}
 |skills/swiftui-expert-skill/references:{animation-advanced.md,animation-basics.md,animation-transitions.md,image-optimization.md,layout-best-practices.md,liquid-glass.md,list-patterns.md,modern-apis.md,performance-patterns.md,scroll-patterns.md,sheet-navigation-patterns.md,state-management.md,text-formatting.md,view-structure.md}
+|skills/frontend-design:{SKILL.md}
 |skills/ux-review:{SKILL.md}
 |skills/web-research-synthesizer:{SKILL.md}
 

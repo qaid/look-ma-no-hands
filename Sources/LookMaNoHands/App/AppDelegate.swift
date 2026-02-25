@@ -134,6 +134,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             _ = await NotificationService.shared.requestPermission()
         }
 
+        // Restore meeting window if it was open when the app last quit
+        if Settings.shared.meetingWindowWasOpen {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.openMeetingTranscription()
+            }
+        }
+
         // Show launch splash if enabled and not coming from onboarding
         if Settings.shared.showLaunchConfirmation {
             // Small delay to ensure app is fully initialized
@@ -563,6 +570,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
+        Settings.shared.meetingWindowWasOpen = true
         NSLog("✅ Meeting Transcription window created and displayed")
     }
     
@@ -1655,6 +1663,7 @@ extension AppDelegate: NSWindowDelegate {
 
         // If the meeting window is closing, revert to accessory mode
         if window === meetingWindow {
+            Settings.shared.meetingWindowWasOpen = false
             NSApp.setActivationPolicy(.accessory)
             print("Meeting window closed - reverted to accessory mode")
         }
