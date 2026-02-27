@@ -64,6 +64,11 @@ class ContinuousTranscriber {
         self.whisperService = whisperService
     }
 
+    deinit {
+        isTranscribing = false
+        audioBuffer.removeAll()
+    }
+
     // MARK: - Session Control
 
     /// Start a new transcription session

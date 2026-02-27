@@ -36,6 +36,13 @@ class MixedAudioRecorder {
         setupSystemAudioCallback()
     }
 
+    deinit {
+        if isRecording {
+            _ = microphoneRecorder.stopRecording()
+            isRecording = false
+        }
+    }
+
     // MARK: - Recording Control
 
     /// Start capturing and mixing both audio sources

@@ -20,9 +20,6 @@ class SystemAudioRecorder: NSObject {
     /// Audio stream from ScreenCaptureKit
     private var stream: SCStream?
 
-    /// Audio engine for processing captured audio
-    private let audioEngine = AVAudioEngine()
-
     /// Buffer to store captured audio samples
     private var audioBuffer: [Float] = []
     private let bufferLock = NSLock()  // Thread-safe access to audioBuffer
@@ -35,6 +32,14 @@ class SystemAudioRecorder: NSObject {
 
     /// Callback for audio data chunks
     var onAudioChunk: (([Float]) -> Void)?
+
+    deinit {
+        if isRecording {
+            stream?.stopCapture { _ in }
+            stream = nil
+            isRecording = false
+        }
+    }
 
     // MARK: - Permissions
 

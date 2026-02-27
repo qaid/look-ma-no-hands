@@ -3,7 +3,7 @@ import WhisperKit
 
 /// Service for transcribing audio using the local Whisper model
 /// Uses WhisperKit by Argmax with Apple Silicon optimizations
-/// Thread safety is handled internally by WhisperKit
+/// Serializes transcribe() calls to prevent concurrent access from dictation and meeting mode
 class WhisperService: @unchecked Sendable {
 
     // MARK: - Properties
@@ -22,6 +22,10 @@ class WhisperService: @unchecked Sendable {
 
     /// Name of the currently loaded model (e.g., "base", "large-v3-turbo")
     private(set) var loadedModelName: String?
+
+    /// Lock to serialize transcription calls (shared between dictation and meeting mode)
+    private let transcriptionLock = NSLock()
+    private var isTranscribing = false
     
     // MARK: - Initialization
 
@@ -92,6 +96,23 @@ class WhisperService: @unchecked Sendable {
 
         guard !samples.isEmpty else {
             throw WhisperError.emptyAudio
+        }
+
+        // Serialize transcription calls — prevents concurrent access from dictation and meeting mode
+        // which can corrupt WhisperKit state and cause long blocking that disables the CGEvent tap
+        while true {
+            let acquired = transcriptionLock.withLock {
+                if !isTranscribing {
+                    isTranscribing = true
+                    return true
+                }
+                return false
+            }
+            if acquired { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        defer {
+            transcriptionLock.withLock { isTranscribing = false }
         }
 
         let startTime = Date()

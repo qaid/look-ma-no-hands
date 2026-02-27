@@ -924,7 +924,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if transcriptionState.isRecording {
             print("Stopping recording...")
             stopRecordingAndTranscribe()
-        } else if transcriptionState.recordingState == .idle {
+        } else if transcriptionState.recordingState == .idle ||
+                  transcriptionState.recordingState.isError {
+            if transcriptionState.recordingState.isError {
+                print("Recovering from error state, resetting...")
+                transcriptionState.reset()
+            }
             print("Starting recording...")
             startRecording()
         } else {
@@ -1267,6 +1272,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
                 await MainActor.run {
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
+                    // Auto-recover from error state after 3 seconds
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(3))
+                        if self.transcriptionState.recordingState.isError {
+                            self.transcriptionState.reset()
+                        }
+                    }
                 }
             }
         }.value

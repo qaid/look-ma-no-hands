@@ -99,6 +99,16 @@ class KeyboardMonitor {
             guard let refcon = refcon else { return Unmanaged.passUnretained(event) }
 
             let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(refcon).takeUnretainedValue()
+
+            // macOS disables the tap if the callback takes too long — re-enable it
+            if type == .tapDisabledByTimeout {
+                if let tap = monitor.eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+                NSLog("⚠️ KeyboardMonitor: Event tap re-enabled after timeout")
+                return Unmanaged.passUnretained(event)
+            }
+
             let shouldConsume = monitor.handleEvent(type: type, event: event)
 
             // If handleEvent returned true, consume the event (return nil) to prevent system handling

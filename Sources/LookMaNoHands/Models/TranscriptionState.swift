@@ -26,6 +26,11 @@ enum RecordingState: Equatable {
             return "Error: \(message)"
         }
     }
+
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
+    }
 }
 
 /// Central state management for the transcription pipeline
