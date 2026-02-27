@@ -219,23 +219,13 @@ struct MeetingAnalyzeTab: View {
                         .foregroundStyle(.tertiary)
                         .tracking(0.5)
 
-                    Picker("", selection: $selectedType) {
+                    Picker("", selection: typePickerBinding) {
                         ForEach(MeetingType.allCases) { type in
                             Label(type.displayName, systemImage: type.icon).tag(type)
                         }
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
-                    .onChange(of: selectedType) { oldType, newType in
-                        let defaultPrompt = Settings.shared.meetingTypePrompts[oldType.rawValue] ?? oldType.defaultPrompt
-                        if customPrompt != defaultPrompt {
-                            pendingTypeChange = newType
-                            selectedType = oldType  // revert until confirmed
-                            showPromptChangedAlert = true
-                        } else {
-                            applyTypeChange(newType)
-                        }
-                    }
                 }
 
                 Rectangle()
@@ -273,6 +263,21 @@ struct MeetingAnalyzeTab: View {
                 Spacer()
             }
         }
+    }
+
+    private var typePickerBinding: Binding<MeetingType> {
+        Binding(
+            get: { selectedType },
+            set: { newType in
+                let defaultPrompt = Settings.shared.meetingTypePrompts[selectedType.rawValue] ?? selectedType.defaultPrompt
+                if customPrompt != defaultPrompt {
+                    pendingTypeChange = newType
+                    showPromptChangedAlert = true
+                } else {
+                    applyTypeChange(newType)
+                }
+            }
+        )
     }
 
     private func applyTypeChange(_ type: MeetingType) {

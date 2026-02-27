@@ -12,8 +12,8 @@ struct MeetingRecordTab: View {
 
     // MARK: - Services
 
-    private let mixedAudioRecorder: MixedAudioRecorder
-    private let continuousTranscriber: ContinuousTranscriber
+    @State private var mixedAudioRecorder: MixedAudioRecorder
+    @State private var continuousTranscriber: ContinuousTranscriber
     private let whisperService: WhisperService
     private let recordingIndicator: RecordingIndicatorWindowController?
     private weak var appDelegate: AppDelegate?
@@ -49,10 +49,8 @@ struct MeetingRecordTab: View {
         self.recordingIndicator = recordingIndicator
         self.appDelegate = appDelegate
         self.onRecordingFinished = onRecordingFinished
-        self.mixedAudioRecorder = MixedAudioRecorder()
-        self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
-        setupTranscriberCallbacks()
-        setupAudioRecorderCallback()
+        _mixedAudioRecorder = State(initialValue: MixedAudioRecorder())
+        _continuousTranscriber = State(initialValue: ContinuousTranscriber(whisperService: whisperService))
     }
 
     // MARK: - Body
@@ -82,6 +80,9 @@ struct MeetingRecordTab: View {
                 .padding(.vertical, 16)
         }
         .onAppear {
+            liveState.isActive = true
+            setupTranscriberCallbacks()
+            setupAudioRecorderCallback()
             checkStatus()
             if liveState.status == .missingPermissions {
                 CGRequestScreenCaptureAccess()
@@ -148,24 +149,50 @@ struct MeetingRecordTab: View {
 
     private var recordingVisualizationView: some View {
         HStack(spacing: 12) {
-            Button {
-                handleRecordingToggle()
-            } label: {
-                Image(systemName: liveState.isRecording ? "stop.circle.fill" : "record.circle")
-                    .font(.system(size: 32))
-                    .foregroundColor(recordButtonColor)
+            if liveState.status == .completed {
+                // Pill-shaped "New" button replaces the record button after completion
+                Button {
+                    resetForNewRecording()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("New")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .frame(height: 36)
+                    .background(Capsule().fill(Color.red))
+                }
+                .buttonStyle(.plain)
+                .help("Start a new recording")
+            } else {
+                Button {
+                    handleRecordingToggle()
+                } label: {
+                    Image(systemName: liveState.isRecording ? "stop.circle.fill" : "record.circle")
+                        .font(.system(size: 32))
+                        .foregroundColor(recordButtonColor)
+                }
+                .buttonStyle(.plain)
+                .disabled(!liveState.canRecord && liveState.status != .missingPermissions)
+                .disabled(store.isImportingAudio)
+                .help(liveState.isRecording ? "Stop recording" : "Start recording")
             }
-            .buttonStyle(.plain)
-            .disabled(liveState.status == .completed || (!liveState.canRecord && liveState.status != .missingPermissions))
-            .disabled(store.isImportingAudio)
-            .help(liveState.isRecording ? "Stop recording" : "Start recording")
 
             // Hidden button for Space shortcut — disabled when note input has focus
-            Button("") { handleRecordingToggle() }
+            Button("") {
+                if liveState.status == .completed {
+                    resetForNewRecording()
+                } else {
+                    handleRecordingToggle()
+                }
+            }
                 .keyboardShortcut(.space, modifiers: [])
                 .frame(width: 0, height: 0)
                 .opacity(0)
-                .disabled(isNoteInputFocused || store.isImportingAudio || liveState.status == .completed || (!liveState.canRecord && liveState.status != .missingPermissions))
+                .disabled(isNoteInputFocused || store.isImportingAudio || (!liveState.canRecord && liveState.status != .missingPermissions && liveState.status != .completed))
 
             if liveState.isRecording {
                 WaveformLineView(frequencyBands: Binding(
@@ -203,34 +230,22 @@ struct MeetingRecordTab: View {
     private var recordButtonColor: Color {
         if store.isImportingAudio { return .secondary }
         if liveState.isRecording { return .red }
-        if liveState.status == .completed { return .secondary }
         if liveState.status == .missingPermissions { return .red }
         if !liveState.canRecord { return .secondary }
         return .red
     }
 
     private var completedVisualizationState: some View {
-        HStack(spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(.green)
-                Text("Recording saved")
-                    .font(.system(size: 14, weight: .medium))
-                Text(formatTime(totalDuration))
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-
+        HStack(spacing: 6) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 16))
+                .foregroundStyle(.green)
+            Text("Recording saved")
+                .font(.system(size: 14, weight: .medium))
+            Text(formatTime(totalDuration))
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
             Spacer()
-
-            Button {
-                resetForNewRecording()
-            } label: {
-                Label("New Recording", systemImage: "plus.circle")
-                    .font(.system(size: 13))
-            }
-            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
     }
@@ -711,6 +726,7 @@ struct MeetingRecordTab: View {
 
     private func resetForNewRecording() {
         clearTranscript()
+        Task { await startRecording() }
     }
 
     // MARK: - Status Check
