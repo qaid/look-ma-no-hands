@@ -82,6 +82,7 @@ struct MeetingRecordTab: View {
                 .padding(.vertical, 16)
         }
         .onAppear {
+            liveState.isActive = true
             checkStatus()
             if liveState.status == .missingPermissions {
                 CGRequestScreenCaptureAccess()
