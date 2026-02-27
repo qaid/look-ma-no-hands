@@ -12,8 +12,8 @@ struct MeetingRecordTab: View {
 
     // MARK: - Services
 
-    private let mixedAudioRecorder: MixedAudioRecorder
-    private let continuousTranscriber: ContinuousTranscriber
+    @State private var mixedAudioRecorder: MixedAudioRecorder
+    @State private var continuousTranscriber: ContinuousTranscriber
     private let whisperService: WhisperService
     private let recordingIndicator: RecordingIndicatorWindowController?
     private weak var appDelegate: AppDelegate?
@@ -49,10 +49,8 @@ struct MeetingRecordTab: View {
         self.recordingIndicator = recordingIndicator
         self.appDelegate = appDelegate
         self.onRecordingFinished = onRecordingFinished
-        self.mixedAudioRecorder = MixedAudioRecorder()
-        self.continuousTranscriber = ContinuousTranscriber(whisperService: whisperService)
-        setupTranscriberCallbacks()
-        setupAudioRecorderCallback()
+        _mixedAudioRecorder = State(initialValue: MixedAudioRecorder())
+        _continuousTranscriber = State(initialValue: ContinuousTranscriber(whisperService: whisperService))
     }
 
     // MARK: - Body
@@ -83,6 +81,8 @@ struct MeetingRecordTab: View {
         }
         .onAppear {
             liveState.isActive = true
+            setupTranscriberCallbacks()
+            setupAudioRecorderCallback()
             checkStatus()
             if liveState.status == .missingPermissions {
                 CGRequestScreenCaptureAccess()
