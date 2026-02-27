@@ -6,6 +6,7 @@ enum MeetingType: String, CaseIterable, Codable, Identifiable {
     case oneOnOne = "oneOnOne"
     case allHands = "allHands"
     case customerCall = "customerCall"
+    case videoEssay = "videoEssay"
     case general = "general"
     case custom = "custom"
 
@@ -17,6 +18,7 @@ enum MeetingType: String, CaseIterable, Codable, Identifiable {
         case .oneOnOne: return "1:1"
         case .allHands: return "All-Hands"
         case .customerCall: return "Customer Call"
+        case .videoEssay: return "Video Essay"
         case .general: return "General"
         case .custom: return "Custom"
         }
@@ -28,6 +30,7 @@ enum MeetingType: String, CaseIterable, Codable, Identifiable {
         case .oneOnOne: return "person.2"
         case .allHands: return "person.3"
         case .customerCall: return "phone"
+        case .videoEssay: return "play.rectangle"
         case .general: return "doc.text"
         case .custom: return "slider.horizontal.3"
         }
@@ -116,6 +119,33 @@ You are summarizing a customer call. Focus on:
 
 ## Notable Quotes
 > Key things the customer said verbatim
+
+## Transcript
+[TRANSCRIPTION_PLACEHOLDER]
+"""
+        case .videoEssay:
+            return """
+/no_think
+
+You are summarizing a video essay or lecture — a single-speaker, long-form presentation that develops an argument or explores a topic in depth. Focus on:
+
+## Thesis / Central Argument
+- The main claim or question the speaker is exploring
+
+## Key Arguments & Evidence
+- Major points made, in the order presented
+- Supporting evidence, examples, or data cited for each
+
+## Referenced Works & Sources
+- Books, papers, people, videos, or other sources the speaker mentions or quotes
+
+## Notable Quotes
+> Memorable or particularly well-stated lines from the speaker
+
+## Conclusions & Takeaways
+- What the speaker concludes or wants the audience to take away
+
+Keep the structure clean and concise. Preserve the logical flow of the speaker's argument rather than imposing chronological timestamps. Use bullet points, not paragraphs.
 
 ## Transcript
 [TRANSCRIPTION_PLACEHOLDER]
