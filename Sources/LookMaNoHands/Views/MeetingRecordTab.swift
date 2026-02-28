@@ -326,6 +326,8 @@ struct MeetingRecordTab: View {
                 }
                 .frame(minHeight: 200, maxHeight: .infinity)
                 .transition(.opacity.combined(with: .move(edge: .top)))
+            } else {
+                Spacer(minLength: 0)
             }
         }
     }
