@@ -1,0 +1,535 @@
+/* ============================================================
+   Look Ma No Hands — Shared Component Styles
+   Patterns extracted from SwiftUI views.
+   ============================================================ */
+
+/* ── Status Pill / Capsule ──────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-footnote);
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+.pill-green   { background: var(--color-green); }
+.pill-red     { background: var(--color-recording-red); }
+.pill-orange  { background: var(--color-orange); }
+.pill-blue    { background: var(--color-blue); }
+.pill-purple  { background: var(--color-purple); }
+.pill-gray    { background: rgba(128,128,128,0.45); }
+
+/* ── Status Dot ─────────────────────────────────────────── */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.dot-green  { background: var(--color-green); }
+.dot-red    { background: var(--color-recording-red); }
+.dot-orange { background: var(--color-orange); }
+
+/* ── Material Panel (ultraThinMaterial) ─────────────────── */
+.material {
+  background: var(--color-material);
+  border: var(--border-material);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+}
+.material-rounded {
+  border-radius: var(--radius-xl);
+}
+
+/* ── Card (controlBackgroundColor surface) ──────────────── */
+.card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-separator);
+}
+
+/* ── Sidebar list item ──────────────────────────────────── */
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: default;
+  color: var(--color-text-primary);
+  font-size: var(--text-body);
+  text-decoration: none;
+}
+.sidebar-item:hover {
+  background: var(--color-surface-3);
+}
+.sidebar-item.active {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  font-weight: 500;
+}
+.sidebar-item .icon {
+  width: 18px;
+  text-align: center;
+  font-size: 15px;
+  opacity: 0.85;
+}
+
+/* ── Permission Row ─────────────────────────────────────── */
+.permission-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-separator);
+}
+.permission-row .perm-icon {
+  font-size: 28px;
+  width: 44px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.permission-row .perm-info { flex: 1; }
+.permission-row .perm-title {
+  font-size: var(--text-headline);
+  font-weight: 600;
+}
+.permission-row .perm-desc {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.permission-row .perm-status { flex-shrink: 0; }
+
+/* ── Filter Pill (active / inactive) ───────────────────── */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-footnote);
+  font-weight: 500;
+  cursor: default;
+  border: 1px solid var(--color-separator);
+  background: transparent;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+.filter-pill.active {
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ── Meeting Row ────────────────────────────────────────── */
+.meeting-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  cursor: default;
+}
+.meeting-row:hover { background: var(--color-surface-3); }
+.meeting-row.selected { background: var(--color-accent-dim); }
+.meeting-row .meeting-icon {
+  font-size: 20px;
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.meeting-row .meeting-info { flex: 1; min-width: 0; }
+.meeting-row .meeting-title {
+  font-size: var(--text-body);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meeting-row .meeting-meta {
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+.meeting-row .meeting-duration {
+  font-size: var(--text-caption);
+  font-family: var(--font-mono);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ── Key Cap (hotkey display) ───────────────────────────── */
+.keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: var(--text-caption);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-separator);
+  border-bottom: 2px solid var(--color-separator);
+  color: var(--color-text-primary);
+}
+
+/* ── SF Symbol Icon (inline SVG wrapper) ───────────────── */
+.sf-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.sf-icon svg {
+  display: block;
+}
+
+/* ── Waveform visualization (CSS bars — legacy) ────────── */
+.waveform {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+}
+.waveform-bar {
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to top, #007AFF, #8B5CF6);
+  animation: waveBar 0.8s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+.waveform-bar:nth-child(odd)  { animation-delay: 0s; }
+.waveform-bar:nth-child(even) { animation-delay: 0.2s; }
+@keyframes waveBar {
+  from { transform: scaleY(0.15); opacity: 0.5; }
+  to   { transform: scaleY(1.0);  opacity: 1.0; }
+}
+
+/* ── Smooth Waveform Line (SVG bezier, matches WaveformLineView) ── */
+.waveform-smooth {
+  flex: 1;
+  height: 34px;
+  overflow: hidden;
+}
+.waveform-smooth svg {
+  width: 100%;
+  height: 100%;
+}
+.waveform-smooth-60 {
+  height: 60px;
+}
+
+/* ── Progress bar ───────────────────────────────────────── */
+.progress-bar {
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+.progress-bar .fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  transition: width 0.3s ease;
+}
+
+/* ── Button styles ──────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  font-weight: 400;
+  font-family: var(--font-family);
+  cursor: default;
+  border: 1px solid var(--color-separator);
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+.btn-primary {
+  background: var(--color-accent);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 500;
+}
+.btn-sm {
+  padding: 3px 10px;
+  font-size: var(--text-footnote);
+}
+.btn-lg {
+  padding: 8px 24px;
+  font-size: var(--text-callout);
+  font-weight: 500;
+  border-radius: var(--radius-lg);
+}
+.btn-danger {
+  background: var(--color-recording-red);
+  border-color: transparent;
+  color: #fff;
+}
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-secondary);
+}
+.btn-ghost:hover { color: var(--color-text-primary); }
+
+/* ── Divider ─────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--color-separator);
+  flex-shrink: 0;
+}
+.divider-v {
+  width: 1px;
+  background: var(--color-separator);
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+/* ── Section heading ────────────────────────────────────── */
+.section-title {
+  font-size: var(--text-headline);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+}
+
+/* ── Feature row (icon + label) ─────────────────────────── */
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-body);
+}
+.feature-row .feature-icon {
+  width: 24px;
+  text-align: center;
+  color: var(--color-accent);
+  font-size: var(--text-headline);
+  flex-shrink: 0;
+}
+
+/* ── Transcript segment row ─────────────────────────────── */
+.segment-row {
+  display: flex;
+  gap: var(--space-3);
+  padding: 4px var(--space-2);
+}
+.segment-ts {
+  font-size: var(--text-subhead);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  width: 52px;
+  flex-shrink: 0;
+}
+.segment-text {
+  font-size: var(--text-headline);
+  flex: 1;
+}
+.segment-row.note-row {
+  background: rgba(255, 159, 10, 0.08);
+  border-radius: var(--radius-md);
+}
+.segment-row.note-row .segment-ts {
+  color: var(--color-orange);
+}
+.note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-orange);
+  font-size: var(--text-subhead);
+}
+
+/* ── Checkbox / Toggle ──────────────────────────────────── */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+  cursor: default;
+}
+.checkbox-box {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--color-separator);
+  background: var(--color-surface-2);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  color: var(--color-accent);
+}
+.checkbox-box.checked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* ── TextField ──────────────────────────────────────────── */
+.textfield {
+  width: 100%;
+  padding: var(--space-2) var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-separator);
+  border-radius: var(--radius-md);
+  font-size: var(--text-body);
+  font-family: var(--font-family);
+  color: var(--color-text-primary);
+  outline: none;
+}
+.textfield:focus-visible {
+  border-color: var(--color-accent);
+}
+.textfield-orange {
+  border-color: rgba(255,159,10,0.55);
+}
+.textfield-orange:focus-visible {
+  border-color: var(--color-orange);
+  border-width: 1.5px;
+}
+
+/* ── Onboarding step circle ─────────────────────────────── */
+.step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-footnote);
+  font-weight: 600;
+  border: 2px solid var(--color-separator);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
+}
+.step-circle.current {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.step-circle.done {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* ── Layout helpers ─────────────────────────────────────── */
+.flex        { display: flex; }
+.flex-col    { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.flex-1      { flex: 1; }
+.gap-1       { gap: var(--space-1); }
+.gap-2       { gap: var(--space-2); }
+.gap-3       { gap: var(--space-3); }
+.gap-4       { gap: var(--space-4); }
+.gap-6       { gap: var(--space-6); }
+.p-2         { padding: var(--space-2); }
+.p-3         { padding: var(--space-3); }
+.p-4         { padding: var(--space-4); }
+.p-6         { padding: var(--space-6); }
+.px-4        { padding-left: var(--space-4); padding-right: var(--space-4); }
+.px-6        { padding-left: var(--space-6); padding-right: var(--space-6); }
+.py-3        { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.text-secondary { color: var(--color-text-secondary); }
+.text-tertiary  { color: var(--color-text-tertiary); }
+.text-sm     { font-size: var(--text-subhead); }
+.text-xs     { font-size: var(--text-caption); }
+.text-xx     { font-size: var(--text-caption2); }
+.font-mono   { font-family: var(--font-mono); }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-bold   { font-weight: 700; }
+.text-center { text-align: center; }
+.overflow-hidden { overflow: hidden; }
+.text-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Screen wrapper — enforces exact macOS window dimensions */
+.screen-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: var(--space-6);
+  background: var(--color-bg);
+}
+.screen-label {
+  font-size: var(--text-caption);
+  color: var(--color-text-tertiary);
+  text-align: center;
+  margin-top: var(--space-3);
+  font-family: var(--font-mono);
+}
+.screen-frame {
+  box-shadow: var(--shadow-lg);
+  border-radius: 12px;
+  overflow: hidden;
+  border: var(--border-material);
+  position: relative;
+}
+
+/* ── State toggle controls (for showing multiple states) ── */
+.state-controls {
+  display: flex;
+  gap: var(--space-2);
+  justify-content: center;
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+.state-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-caption);
+  cursor: pointer;
+  border: 1px solid var(--color-separator);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-family: var(--font-family);
+  transition: all 0.15s;
+}
+.state-btn.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
+/* ── Nav bar at top of preview pages ───────────────────── */
+.preview-nav {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-separator);
+  padding: 10px var(--space-6);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--text-subhead);
+}
+.preview-nav a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+.preview-nav a:hover { text-decoration: underline; }
+.preview-nav .page-title {
+  color: var(--color-text-secondary);
+  margin-left: auto;
+}

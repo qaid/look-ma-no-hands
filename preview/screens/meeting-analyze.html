@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Analyze — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      padding: 40px;
+    }
+
+    /* MeetingAnalyzeTab: same container as MeetingView ~700×500 */
+    .analyze-window {
+      width: 700px;
+      height: 500px;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-bg);
+      overflow: hidden;
+    }
+
+    /* Header */
+    .analyze-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-6);
+    }
+    .analyze-title {
+      font-size: var(--text-callout);
+      font-weight: 500;
+    }
+    .title-editable {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: default;
+    }
+    .title-edit-icon { color: var(--color-text-tertiary); font-size: 12px; }
+
+    /* Type/Model picker row */
+    .picker-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-6);
+    }
+    .picker-label {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-tertiary);
+    }
+    .picker-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--color-separator);
+      flex-shrink: 0;
+    }
+
+    /* Action row */
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-6);
+    }
+    .action-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--color-separator);
+      flex-shrink: 0;
+      margin: 0 var(--space-1);
+    }
+    .btn-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      cursor: default;
+      color: var(--color-text-secondary);
+    }
+    .btn-icon:hover { background: var(--color-surface-3); color: var(--color-text-primary); }
+    .btn-icon.disabled { opacity: 0.3; pointer-events: none; }
+
+    /* Scrollable content area */
+    .analyze-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 var(--space-6) var(--space-4);
+    }
+
+    /* Collapsible section header */
+    .section-header-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) 0;
+      cursor: default;
+      font-size: var(--text-callout);
+      font-weight: 500;
+    }
+    .section-header-row .chevron {
+      color: var(--color-text-secondary);
+    }
+
+    /* Transcript box */
+    .transcript-box {
+      max-height: 140px;
+      overflow-y: auto;
+      border: 1px solid var(--color-separator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    /* Prompt box */
+    .prompt-box {
+      border: 1px solid var(--color-separator);
+      border-radius: var(--radius-lg);
+      padding: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+    .prompt-textarea {
+      width: 100%;
+      min-height: 80px;
+      background: transparent;
+      border: none;
+      color: var(--color-text-primary);
+      font-family: var(--font-mono);
+      font-size: var(--text-subhead);
+      resize: none;
+      outline: none;
+      line-height: 1.5;
+    }
+    .prompt-reset {
+      font-size: var(--text-caption);
+      color: var(--color-accent);
+      cursor: default;
+      margin-top: var(--space-1);
+    }
+
+    /* Notes output — markdown-like rendering */
+    .notes-output h2 {
+      font-size: var(--text-headline);
+      font-weight: 700;
+      margin: var(--space-4) 0 var(--space-2);
+      color: var(--color-text-primary);
+    }
+    .notes-output h2:first-child { margin-top: 0; }
+    .notes-output ul {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .notes-output li {
+      display: flex;
+      gap: 6px;
+      font-size: var(--text-body);
+      line-height: 1.5;
+    }
+    .notes-output li::before { content: '\2022'; color: var(--color-text-tertiary); flex-shrink: 0; }
+    .notes-output p { font-size: var(--text-body); line-height: 1.5; margin-bottom: var(--space-2); }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      color: var(--color-text-secondary);
+      padding: var(--space-12);
+    }
+
+    /* Badge */
+    .badge-processed {
+      font-size: var(--text-caption);
+      font-weight: 500;
+      color: var(--color-accent);
+      background: var(--color-accent-dim);
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+    }
+
+    /* Spinner */
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid var(--color-separator);
+      border-top-color: var(--color-accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Streaming cursor blink */
+    .cursor-blink {
+      display: inline-block;
+      width: 2px;
+      height: 14px;
+      background: var(--color-accent);
+      margin-left: 2px;
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+
+    .state-content { display: none; }
+    .state-content.active { display: flex; flex-direction: column; height: 100%; }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Meeting Analyze</span>
+    <span class="page-title">MeetingAnalyzeTab · 700×500 (stacked layout)</span>
+  </nav>
+
+  <div class="catalog-bg">
+    <div class="state-controls">
+      <button class="state-btn active" onclick="showState('empty', this)">No Selection</button>
+      <button class="state-btn" onclick="showState('ready', this)">Ready to Analyze</button>
+      <button class="state-btn" onclick="showState('analyzing', this)">Analyzing...</button>
+      <button class="state-btn" onclick="showState('done', this)">Notes Done</button>
+    </div>
+
+    <div class="screen-frame">
+      <div class="analyze-window" data-swiftui-file="MeetingAnalyzeTab.swift">
+
+        <!-- Empty state -->
+        <div class="state-content active" id="state-empty">
+          <div class="empty-state">
+            <div data-icon="doc.text.magnifyingglass" data-size="48" style="color:var(--color-text-tertiary)"></div>
+            <div style="font-size:var(--text-title3); font-weight:600; color:var(--color-text-primary)">No Meeting Selected</div>
+            <div style="font-size:var(--text-body); text-align:center; max-width:280px; line-height:1.5">
+              Select a meeting from the Library tab to analyze it.
+            </div>
+          </div>
+        </div>
+
+        <!-- Ready state — stacked vertical layout -->
+        <div class="state-content" id="state-ready">
+          <!-- Header -->
+          <div class="analyze-header">
+            <span data-icon="figure.stand" data-size="18" style="color:var(--color-accent)"></span>
+            <span class="title-editable">
+              <span class="analyze-title">Team Standup — Mon Feb 28</span>
+              <span class="title-edit-icon" data-icon="pencil.line" data-size="12"></span>
+            </span>
+            <span style="flex:1"></span>
+            <span class="pill pill-gray">03:42 · 5 segments</span>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Type / Model picker -->
+          <div class="picker-row">
+            <span class="picker-label">TYPE</span>
+            <select style="background:var(--color-surface); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none;">
+              <option selected>Standup</option>
+              <option>1:1</option>
+              <option>All-Hands</option>
+              <option>Customer Call</option>
+              <option>Video Essay</option>
+              <option>General</option>
+              <option>Custom</option>
+            </select>
+            <div class="picker-divider"></div>
+            <span class="picker-label">MODEL</span>
+            <select style="background:var(--color-surface); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none;">
+              <option>llama3.2</option>
+              <option>mistral</option>
+            </select>
+          </div>
+
+          <!-- Action row -->
+          <div class="action-row">
+            <button class="btn btn-primary"><span data-icon="sparkles" data-size="13" style="color:#fff"></span> Process</button>
+            <div class="action-divider"></div>
+            <div class="btn-icon disabled" data-icon="doc.on.clipboard" data-size="15"></div>
+            <div class="btn-icon disabled" data-icon="square.and.arrow.up" data-size="15"></div>
+            <div style="flex:1"></div>
+            <div class="btn-icon" data-icon="doc.text" data-size="15"></div>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Scrollable sections -->
+          <div class="analyze-scroll">
+            <!-- Transcript section (expanded) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.down" data-size="12"></span>
+              <span>Transcript</span>
+            </div>
+            <div class="transcript-box">
+              <div class="segment-row"><span class="segment-ts">00:00</span><span class="segment-text">Alright, let's get started with the daily standup.</span></div>
+              <div class="segment-row"><span class="segment-ts">00:12</span><span class="segment-text">Yesterday I finished the new onboarding flow.</span></div>
+              <div class="segment-row"><span class="segment-ts">00:35</span><span class="segment-text">Today I'll be working on the meeting recording feature.</span></div>
+              <div class="segment-row"><span class="segment-ts">00:48</span><span class="segment-text">No blockers at the moment.</span></div>
+              <div class="segment-row"><span class="segment-ts">01:02</span><span class="segment-text">Let's sync on the API design after this.</span></div>
+            </div>
+
+            <!-- Prompt section (expanded) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.down" data-size="12"></span>
+              <span>Prompt</span>
+            </div>
+            <div class="prompt-box">
+              <textarea class="prompt-textarea" readonly>You are summarizing a daily standup meeting. Focus on:
+
+## Done
+- What was completed since last standup
+
+## In Progress / Next
+- What is being worked on now
+
+## Blockers
+- Any impediments or things needing help</textarea>
+              <div class="prompt-reset">Reset to default</div>
+            </div>
+
+            <!-- Notes section (empty) -->
+            <div class="section-header-row">
+              <span>Notes</span>
+            </div>
+            <div style="padding:var(--space-4); text-align:center; color:var(--color-text-tertiary); font-size:var(--text-body)">
+              Click Process to generate meeting notes
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyzing state -->
+        <div class="state-content" id="state-analyzing">
+          <!-- Header -->
+          <div class="analyze-header">
+            <span data-icon="figure.stand" data-size="18" style="color:var(--color-accent)"></span>
+            <span class="analyze-title">Team Standup — Mon Feb 28</span>
+            <span style="flex:1"></span>
+            <span class="pill pill-blue">Analyzing...</span>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Type / Model (read-only) -->
+          <div class="picker-row">
+            <span class="picker-label">TYPE</span>
+            <span style="font-size:var(--text-body)">Standup</span>
+            <div class="picker-divider"></div>
+            <span class="picker-label">MODEL</span>
+            <span style="font-size:var(--text-body)">llama3.2</span>
+          </div>
+
+          <!-- Action row -->
+          <div class="action-row">
+            <button class="btn btn-danger"><span data-icon="stop.fill" data-size="11" style="color:#fff"></span> Cancel</button>
+            <div class="action-divider"></div>
+            <div class="btn-icon disabled" data-icon="doc.on.clipboard" data-size="15"></div>
+            <div class="btn-icon disabled" data-icon="square.and.arrow.up" data-size="15"></div>
+            <div style="flex:1"></div>
+            <div class="btn-icon" data-icon="doc.text" data-size="15"></div>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Scrollable sections -->
+          <div class="analyze-scroll">
+            <!-- Transcript (expanded) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.down" data-size="12"></span>
+              <span>Transcript</span>
+            </div>
+            <div class="transcript-box">
+              <div class="segment-row"><span class="segment-ts">00:00</span><span class="segment-text">Alright, let's get started with the daily standup.</span></div>
+              <div class="segment-row"><span class="segment-ts">00:12</span><span class="segment-text">Yesterday I finished the new onboarding flow.</span></div>
+              <div class="segment-row"><span class="segment-ts">00:35</span><span class="segment-text">Today I'll be working on the meeting recording feature.</span></div>
+            </div>
+
+            <!-- Prompt (collapsed) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.right" data-size="12"></span>
+              <span>Prompt</span>
+              <span style="color:var(--color-text-tertiary); font-size:var(--text-caption); margin-left:auto">(collapsed)</span>
+            </div>
+
+            <!-- Notes (streaming) -->
+            <div class="section-header-row">
+              <span>Notes</span>
+              <div class="spinner" style="width:14px; height:14px; border-width:2px; margin-left:6px;"></div>
+            </div>
+            <div class="notes-output">
+              <h2>Summary</h2>
+              <p>Daily standup covering yesterday's completed work and today's plans.<span class="cursor-blink"></span></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Done state -->
+        <div class="state-content" id="state-done">
+          <!-- Header -->
+          <div class="analyze-header">
+            <span data-icon="figure.stand" data-size="18" style="color:var(--color-accent)"></span>
+            <span class="analyze-title">Team Standup — Mon Feb 28</span>
+            <span style="flex:1"></span>
+            <span class="pill pill-green">Notes Ready</span>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Type / Model -->
+          <div class="picker-row">
+            <span class="picker-label">TYPE</span>
+            <span style="font-size:var(--text-body)">Standup</span>
+            <div class="picker-divider"></div>
+            <span class="picker-label">MODEL</span>
+            <span style="font-size:var(--text-body)">llama3.2</span>
+            <span style="flex:1"></span>
+            <button class="btn btn-sm"><span data-icon="arrow.clockwise" data-size="12"></span> Re-process</button>
+          </div>
+
+          <!-- Action row -->
+          <div class="action-row">
+            <button class="btn btn-primary"><span data-icon="sparkles" data-size="13" style="color:#fff"></span> Process</button>
+            <div class="action-divider"></div>
+            <div class="btn-icon" data-icon="doc.on.clipboard" data-size="15"></div>
+            <div class="btn-icon" data-icon="square.and.arrow.up" data-size="15"></div>
+            <div style="flex:1"></div>
+            <div class="btn-icon" data-icon="doc.text" data-size="15"></div>
+          </div>
+          <div class="divider"></div>
+
+          <!-- Scrollable sections -->
+          <div class="analyze-scroll">
+            <!-- Transcript (collapsed) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.right" data-size="12"></span>
+              <span>Transcript</span>
+              <span style="color:var(--color-text-tertiary); font-size:var(--text-caption); margin-left:auto">(collapsed)</span>
+            </div>
+
+            <!-- Prompt (collapsed) -->
+            <div class="section-header-row">
+              <span class="chevron" data-icon="chevron.right" data-size="12"></span>
+              <span>Prompt</span>
+              <span style="color:var(--color-text-tertiary); font-size:var(--text-caption); margin-left:auto">(collapsed)</span>
+            </div>
+
+            <!-- Notes (full output) -->
+            <div class="section-header-row">
+              <span>Notes</span>
+              <span class="badge-processed">Processed</span>
+              <span style="flex:1"></span>
+              <div class="btn-icon" data-icon="doc.on.clipboard" data-size="14" style="color:var(--color-text-secondary)"></div>
+              <div class="btn-icon" data-icon="square.and.arrow.up" data-size="14" style="color:var(--color-text-secondary)"></div>
+            </div>
+            <div class="notes-output">
+              <h2>Done</h2>
+              <ul>
+                <li>Completed new onboarding flow and pushed for review</li>
+              </ul>
+              <h2>In Progress / Next</h2>
+              <ul>
+                <li>Meeting recording feature (today's focus)</li>
+                <li>Sync on API design after standup</li>
+              </ul>
+              <h2>Blockers</h2>
+              <ul>
+                <li>None reported</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /analyze-window -->
+    </div><!-- /screen-frame -->
+  </div>
+
+  <script src="../icons.js"></script>
+  <script>
+    function showState(id, btn) {
+      document.querySelectorAll('.state-content').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('state-' + id).classList.add('active');
+      btn.classList.add('active');
+      initIcons();
+    }
+  </script>
+</body>
+</html>

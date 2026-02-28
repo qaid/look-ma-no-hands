@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu Bar — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 48px;
+      padding: 60px 40px;
+    }
+
+    /* NSMenu popup — macOS style */
+    .menu-popup {
+      width: 200px;
+      background: var(--color-material);
+      backdrop-filter: blur(30px) saturate(1.8);
+      -webkit-backdrop-filter: blur(30px) saturate(1.8);
+      border-radius: 8px;
+      border: var(--border-material);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 0.5px rgba(255,255,255,0.08);
+      padding: 5px 0;
+      font-size: var(--text-body);
+      overflow: hidden;
+    }
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 4px 16px;
+      cursor: default;
+      white-space: nowrap;
+      border-radius: 0;
+    }
+    .menu-item:hover {
+      background: var(--color-accent);
+      color: #fff;
+    }
+    .menu-item .shortcut {
+      margin-left: auto;
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+    }
+    .menu-item:hover .shortcut { color: rgba(255,255,255,0.7); }
+    .menu-separator {
+      height: 1px;
+      background: var(--color-separator);
+      margin: 4px 0;
+    }
+    .menu-section-header {
+      padding: 2px 16px;
+      font-size: var(--text-caption2);
+      color: var(--color-text-tertiary);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .menu-status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px 4px;
+    }
+    .menu-status-text {
+      font-weight: 600;
+      font-size: var(--text-body);
+    }
+    .menu-item-icon {
+      width: 16px;
+      text-align: center;
+      font-size: 13px;
+    }
+
+    /* Menu bar icon in context */
+    .menubar-context {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+    }
+    .mock-menubar {
+      width: 320px;
+      height: 24px;
+      background: rgba(30,30,30,0.95);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: var(--space-3);
+      gap: var(--space-3);
+      border-radius: 6px 6px 0 0;
+    }
+    .menubar-icon {
+      font-size: 13px;
+      color: rgba(255,255,255,0.88);
+      padding: 2px 4px;
+      background: rgba(255,255,255,0.12);
+      border-radius: 3px;
+    }
+
+    .state-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .state-label {
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      font-family: var(--font-mono);
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; }
+      50% { opacity:0.3; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Menu Bar</span>
+    <span class="page-title">NSMenu (AppDelegate) · 200px wide</span>
+  </nav>
+
+  <div class="catalog-bg">
+
+    <!-- State: Ready -->
+    <div class="state-slot" data-swiftui-file="AppDelegate.swift">
+      <div class="state-label">Status: Ready</div>
+      <div class="menubar-context">
+        <div class="mock-menubar">
+          <span style="font-size:11px; color:rgba(255,255,255,0.5)">Thu 12:34</span>
+          <span class="menubar-icon">🙌🏾</span>
+        </div>
+        <div class="menu-popup" style="border-radius:0 0 8px 8px; margin-top:-1px; width:240px;">
+          <div class="menu-status-row">
+            <span class="dot dot-green"></span>
+            <span class="menu-status-text">Status: Ready</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="mic.fill" data-size="13"></span>
+            <span>Start Recording (⇪)</span>
+          </div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="person.2.fill" data-size="13"></span>
+            <span>Start Meeting Transcription...</span>
+            <span class="shortcut">⌘M</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="keyboard" data-size="13"></span>
+            <span>Dictation Hotkey</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="gearshape" data-size="13"></span>
+            <span>Settings...</span>
+            <span class="shortcut">⌘,</span>
+          </div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="arrow.down.circle" data-size="13"></span>
+            <span>Check for Updates...</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="arrow.circlepath" data-size="13"></span>
+            <span style="color:var(--color-text-secondary)">Developer Reset</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="power" data-size="13"></span>
+            <span>Quit Look Ma No Hands</span>
+            <span class="shortcut">⌘Q</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- State: Recording -->
+    <div class="state-slot" data-swiftui-file="AppDelegate.swift">
+      <div class="state-label">Status: Recording</div>
+      <div class="menubar-context">
+        <div class="mock-menubar" style="background:rgba(60,10,10,0.95)">
+          <span style="font-size:11px; color:rgba(255,255,255,0.5)">Thu 12:34</span>
+          <span class="menubar-icon" style="background:rgba(255,59,48,0.25); color:rgb(255,90,80)" data-icon="mic.fill" data-size="13"></span>
+        </div>
+        <div class="menu-popup" style="border-radius:0 0 8px 8px; margin-top:-1px; width:240px;">
+          <div class="menu-status-row">
+            <span class="dot dot-red" style="animation:pulse 1s infinite"></span>
+            <span class="menu-status-text" style="color:var(--color-recording-red)">Recording...</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item" style="color:var(--color-recording-red)">
+            <span class="menu-item-icon" data-icon="stop.fill" data-size="13"></span>
+            <span>Stop Recording (⇪)</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="keyboard" data-size="13"></span>
+            <span>Dictation Hotkey</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="gearshape" data-size="13"></span>
+            <span>Settings...</span>
+            <span class="shortcut">⌘,</span>
+          </div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="arrow.down.circle" data-size="13"></span>
+            <span>Check for Updates...</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="power" data-size="13"></span>
+            <span>Quit Look Ma No Hands</span>
+            <span class="shortcut">⌘Q</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- State: Hotkey paused -->
+    <div class="state-slot" data-swiftui-file="AppDelegate.swift">
+      <div class="state-label">Status: Paused</div>
+      <div class="menubar-context">
+        <div class="mock-menubar">
+          <span style="font-size:11px; color:rgba(255,255,255,0.5)">Thu 12:34</span>
+          <span class="menubar-icon" style="opacity:0.4">🙌🏾</span>
+        </div>
+        <div class="menu-popup" style="border-radius:0 0 8px 8px; margin-top:-1px; width:240px;">
+          <div class="menu-status-row">
+            <span class="dot dot-orange"></span>
+            <span class="menu-status-text" style="color:var(--color-text-secondary)">Hotkey Paused</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="mic.fill" data-size="13"></span>
+            <span>Start Recording (⇪)</span>
+          </div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="person.2.fill" data-size="13"></span>
+            <span>Start Meeting Transcription...</span>
+            <span class="shortcut">⌘M</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="keyboard" data-size="13"></span>
+            <span>Dictation Hotkey</span>
+            <span style="margin-left:auto; font-size:var(--text-caption); color:var(--color-orange)">Paused</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="gearshape" data-size="13"></span>
+            <span>Settings...</span>
+            <span class="shortcut">⌘,</span>
+          </div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="arrow.down.circle" data-size="13"></span>
+            <span>Check for Updates...</span>
+          </div>
+          <div class="menu-separator"></div>
+          <div class="menu-item">
+            <span class="menu-item-icon" data-icon="power" data-size="13"></span>
+            <span>Quit Look Ma No Hands</span>
+            <span class="shortcut">⌘Q</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="../icons.js"></script>
+</body>
+</html>

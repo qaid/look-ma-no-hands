@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launch Splash — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .splash {
+      width: 280px;
+      height: 220px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      padding: 20px 24px;
+      background: var(--color-material);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      border-radius: var(--radius-xl);
+      border: var(--border-material);
+      box-shadow: var(--shadow-md);
+    }
+    .splash-icon {
+      font-size: 56px;
+      line-height: 1;
+    }
+    .splash-icon.paused { opacity: 0.4; }
+    .splash-name {
+      font-size: var(--text-title2);
+      font-weight: 600;
+    }
+    .splash-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: var(--text-subhead);
+      color: var(--color-text-secondary);
+    }
+    .splash-divider {
+      width: calc(100% - 40px);
+      height: 1px;
+      background: var(--color-separator);
+    }
+    .splash-hint {
+      font-size: var(--text-caption);
+      color: var(--color-text-secondary);
+      text-align: center;
+    }
+    .splash-hint-sub {
+      font-size: var(--text-caption2);
+      color: var(--color-text-tertiary);
+      text-align: center;
+      margin-top: 3px;
+    }
+    /* State: paused */
+    body.paused .splash-hint { display: none; }
+
+    .catalog-bg {
+      /* Show two states side by side */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+      padding: 60px 40px;
+    }
+    .state-pair {
+      display: flex;
+      gap: 48px;
+      align-items: flex-start;
+    }
+    .state-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .state-label {
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Launch Splash</span>
+    <span class="page-title">LaunchSplashView · 280×220</span>
+  </nav>
+
+  <div class="catalog-bg">
+    <div class="state-pair">
+
+      <!-- State: Ready (hotkeyEnabled = true) -->
+      <div class="state-slot" data-swiftui-file="LaunchSplashView.swift">
+        <div class="splash">
+          <div class="splash-icon">🙌🏾</div>
+          <div class="splash-name">Look Ma No Hands</div>
+          <div class="splash-status">
+            <span class="dot dot-green"></span>
+            <span>Ready</span>
+          </div>
+          <div class="splash-divider"></div>
+          <div class="splash-hint">Press Caps Lock to record</div>
+        </div>
+        <div class="state-label">Ready (hotkeyEnabled = true)</div>
+      </div>
+
+      <!-- State: Hotkey Paused (hotkeyEnabled = false) -->
+      <div class="state-slot" data-swiftui-file="LaunchSplashView.swift">
+        <div class="splash">
+          <div class="splash-icon paused">🙌🏾</div>
+          <div class="splash-name">Look Ma No Hands</div>
+          <div class="splash-status">
+            <span class="dot dot-red"></span>
+            <span>Hotkey Paused</span>
+          </div>
+          <div class="splash-divider"></div>
+          <div style="text-align:center">
+            <div class="splash-hint">Dictation hotkey is paused</div>
+            <div class="splash-hint-sub">Use Cmd+Shift+D to re-enable</div>
+          </div>
+        </div>
+        <div class="state-label">Paused (hotkeyEnabled = false)</div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
