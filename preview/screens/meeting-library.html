@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Library — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      padding: 40px;
+    }
+
+    /* MeetingLibraryTab: ~700×500 */
+    .library-window {
+      width: 700px;
+      height: 500px;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-bg);
+      overflow: hidden;
+    }
+
+    /* Toolbar */
+    .lib-toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4) 8px;
+    }
+    .lib-toolbar .toolbar-icon-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-md);
+      cursor: default;
+      color: var(--color-text-secondary);
+      flex-shrink: 0;
+    }
+    .lib-toolbar .toolbar-icon-btn:hover {
+      background: var(--color-surface-3);
+      color: var(--color-text-primary);
+    }
+    .lib-search {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-surface);
+      border: 1px solid var(--color-separator);
+      border-radius: var(--radius-md);
+      padding: 4px var(--space-2);
+      flex: 1;
+      min-width: 160px;
+    }
+    .lib-search input {
+      background: transparent;
+      border: none;
+      color: var(--color-text-primary);
+      font-family: var(--font-family);
+      font-size: var(--text-body);
+      outline: none;
+      flex: 1;
+    }
+    .lib-search input::placeholder { color: var(--color-text-tertiary); }
+    .lib-search .search-clear {
+      display: flex;
+      align-items: center;
+      color: var(--color-text-tertiary);
+      cursor: default;
+    }
+
+    /* Filter pills row */
+    .lib-filters {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 4px var(--space-4) 8px;
+      flex-wrap: wrap;
+    }
+
+    /* List */
+    .lib-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 var(--space-4) var(--space-4);
+    }
+
+    /* Meeting row */
+    .lib-meeting-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-3);
+      border-radius: var(--radius-lg);
+      cursor: default;
+      position: relative;
+    }
+    .lib-meeting-row:hover { background: var(--color-surface-3); }
+    .lib-meeting-row.selected { background: var(--color-accent-dim); }
+    .lib-meeting-row.selected .meeting-title { color: var(--color-accent); }
+    .lib-meeting-row .row-check {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1.5px solid var(--color-separator);
+      flex-shrink: 0;
+    }
+    .lib-meeting-row .row-check.checked {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: #fff;
+    }
+    .lib-meeting-row .row-type-icon {
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+      color: var(--color-accent);
+    }
+    .lib-meeting-row .row-info { flex: 1; min-width: 0; }
+    .lib-meeting-row .meeting-title {
+      font-size: var(--text-body);
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .lib-meeting-row .meeting-meta {
+      font-size: var(--text-caption);
+      color: var(--color-text-secondary);
+      margin-top: 1px;
+      display: flex;
+      gap: var(--space-1);
+      align-items: center;
+    }
+    .lib-meeting-row .row-date {
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    /* Import progress sheet */
+    .import-sheet {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 0;
+    }
+    .import-card {
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      border: var(--border-material);
+      padding: var(--space-6);
+      width: 340px;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      color: var(--color-text-secondary);
+      padding: var(--space-12);
+    }
+
+    /* Selection mode toolbar */
+    .selection-toolbar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4) 8px;
+    }
+
+    .state-content { display: none; }
+    .state-content.active { display: flex; flex-direction: column; height: 100%; position: relative; }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Meeting Library</span>
+    <span class="page-title">MeetingLibraryTab · 700×500</span>
+  </nav>
+
+  <div class="catalog-bg">
+    <div class="state-controls">
+      <button class="state-btn active" onclick="showState('list', this)">With Meetings</button>
+      <button class="state-btn" onclick="showState('empty', this)">Empty State</button>
+      <button class="state-btn" onclick="showState('selection', this)">Selection Mode</button>
+      <button class="state-btn" onclick="showState('importing', this)">Importing</button>
+    </div>
+
+    <div class="screen-frame">
+      <div class="library-window" data-swiftui-file="MeetingLibraryTab.swift">
+
+        <!-- State: List with meetings -->
+        <div class="state-content active" id="state-list">
+          <div class="lib-toolbar">
+            <div class="toolbar-icon-btn" data-icon="checkmark.circle" data-size="16"></div>
+            <div class="lib-search">
+              <span data-icon="magnifyingglass" data-size="13" style="color:var(--color-text-tertiary)"></span>
+              <input placeholder="Search meetings...">
+            </div>
+            <div class="divider-v" style="height:20px"></div>
+            <div class="toolbar-icon-btn" data-icon="square.and.arrow.down" data-size="15"></div>
+            <div class="toolbar-icon-btn" data-icon="gearshape" data-size="15"></div>
+          </div>
+          <div class="lib-filters" id="filter-pills-list">
+            <!-- Rendered by JS -->
+          </div>
+          <div class="divider"></div>
+          <div class="lib-list" id="meeting-rows-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- State: Empty -->
+        <div class="state-content" id="state-empty">
+          <div class="lib-toolbar">
+            <div class="toolbar-icon-btn" style="opacity:0.4" data-icon="checkmark.circle" data-size="16"></div>
+            <div class="lib-search">
+              <span data-icon="magnifyingglass" data-size="13" style="color:var(--color-text-tertiary)"></span>
+              <input placeholder="Search meetings...">
+            </div>
+            <div class="divider-v" style="height:20px"></div>
+            <div class="toolbar-icon-btn" data-icon="square.and.arrow.down" data-size="15"></div>
+            <div class="toolbar-icon-btn" data-icon="gearshape" data-size="15"></div>
+          </div>
+          <div class="divider"></div>
+          <div class="empty-state">
+            <div data-icon="tray" data-size="40" style="color:var(--color-text-tertiary)"></div>
+            <div style="font-size:var(--text-title3); font-weight:600; color:var(--color-text-primary)">No meetings yet</div>
+            <div style="font-size:var(--text-body); text-align:center; max-width:300px; line-height:1.5">
+              Record your first meeting using the Record tab, or import an existing audio file to get started.
+            </div>
+            <button class="btn btn-primary"><span data-icon="square.and.arrow.down" data-size="13" style="color:#fff"></span> Import Audio File</button>
+          </div>
+        </div>
+
+        <!-- State: Selection mode -->
+        <div class="state-content" id="state-selection">
+          <div class="selection-toolbar">
+            <button class="btn btn-sm btn-ghost" style="color:var(--color-accent)">Cancel</button>
+            <button class="btn btn-sm">Select All</button>
+            <span style="flex:1; text-align:center; font-size:var(--text-body); font-weight:500;">2 selected</span>
+            <div class="toolbar-icon-btn" data-icon="square.and.arrow.up" data-size="15"></div>
+            <div class="toolbar-icon-btn" style="color:var(--color-recording-red)" data-icon="trash" data-size="15"></div>
+          </div>
+          <div class="divider"></div>
+          <div class="lib-list" id="meeting-rows-selection">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- State: Importing -->
+        <div class="state-content" id="state-importing">
+          <div class="lib-toolbar">
+            <div class="toolbar-icon-btn" data-icon="checkmark.circle" data-size="16"></div>
+            <div class="lib-search">
+              <span data-icon="magnifyingglass" data-size="13" style="color:var(--color-text-tertiary)"></span>
+              <input placeholder="Search meetings..." disabled>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="lib-list" style="filter:blur(1px); opacity:0.4;">
+            <div class="lib-meeting-row">
+              <div class="row-type-icon" data-icon="figure.stand" data-size="18"></div>
+              <div class="row-info"><div class="meeting-title">Team Standup</div></div>
+              <span class="row-date">03:42</span>
+            </div>
+          </div>
+          <!-- Import overlay sheet -->
+          <div class="import-sheet">
+            <div class="import-card">
+              <div style="font-size:var(--text-title3); font-weight:600;">Importing Audio</div>
+              <div style="color:var(--color-text-secondary); font-size:var(--text-body)">Transcribing meeting-recording.m4a...</div>
+              <div class="progress-bar">
+                <div class="fill" style="width:62%"></div>
+              </div>
+              <div style="font-size:var(--text-footnote); color:var(--color-text-tertiary); font-family:var(--font-mono)">62% — 00:28 remaining</div>
+              <div style="display:flex; justify-content:flex-end;">
+                <button class="btn btn-sm btn-danger">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /library-window -->
+    </div><!-- /screen-frame -->
+  </div>
+
+  <script src="../icons.js"></script>
+  <script>
+    // Meeting type definitions matching MeetingType.swift
+    var meetingTypes = [
+      { id: 'all', name: 'All', icon: 'tray.full' },
+      { id: 'standup', name: 'Standup', icon: 'figure.stand' },
+      { id: 'oneOnOne', name: '1:1', icon: 'person.2' },
+      { id: 'allHands', name: 'All-Hands', icon: 'person.3' },
+      { id: 'customerCall', name: 'Customer Call', icon: 'phone' },
+      { id: 'videoEssay', name: 'Video Essay', icon: 'play.rectangle' },
+      { id: 'general', name: 'General', icon: 'doc.text' },
+      { id: 'custom', name: 'Custom', icon: 'slider.horizontal.3' }
+    ];
+
+    // Sample meeting data
+    var meetings = [
+      { title: 'Team Standup — Mon Feb 28', type: 'standup', duration: '03:42', segments: 5, hasNotes: true, date: 'Today' },
+      { title: 'Product Design Review', type: 'allHands', duration: '45:18', segments: 12, hasNotes: false, date: 'Yesterday' },
+      { title: 'Weekly 1:1 with Manager', type: 'oneOnOne', duration: '28:55', segments: 8, hasNotes: true, date: '2 days ago' },
+      { title: 'Customer Onboarding Call', type: 'customerCall', duration: '32:10', segments: 10, hasNotes: false, date: '3 days ago' },
+      { title: 'AI Tools Overview', type: 'videoEssay', duration: '12:04', segments: 3, hasNotes: false, date: 'Feb 24' },
+    ];
+
+    function getTypeInfo(typeId) {
+      return meetingTypes.find(function(t) { return t.id === typeId; }) || meetingTypes[6];
+    }
+
+    function renderFilterPills(containerId) {
+      var html = '';
+      meetingTypes.forEach(function(t, i) {
+        var active = i === 0 ? ' active' : '';
+        html += '<span class="filter-pill' + active + '">' + sfIcon(t.icon, 12) + ' ' + t.name + '</span>';
+      });
+      document.getElementById(containerId).innerHTML = html;
+    }
+
+    function renderMeetingRow(m, opts) {
+      opts = opts || {};
+      var type = getTypeInfo(m.type);
+      var selectedClass = opts.selected ? ' selected' : '';
+      var checkHtml = '';
+      if (opts.showCheck) {
+        checkHtml = opts.checked
+          ? '<div class="row-check checked">' + sfIcon('checkmark', 10, 'color:#fff') + '</div>'
+          : '<div class="row-check"></div>';
+      }
+      var metaParts = [type.name, m.duration, m.segments + ' segments'];
+      if (m.hasNotes) metaParts.push(sfIcon('sparkles', 11, 'color:var(--color-green)'));
+      return '<div class="lib-meeting-row' + selectedClass + '">' +
+        checkHtml +
+        '<div class="row-type-icon">' + sfIcon(type.icon, 18) + '</div>' +
+        '<div class="row-info">' +
+          '<div class="meeting-title">' + m.title + '</div>' +
+          '<div class="meeting-meta">' + metaParts.join(' <span style="color:var(--color-text-tertiary)">&middot;</span> ') + '</div>' +
+        '</div>' +
+        '<span class="row-date">' + m.date + '</span>' +
+      '</div>';
+    }
+
+    function renderMeetingList(containerId, opts) {
+      var html = '';
+      meetings.forEach(function(m, i) {
+        var rowOpts = Object.assign({}, opts);
+        if (opts && opts.selectedIndices) {
+          rowOpts.selected = opts.selectedIndices.indexOf(i) >= 0;
+          rowOpts.checked = rowOpts.selected;
+        }
+        if (i === 0 && !opts) rowOpts.selected = true;
+        html += renderMeetingRow(m, rowOpts);
+      });
+      document.getElementById(containerId).innerHTML = html;
+    }
+
+    // Render lists
+    renderFilterPills('filter-pills-list');
+    renderMeetingList('meeting-rows-list');
+    renderMeetingList('meeting-rows-selection', { showCheck: true, selectedIndices: [0, 2] });
+
+    // Re-init icons for dynamically rendered content
+    initIcons();
+
+    function showState(id, btn) {
+      document.querySelectorAll('.state-content').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('state-' + id).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

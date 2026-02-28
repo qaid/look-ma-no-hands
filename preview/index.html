@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UI Catalog — Look Ma No Hands</title>
+  <link rel="stylesheet" href="design-tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: var(--space-6) var(--space-8);
+      border-bottom: 1px solid var(--color-separator);
+      background: var(--color-surface);
+    }
+    header h1 {
+      font-size: var(--text-title1);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    header p {
+      font-size: var(--text-body);
+      color: var(--color-text-secondary);
+      margin-top: 4px;
+    }
+    header .meta {
+      display: flex;
+      gap: var(--space-4);
+      margin-top: var(--space-3);
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      font-family: var(--font-mono);
+    }
+
+    main {
+      flex: 1;
+      padding: var(--space-8);
+    }
+
+    .catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .catalog-card {
+      display: flex;
+      flex-direction: column;
+      background: var(--color-surface);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--color-separator);
+      overflow: hidden;
+      text-decoration: none;
+      color: var(--color-text-primary);
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    }
+    .catalog-card:hover {
+      border-color: var(--color-accent);
+      box-shadow: 0 4px 20px rgba(0, 122, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .card-preview {
+      height: 120px;
+      background: var(--color-surface-2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      border-bottom: 1px solid var(--color-separator);
+      position: relative;
+      overflow: hidden;
+    }
+    .card-preview .dims {
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      font-size: var(--text-caption2);
+      color: var(--color-text-tertiary);
+      font-family: var(--font-mono);
+    }
+
+    .card-body {
+      padding: var(--space-4);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .card-name {
+      font-size: var(--text-headline);
+      font-weight: 600;
+    }
+    .card-swift {
+      font-size: var(--text-caption);
+      color: var(--color-text-secondary);
+      font-family: var(--font-mono);
+    }
+    .card-states {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .state-tag {
+      font-size: var(--text-caption2);
+      color: var(--color-text-tertiary);
+      background: var(--color-surface-3);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+
+    /* Section header */
+    .section-header {
+      font-size: var(--text-body);
+      font-weight: 600;
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: var(--text-caption);
+      margin: var(--space-6) 0 var(--space-3);
+    }
+    .section-header:first-child { margin-top: 0; }
+
+    /* Design token summary */
+    .token-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px 0;
+      border-bottom: 1px solid var(--color-separator);
+      font-size: var(--text-body);
+    }
+    .token-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      border: 1px solid var(--color-separator);
+    }
+    .token-name { font-family: var(--font-mono); font-size: var(--text-caption); flex: 1; }
+    .token-value { font-family: var(--font-mono); font-size: var(--text-caption); color: var(--color-text-tertiary); }
+
+    footer {
+      padding: var(--space-6) var(--space-8);
+      border-top: 1px solid var(--color-separator);
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Tiny SVG waveform preview */
+    .mini-wave-svg {
+      width: 120px;
+      height: 28px;
+    }
+    .mini-wave-svg svg {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🙌🏾 Look Ma No Hands — UI Catalog</h1>
+    <p>HTML preview catalog for all app screens. HTML is the design source of truth.</p>
+    <div class="meta">
+      <span>Screens: 8</span>
+      <span>·</span>
+      <span>Dark mode default</span>
+      <span>·</span>
+      <span>Serve: <code>bash preview/serve.sh</code> → <a href="http://localhost:8420" style="color:var(--color-accent)">localhost:8420</a></span>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="section-header">Utility Windows</div>
+    <div class="catalog-grid">
+
+      <a href="screens/launch-splash.html" class="catalog-card">
+        <div class="card-preview">🙌🏾<div class="dims">280 × 220</div></div>
+        <div class="card-body">
+          <div class="card-name">Launch Splash</div>
+          <div class="card-swift">LaunchSplashView.swift</div>
+          <div class="card-states">
+            <span class="state-tag">Ready</span>
+            <span class="state-tag">Paused</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="screens/recording-indicator.html" class="catalog-card">
+        <div class="card-preview">
+          <div style="display:flex; align-items:center; gap:6px; scale:0.85;">
+            <div style="width:8px; height:8px; border-radius:50%; background:rgb(255,59,48);"></div>
+            <div class="mini-wave-svg">
+              <svg viewBox="0 0 120 28" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="idx-wg" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="rgb(255,64,51)" stop-opacity="0.6"/>
+                    <stop offset="0.35" stop-color="rgb(77,128,255)" stop-opacity="0.8"/>
+                    <stop offset="1" stop-color="rgb(102,64,217)" stop-opacity="0.7"/>
+                  </linearGradient>
+                </defs>
+                <path d="M0,14 C10,5 20,23 35,10 C50,0 60,24 80,12 C95,4 105,22 120,14" fill="none" stroke="url(#idx-wg)" stroke-width="2"/>
+              </svg>
+            </div>
+          </div>
+          <div class="dims">340 × 60</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Recording Indicator</div>
+          <div class="card-swift">RecordingIndicator.swift</div>
+          <div class="card-states">
+            <span class="state-tag">Active</span>
+            <span class="state-tag">Top</span>
+            <span class="state-tag">Cursor</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="screens/menu-bar.html" class="catalog-card">
+        <div class="card-preview">
+          <div style="background:rgba(30,30,30,0.9); padding:4px 8px; border-radius:4px; font-size:20px">🙌🏾</div>
+          <div class="dims">240px wide</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Menu Bar</div>
+          <div class="card-swift">AppDelegate.swift · NSMenu</div>
+          <div class="card-states">
+            <span class="state-tag">Ready</span>
+            <span class="state-tag">Recording</span>
+            <span class="state-tag">Paused</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="section-header">Onboarding</div>
+    <div class="catalog-grid">
+
+      <a href="screens/onboarding.html" class="catalog-card">
+        <div class="card-preview">
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px; scale:0.7; transform-origin:center;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div class="step-circle current" style="width:22px; height:22px; font-size:10px">1</div>
+              <div style="width:20px; height:2px; background:var(--color-separator)"></div>
+              <div class="step-circle" style="width:22px; height:22px; font-size:10px">2</div>
+              <div style="width:20px; height:2px; background:var(--color-separator)"></div>
+              <div class="step-circle" style="width:22px; height:22px; font-size:10px">3</div>
+              <div style="width:20px; height:2px; background:var(--color-separator)"></div>
+              <div class="step-circle" style="width:22px; height:22px; font-size:10px">4</div>
+              <div style="width:20px; height:2px; background:var(--color-separator)"></div>
+              <div class="step-circle" style="width:22px; height:22px; font-size:10px">5</div>
+            </div>
+          </div>
+          <div class="dims">600 × 520</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Onboarding</div>
+          <div class="card-swift">OnboardingView.swift</div>
+          <div class="card-states">
+            <span class="state-tag">Welcome</span>
+            <span class="state-tag">Ollama</span>
+            <span class="state-tag">Model</span>
+            <span class="state-tag">Permissions</span>
+            <span class="state-tag">Complete</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="section-header">Settings</div>
+    <div class="catalog-grid">
+
+      <a href="screens/settings.html" class="catalog-card">
+        <div class="card-preview">
+          <div style="display:flex; height:70px; width:200px; scale:0.8; border:1px solid var(--color-separator); border-radius:6px; overflow:hidden;">
+            <div style="width:60px; background:var(--color-surface); border-right:1px solid var(--color-separator); padding:4px; display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:8px; padding:3px 4px; background:var(--color-accent-dim); border-radius:3px; color:var(--color-accent)">General</div>
+              <div style="font-size:8px; padding:2px 4px; color:var(--color-text-secondary)">Recording</div>
+              <div style="font-size:8px; padding:2px 4px; color:var(--color-text-secondary)">Vocab</div>
+            </div>
+            <div style="flex:1; padding:6px; background:var(--color-bg);">
+              <div style="font-size:7px; font-weight:600; margin-bottom:3px;">Waveform Visualizer</div>
+              <div style="display:flex; gap:3px;">
+                <div style="width:20px; height:14px; background:var(--color-surface); border:1px solid var(--color-separator); border-radius:2px;"></div>
+                <div style="width:20px; height:14px; background:var(--color-accent-dim); border:1px solid var(--color-accent); border-radius:2px;"></div>
+                <div style="width:20px; height:14px; background:var(--color-surface); border:1px solid var(--color-separator); border-radius:2px;"></div>
+              </div>
+            </div>
+          </div>
+          <div class="dims">750 × 450</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Settings</div>
+          <div class="card-swift">SettingsView.swift</div>
+          <div class="card-states">
+            <span class="state-tag">General</span>
+            <span class="state-tag">Recording</span>
+            <span class="state-tag">Vocabulary</span>
+            <span class="state-tag">Models</span>
+            <span class="state-tag">Permissions</span>
+            <span class="state-tag">Diagnostics</span>
+            <span class="state-tag">About</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <div class="section-header">Meeting Mode</div>
+    <div class="catalog-grid">
+
+      <a href="screens/meeting-record.html" class="catalog-card">
+        <div class="card-preview">
+          <div style="display:flex; align-items:center; gap:8px; scale:0.85;">
+            <div data-icon="stop.fill" data-size="24" style="color:rgb(255,59,48)"></div>
+            <div class="mini-wave-svg">
+              <svg viewBox="0 0 120 28" preserveAspectRatio="none">
+                <path d="M0,14 C10,5 20,23 35,10 C50,0 60,24 80,12 C95,4 105,22 120,14" fill="none" stroke="rgb(255,59,48)" stroke-width="2" stroke-opacity="0.8"/>
+              </svg>
+            </div>
+          </div>
+          <div class="dims">700 × 500</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Meeting Record</div>
+          <div class="card-swift">MeetingRecordTab.swift</div>
+          <div class="card-states">
+            <span class="state-tag">Ready</span>
+            <span class="state-tag">Recording</span>
+            <span class="state-tag">Completed</span>
+            <span class="state-tag">No Permission</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="screens/meeting-analyze.html" class="catalog-card">
+        <div class="card-preview">
+          <div data-icon="doc.text.magnifyingglass" data-size="40" style="color:var(--color-text-secondary)"></div>
+          <div class="dims">700 × 500</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Meeting Analyze</div>
+          <div class="card-swift">MeetingAnalyzeTab.swift</div>
+          <div class="card-states">
+            <span class="state-tag">No Selection</span>
+            <span class="state-tag">Ready</span>
+            <span class="state-tag">Analyzing</span>
+            <span class="state-tag">Notes Done</span>
+          </div>
+        </div>
+      </a>
+
+      <a href="screens/meeting-library.html" class="catalog-card">
+        <div class="card-preview">
+          <div data-icon="tray.full" data-size="40" style="color:var(--color-text-secondary)"></div>
+          <div class="dims">700 × 500</div>
+        </div>
+        <div class="card-body">
+          <div class="card-name">Meeting Library</div>
+          <div class="card-swift">MeetingLibraryTab.swift</div>
+          <div class="card-states">
+            <span class="state-tag">List</span>
+            <span class="state-tag">Empty</span>
+            <span class="state-tag">Selection</span>
+            <span class="state-tag">Importing</span>
+          </div>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Design token reference -->
+    <div class="section-header" style="margin-top:var(--space-8)">Design Token Reference</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:var(--space-4); max-width:900px;">
+      <div>
+        <div style="font-size:var(--text-caption); font-weight:600; color:var(--color-text-secondary); margin-bottom:var(--space-2); text-transform:uppercase; letter-spacing:0.05em">Colors</div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-accent)"></div><span class="token-name">--color-accent</span><span class="token-value">#007AFF</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-green)"></div><span class="token-name">--color-green</span><span class="token-value">#30D158</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-recording-red)"></div><span class="token-name">--color-recording-red</span><span class="token-value">rgb(255,59,48)</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-orange)"></div><span class="token-name">--color-orange</span><span class="token-value">#FF9F0A</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-purple)"></div><span class="token-name">--color-purple</span><span class="token-value">#BF5AF2</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-surface)"></div><span class="token-name">--color-surface</span><span class="token-value">#2a2a2a dark</span></div>
+        <div class="token-row"><div class="token-swatch" style="background:var(--color-material)"></div><span class="token-name">--color-material</span><span class="token-value">ultraThinMaterial</span></div>
+      </div>
+      <div>
+        <div style="font-size:var(--text-caption); font-weight:600; color:var(--color-text-secondary); margin-bottom:var(--space-2); text-transform:uppercase; letter-spacing:0.05em">Radii &amp; Spacing</div>
+        <div class="token-row"><span class="token-name">--radius-sm</span><span class="token-value" style="flex:1">4px</span></div>
+        <div class="token-row"><span class="token-name">--radius-md</span><span class="token-value" style="flex:1">6px</span></div>
+        <div class="token-row"><span class="token-name">--radius-lg</span><span class="token-value" style="flex:1">8px</span></div>
+        <div class="token-row"><span class="token-name">--radius-xl</span><span class="token-value" style="flex:1">12px (panels)</span></div>
+        <div class="token-row"><span class="token-name">--space-4</span><span class="token-value" style="flex:1">16px</span></div>
+        <div class="token-row"><span class="token-name">--space-6</span><span class="token-value" style="flex:1">24px</span></div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <span>Look Ma No Hands — HTML Preview Catalog</span>
+    <span>Serve: <code>bash preview/serve.sh</code> → http://localhost:8420</span>
+  </footer>
+
+  <script src="icons.js"></script>
+</body>
+</html>

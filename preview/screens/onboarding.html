@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Onboarding — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      padding: 40px;
+      background: var(--color-bg);
+    }
+
+    /* The actual onboarding window: 600×520 */
+    .onboarding-window {
+      width: 600px;
+      height: 520px;
+      background: var(--color-bg);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Progress indicator floats at top */
+    .progress-bar-row {
+      display: flex;
+      align-items: center;
+      padding: 15px 40px;
+      background: var(--color-bg);
+      z-index: 10;
+      gap: 0;
+    }
+    .progress-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    .progress-connector {
+      height: 2px;
+      flex: 1;
+      margin-bottom: 22px;
+    }
+    .progress-connector.done { background: var(--color-accent); }
+    .progress-connector.pending { background: var(--color-separator); }
+    .step-label {
+      font-size: var(--text-caption2);
+      font-weight: 400;
+      color: var(--color-text-secondary);
+    }
+    .step-label.active { font-weight: 600; color: var(--color-text-primary); }
+    .step-label.done   { color: var(--color-accent); }
+
+    /* Content area */
+    .onboarding-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 15px 40px;
+      overflow: hidden;
+    }
+    .step-icon {
+      margin-bottom: var(--space-3);
+      line-height: 1;
+    }
+    .step-title {
+      font-size: var(--text-title1);
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .step-subtitle {
+      font-size: var(--text-title3);
+      color: var(--color-text-secondary);
+      text-align: center;
+      margin-bottom: var(--space-4);
+    }
+    .step-desc {
+      font-size: var(--text-body);
+      color: var(--color-text-secondary);
+      text-align: center;
+      margin-bottom: var(--space-4);
+      max-width: 460px;
+      line-height: 1.5;
+    }
+
+    /* Feature rows */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-top: var(--space-2);
+      align-self: flex-start;
+    }
+
+    /* Permission cards */
+    .perm-cards {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      width: 100%;
+      max-width: 500px;
+      margin-top: var(--space-2);
+    }
+
+    /* Summary rows */
+    .summary-rows {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      width: 100%;
+      max-width: 440px;
+      margin-top: var(--space-2);
+    }
+    .summary-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-body);
+    }
+    .summary-row .s-status { width: 20px; flex-shrink: 0; text-align: center; }
+    .summary-row .s-icon   { width: 20px; flex-shrink: 0; text-align: center; color: var(--color-text-secondary); }
+
+    /* Navigation */
+    .onboarding-nav {
+      display: flex;
+      align-items: center;
+      padding: 0 40px 20px;
+    }
+
+    /* State tabs */
+    .step-content { display: none; }
+    .step-content.visible { display: flex; flex-direction: column; align-items: center; width: 100%; }
+
+    /* Instruction row */
+    .instr-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .instr-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-footnote);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Model picker area */
+    .model-picker-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 6px var(--space-3);
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-separator);
+      width: 100%;
+      max-width: 440px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Onboarding</span>
+    <span class="page-title">OnboardingView · 600×520</span>
+  </nav>
+
+  <!-- State controls -->
+  <div class="catalog-bg">
+    <div class="state-controls">
+      <button class="state-btn active" onclick="showStep(0, this)">1 Welcome</button>
+      <button class="state-btn" onclick="showStep(1, this)">2 Ollama</button>
+      <button class="state-btn" onclick="showStep(2, this)">3 Model</button>
+      <button class="state-btn" onclick="showStep(3, this)">4 Permissions</button>
+      <button class="state-btn" onclick="showStep(4, this)">5 Complete</button>
+    </div>
+
+    <div class="screen-frame">
+      <div class="onboarding-window" data-swiftui-file="OnboardingView.swift">
+
+        <!-- Progress indicator -->
+        <div class="progress-bar-row" id="progress-bar">
+          <!-- rendered by JS -->
+        </div>
+
+        <!-- Content -->
+        <div class="onboarding-content" id="step-content">
+          <!-- rendered by JS -->
+        </div>
+
+        <!-- Navigation -->
+        <div class="onboarding-nav" id="onboarding-nav">
+          <!-- rendered by JS -->
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="../icons.js"></script>
+  <script>
+    var steps = [
+      { title: 'Welcome', label: 'Welcome' },
+      { title: 'Ollama', label: 'Ollama' },
+      { title: 'Model', label: 'Model' },
+      { title: 'Permissions', label: 'Permissions' },
+      { title: 'Complete', label: 'Complete' },
+    ];
+
+    var stepContents = [
+      // 0: Welcome — mic.circle.fill (70×70, accent)
+      '<div class="step-content visible">' +
+        '<div class="step-icon">' + sfIcon('mic.circle.fill', 70, 'color:var(--color-accent)') + '</div>' +
+        '<div class="step-title">Welcome to Look Ma No Hands</div>' +
+        '<div class="step-subtitle">Fast, local voice dictation for macOS</div>' +
+        '<div class="features">' +
+          '<div class="feature-row"><span class="feature-icon">' + sfIcon('bolt.fill', 16, 'color:var(--color-accent)') + '</span>Lightning-fast voice dictation</div>' +
+          '<div class="feature-row"><span class="feature-icon">' + sfIcon('lock.fill', 16, 'color:var(--color-accent)') + '</span>100% local \u2013 your voice never leaves your Mac</div>' +
+          '<div class="feature-row"><span class="feature-icon">' + sfIcon('waveform', 16, 'color:var(--color-accent)') + '</span>AI-powered meeting transcription</div>' +
+        '</div>' +
+      '</div>',
+
+      // 1: Ollama — brain.head.profile (60×60, purple)
+      '<div class="step-content visible">' +
+        '<div class="step-icon">' + sfIcon('brain.head.profile', 60, 'color:var(--color-purple)') + '</div>' +
+        '<div class="step-title" style="font-size:var(--text-title2)">Install Ollama (Optional)</div>' +
+        '<div class="step-desc">Ollama enables AI-powered meeting notes from transcripts.<br>Voice dictation works without it.</div>' +
+        '<div style="display:flex; flex-direction:column; gap:var(--space-2); align-self:flex-start; max-width:400px; margin-bottom:16px;">' +
+          '<div class="step-label" style="font-weight:600; color:var(--color-text-primary)">Installation steps:</div>' +
+          '<div class="instr-row"><div class="instr-num">1</div><span>Open Terminal</span></div>' +
+          '<div class="instr-row"><div class="instr-num">2</div><span>Run: <code style="font-family:var(--font-mono); font-size:12px; background:var(--color-surface-2); padding:2px 6px; border-radius:4px;">brew install ollama</code></span></div>' +
+          '<div class="instr-row"><div class="instr-num">3</div><span>Run: <code style="font-family:var(--font-mono); font-size:12px; background:var(--color-surface-2); padding:2px 6px; border-radius:4px;">ollama serve</code></span></div>' +
+        '</div>' +
+        '<div style="display:flex; gap:var(--space-3);">' +
+          '<button class="btn">' + sfIcon('doc.on.clipboard', 13) + ' Copy Commands</button>' +
+          '<button class="btn">' + sfIcon('arrow.clockwise', 13) + ' Check Status</button>' +
+        '</div>' +
+      '</div>',
+
+      // 2: Whisper Model — waveform.circle.fill (65×65, blue)
+      '<div class="step-content visible">' +
+        '<div class="step-icon">' + sfIcon('waveform.circle.fill', 65, 'color:var(--color-blue)') + '</div>' +
+        '<div class="step-title">Download Whisper Model</div>' +
+        '<div class="step-desc">Required for voice transcription.<br>We recommend Base for most users, or Large v3 Turbo for meetings.</div>' +
+        '<div class="model-picker-row">' +
+          '<span style="font-size:var(--text-body); color:var(--color-text-secondary)">Select Model</span>' +
+          '<span style="flex:1"></span>' +
+          '<select style="background:transparent; border:none; color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); outline:none;">' +
+            '<option>Base (74 MB) \u2014 Recommended</option>' +
+            '<option>Small (244 MB)</option>' +
+            '<option>Large v3 Turbo (1.5 GB)</option>' +
+          '</select>' +
+        '</div>' +
+        '<div style="margin-top:16px;">' +
+          '<button class="btn btn-primary btn-lg">' + sfIcon('arrow.down.circle', 18, 'color:#fff') + ' Download Model</button>' +
+        '</div>' +
+      '</div>',
+
+      // 3: Permissions — lock.shield.fill (60×60, orange)
+      '<div class="step-content visible">' +
+        '<div class="step-icon">' + sfIcon('lock.shield.fill', 60, 'color:var(--color-orange)') + '</div>' +
+        '<div class="step-title" style="font-size:var(--text-title2)">Grant Permissions</div>' +
+        '<div class="step-desc" style="margin-bottom:8px;">Look Ma No Hands needs permissions to work properly</div>' +
+        '<div class="perm-cards">' +
+          '<div class="permission-row">' +
+            '<div class="perm-icon" style="color:var(--color-orange)">' + sfIcon('mic.fill', 24) + '</div>' +
+            '<div class="perm-info">' +
+              '<div class="perm-title">Microphone</div>' +
+              '<div class="perm-desc">Capture your voice for dictation</div>' +
+            '</div>' +
+            '<div class="perm-status">' +
+              '<button class="btn btn-sm">Grant Permission</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="permission-row">' +
+            '<div class="perm-icon" style="color:var(--color-green)">' + sfIcon('accessibility', 24) + '</div>' +
+            '<div class="perm-info">' +
+              '<div class="perm-title">Accessibility</div>' +
+              '<div class="perm-desc">Monitor Caps Lock and insert text into apps</div>' +
+            '</div>' +
+            '<div class="perm-status" style="color:var(--color-green)">' + sfIcon('checkmark.circle.fill', 22) + '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>',
+
+      // 4: Complete — checkmark.circle.fill (60×60, green)
+      '<div class="step-content visible">' +
+        '<div class="step-icon">' + sfIcon('checkmark.circle.fill', 60, 'color:var(--color-green)') + '</div>' +
+        '<div class="step-title" style="font-size:var(--text-title2)">You\'re All Set!</div>' +
+        '<div style="align-self:flex-start; max-width:460px;">' +
+          '<div class="section-title" style="margin-bottom:12px;">Configuration Summary:</div>' +
+          '<div class="summary-rows">' +
+            '<div class="summary-row">' +
+              '<div class="s-status" style="color:var(--color-green)">' + sfIcon('checkmark.circle.fill', 16) + '</div>' +
+              '<div class="s-icon">' + sfIcon('waveform', 14) + '</div>' +
+              '<span>Whisper model: base</span>' +
+            '</div>' +
+            '<div class="summary-row">' +
+              '<div class="s-status" style="color:var(--color-orange)">' + sfIcon('xmark.circle', 16) + '</div>' +
+              '<div class="s-icon">' + sfIcon('brain.head.profile', 14) + '</div>' +
+              '<span>Ollama: Skipped</span>' +
+            '</div>' +
+            '<div class="summary-row">' +
+              '<div class="s-status" style="color:var(--color-green)">' + sfIcon('checkmark.circle.fill', 16) + '</div>' +
+              '<div class="s-icon">' + sfIcon('mic.fill', 14) + '</div>' +
+              '<span>Microphone: Granted</span>' +
+            '</div>' +
+            '<div class="summary-row">' +
+              '<div class="s-status" style="color:var(--color-green)">' + sfIcon('checkmark.circle.fill', 16) + '</div>' +
+              '<div class="s-icon">' + sfIcon('accessibility', 14) + '</div>' +
+              '<span>Accessibility: Granted</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>',
+    ];
+
+    var currentStep = 0;
+
+    function renderProgress(step) {
+      var bar = document.getElementById('progress-bar');
+      var html = '';
+      steps.forEach(function(s, i) {
+        var circleClass = i < step ? 'done' : (i === step ? 'current' : '');
+        var labelClass = i < step ? 'done' : (i === step ? 'active' : '');
+        var circleContent = i < step ? sfIcon('checkmark', 12, 'color:#fff') : (i + 1);
+        html += '<div class="progress-step">' +
+          '<div class="step-circle ' + circleClass + '">' + circleContent + '</div>' +
+          '<div class="step-label ' + labelClass + '">' + s.label + '</div>' +
+        '</div>';
+        if (i < steps.length - 1) {
+          html += '<div class="progress-connector ' + (i < step ? 'done' : 'pending') + '"></div>';
+        }
+      });
+      bar.innerHTML = html;
+    }
+
+    function renderContent(step) {
+      document.getElementById('step-content').innerHTML = stepContents[step];
+      initIcons();
+    }
+
+    function renderNav(step) {
+      var nav = document.getElementById('onboarding-nav');
+      var isLast = step === steps.length - 1;
+      nav.innerHTML =
+        '<button class="btn" style="visibility:' + (step === 0 ? 'hidden' : 'visible') + '">\u2190 Back</button>' +
+        '<div style="flex:1"></div>' +
+        '<button class="btn btn-primary" style="min-width:100px">' + (isLast ? 'Finish' : 'Continue') + '</button>';
+    }
+
+    function showStep(step, btn) {
+      currentStep = step;
+      document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderProgress(step);
+      renderContent(step);
+      renderNav(step);
+    }
+
+    // Initial render
+    renderProgress(0);
+    renderContent(0);
+    renderNav(0);
+  </script>
+</body>
+</html>

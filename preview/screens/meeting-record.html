@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meeting Record — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      padding: 40px;
+    }
+
+    /* MeetingRecordTab embedded inside MeetingView: 700×500 */
+    .record-window {
+      width: 700px;
+      height: 500px;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-bg);
+      overflow: hidden;
+    }
+
+    /* Header row */
+    .rec-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-6);
+    }
+    .rec-header .title { font-size: var(--text-callout); font-weight: 500; }
+
+    /* Type picker row */
+    .type-picker {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-6);
+      font-size: var(--text-body);
+    }
+    .type-label { color: var(--color-text-secondary); font-size: var(--text-body); }
+
+    /* Visualization row */
+    .viz-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-5) var(--space-6);
+      height: 100px;
+    }
+    .rec-btn {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: default;
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+    .viz-placeholder {
+      flex: 1;
+      height: 60px;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-secondary);
+      font-size: var(--text-body);
+    }
+
+    /* SVG smooth waveform */
+    .viz-waveform {
+      flex: 1;
+      height: 60px;
+      overflow: hidden;
+    }
+    .viz-waveform svg {
+      width: 100%;
+      height: 100%;
+    }
+    @keyframes recWaveDrift {
+      0%   { d: path("M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30"); }
+      50%  { d: path("M0,30 C20,42 40,10 60,35 C80,48 100,12 120,32 C140,45 160,15 180,30 C200,40 220,18 240,30 C260,38 280,22 300,30"); }
+      100% { d: path("M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30"); }
+    }
+    @keyframes recWaveFillDrift {
+      0%   { d: path("M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30 L300,60 L0,60 Z"); }
+      50%  { d: path("M0,30 C20,42 40,10 60,35 C80,48 100,12 120,32 C140,45 160,15 180,30 C200,40 220,18 240,30 C260,38 280,22 300,30 L300,60 L0,60 Z"); }
+      100% { d: path("M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30 L300,60 L0,60 Z"); }
+    }
+    .rec-wave-line { animation: recWaveDrift 3s ease-in-out infinite; }
+    .rec-wave-fill { animation: recWaveFillDrift 3s ease-in-out infinite; }
+
+    .timer {
+      font-family: var(--font-mono);
+      font-size: var(--text-subhead);
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      width: 60px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Transcript section */
+    .transcript-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-4) var(--space-6);
+      overflow: hidden;
+    }
+    .transcript-header {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-2);
+    }
+    .transcript-header .th-group {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      cursor: default;
+    }
+
+    .transcript-body {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      gap: 0;
+    }
+    .transcript-left {
+      flex: 1;
+      overflow-y: auto;
+    }
+    .notes-sidebar {
+      width: 240px;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--color-separator);
+      padding: 0 0 0 var(--space-2);
+    }
+    .notes-list { flex: 1; overflow-y: auto; padding: 6px var(--space-2); }
+    .note-item {
+      margin-bottom: 6px;
+      padding: var(--space-2);
+      background: var(--color-surface);
+      border-radius: var(--radius-md);
+    }
+    .note-item .note-ts {
+      font-size: var(--text-caption2);
+      font-family: var(--font-mono);
+      color: var(--color-orange);
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    .note-item .note-text { font-size: var(--text-subhead); }
+    .notes-input-area {
+      padding: var(--space-2);
+      border-top: 1px solid var(--color-separator);
+    }
+    .note-timestamp-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: var(--text-caption2);
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--color-orange);
+      background: rgba(255,159,10,0.12);
+      border: 0.75px solid rgba(255,159,10,0.35);
+      padding: 2px 7px;
+      border-radius: var(--radius-pill);
+      margin-bottom: 4px;
+      display: flex;
+    }
+
+    /* State: completed */
+    .completed-viz {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2);
+      font-size: var(--text-body);
+    }
+    .new-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 var(--space-4);
+      height: 36px;
+      border-radius: var(--radius-pill);
+      background: var(--color-recording-red);
+      color: #fff;
+      font-size: var(--text-subhead);
+      font-weight: 600;
+      cursor: default;
+      flex-shrink: 0;
+    }
+
+    .state-content { display: none; }
+    .state-content.active { display: flex; flex-direction: column; height: 100%; }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Meeting Record</span>
+    <span class="page-title">MeetingRecordTab · 700×500</span>
+  </nav>
+
+  <div class="catalog-bg">
+    <div class="state-controls">
+      <button class="state-btn active" onclick="showState('ready', this)">Ready</button>
+      <button class="state-btn" onclick="showState('recording', this)">Recording</button>
+      <button class="state-btn" onclick="showState('completed', this)">Completed</button>
+      <button class="state-btn" onclick="showState('no-permission', this)">No Permission</button>
+    </div>
+
+    <div class="screen-frame">
+      <div class="record-window" data-swiftui-file="MeetingRecordTab.swift">
+
+        <!-- State: Ready -->
+        <div class="state-content active" id="state-ready">
+          <div class="rec-header">
+            <span style="color:var(--color-text-secondary)" data-icon="mic.fill" data-size="16"></span>
+            <span class="title">New Meeting</span>
+            <span style="flex:1"></span>
+            <span class="pill pill-gray">Ready</span>
+          </div>
+          <div class="divider"></div>
+          <div class="type-picker">
+            <span class="type-label">Meeting type:</span>
+            <select style="background:var(--color-surface); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none;">
+              <option>Standup</option>
+              <option>1:1</option>
+              <option>All-Hands</option>
+              <option>Customer Call</option>
+              <option>Video Essay</option>
+              <option selected>General</option>
+              <option>Custom</option>
+            </select>
+          </div>
+          <div class="divider"></div>
+          <div class="viz-row">
+            <div class="rec-btn" style="color:var(--color-recording-red)" data-icon="record.circle" data-size="32"></div>
+            <div class="viz-placeholder">Ready to record</div>
+          </div>
+          <div class="divider"></div>
+          <div class="transcript-section">
+            <div class="transcript-header">
+              <div class="th-group">
+                <span style="color:var(--color-text-secondary); font-size:13px; font-weight:600">&#9662;</span>
+                <span data-icon="doc.text" data-size="14" style="color:var(--color-text-secondary)"></span>
+                <span style="font-size:var(--text-callout); font-weight:500">Transcription</span>
+              </div>
+              <div style="flex:1"></div>
+            </div>
+            <div style="flex:1; display:flex; align-items:center; justify-content:center; color:var(--color-text-secondary); font-size:var(--text-body)">
+              No transcript yet
+            </div>
+          </div>
+        </div>
+
+        <!-- State: Recording -->
+        <div class="state-content" id="state-recording">
+          <div class="rec-header">
+            <span style="color:var(--color-text-secondary)" data-icon="mic.fill" data-size="16"></span>
+            <span class="title">Team Standup — Mon Feb 28</span>
+            <span style="flex:1"></span>
+            <span class="pill pill-red">Recording</span>
+          </div>
+          <div class="divider"></div>
+          <div class="type-picker">
+            <span class="type-label">Meeting type:</span>
+            <select disabled style="background:var(--color-surface); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-secondary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none; opacity:0.6;">
+              <option>General</option>
+            </select>
+          </div>
+          <div class="divider"></div>
+          <div class="viz-row">
+            <div class="rec-btn" style="color:var(--color-recording-red)" data-icon="stop.fill" data-size="32"></div>
+            <div class="viz-waveform">
+              <svg viewBox="0 0 300 60" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="rec-stroke" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="rgb(255,64,51)" stop-opacity="0.6"/>
+                    <stop offset="0.35" stop-color="rgb(77,128,255)" stop-opacity="0.8"/>
+                    <stop offset="1" stop-color="rgb(102,64,217)" stop-opacity="0.7"/>
+                  </linearGradient>
+                  <linearGradient id="rec-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgb(77,128,255)" stop-opacity="0.15"/>
+                    <stop offset="1" stop-color="rgb(77,128,255)" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path class="rec-wave-fill" d="M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30 L300,60 L0,60 Z" fill="url(#rec-fill)"/>
+                <path class="rec-wave-line" d="M0,30 C20,15 40,45 60,25 C80,8 100,48 120,28 C140,12 160,42 180,30 C200,18 220,40 240,30 C260,20 280,38 300,30" fill="none" stroke="url(#rec-stroke)" stroke-width="2.5"/>
+              </svg>
+            </div>
+            <div class="timer">03:42</div>
+          </div>
+          <div class="divider"></div>
+          <div class="transcript-section">
+            <div class="transcript-header">
+              <div class="th-group">
+                <span style="color:var(--color-text-secondary); font-size:13px; font-weight:600">&#9662;</span>
+                <span data-icon="doc.text" data-size="14" style="color:var(--color-text-secondary)"></span>
+                <span style="font-size:var(--text-callout); font-weight:500">Transcription</span>
+              </div>
+              <span class="btn btn-ghost" style="font-size:var(--text-subhead); color:var(--color-text-secondary)"><span data-icon="trash" data-size="12"></span> Clear</span>
+              <div style="flex:1"></div>
+              <span class="btn btn-ghost" style="font-size:var(--text-subhead); color:var(--color-orange)"><span data-icon="pencil.line" data-size="12"></span> Jot Notes</span>
+            </div>
+            <div class="transcript-body">
+              <div class="transcript-left">
+                <div class="segment-row">
+                  <span class="segment-ts">00:00</span>
+                  <span class="segment-text">Alright, let's get started with the daily standup.</span>
+                </div>
+                <div class="segment-row">
+                  <span class="segment-ts">00:12</span>
+                  <span class="segment-text">Yesterday I finished the new onboarding flow and pushed it for review.</span>
+                </div>
+                <div class="segment-row note-row">
+                  <span class="segment-ts" style="color:var(--color-orange)">00:28</span>
+                  <span class="segment-text">
+                    <span class="note-badge"><span data-icon="pencil.line" data-size="11"></span> Follow up on PR feedback</span>
+                  </span>
+                </div>
+                <div class="segment-row">
+                  <span class="segment-ts">00:35</span>
+                  <span class="segment-text">Today I'll be working on the meeting recording feature.</span>
+                </div>
+                <div class="segment-row">
+                  <span class="segment-ts">00:48</span>
+                  <span class="segment-text">No blockers at the moment, but I'd like to sync on the API design later.</span>
+                </div>
+              </div>
+              <div class="divider-v"></div>
+              <div class="notes-sidebar">
+                <div class="notes-list">
+                  <div class="note-item">
+                    <div class="note-ts">@ 00:28</div>
+                    <div class="note-text">Follow up on PR feedback</div>
+                  </div>
+                </div>
+                <div class="notes-input-area">
+                  <div class="note-timestamp-badge"><span data-icon="pencil.line" data-size="10"></span> @ 03:42</div>
+                  <input class="textfield textfield-orange" placeholder="Jot a note..." style="margin-bottom:6px; font-size:var(--text-subhead)">
+                  <button class="btn btn-primary" style="width:100%; font-size:var(--text-footnote); background:var(--color-orange); border-color:var(--color-orange)">Add Note</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- State: Completed -->
+        <div class="state-content" id="state-completed">
+          <div class="rec-header">
+            <span style="color:var(--color-text-secondary)" data-icon="mic.fill" data-size="16"></span>
+            <span class="title">Team Standup — Mon Feb 28</span>
+            <span style="flex:1"></span>
+            <span class="pill pill-blue">Completed</span>
+          </div>
+          <div class="divider"></div>
+          <div class="type-picker">
+            <span class="type-label">Meeting type:</span>
+            <span style="font-size:var(--text-body); display:inline-flex; align-items:center; gap:4px;">
+              <span data-icon="doc.text" data-size="14" style="color:var(--color-accent)"></span> General
+            </span>
+          </div>
+          <div class="divider"></div>
+          <div class="viz-row">
+            <div class="new-btn">+ New</div>
+            <div class="completed-viz">
+              <span style="color:var(--color-green)" data-icon="checkmark.circle.fill" data-size="16"></span>
+              <span style="font-weight:500">Recording saved</span>
+              <span style="font-family:var(--font-mono); color:var(--color-text-secondary); font-size:var(--text-subhead)">03:42</span>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="transcript-section">
+            <div class="transcript-header">
+              <div class="th-group">
+                <span style="color:var(--color-text-secondary); font-size:13px; font-weight:600">&#9662;</span>
+                <span data-icon="doc.text" data-size="14" style="color:var(--color-text-secondary)"></span>
+                <span style="font-size:var(--text-callout); font-weight:500">Transcription</span>
+              </div>
+              <span class="btn btn-ghost" style="font-size:var(--text-subhead); color:var(--color-text-secondary)"><span data-icon="trash" data-size="12"></span> Clear</span>
+              <div style="flex:1"></div>
+            </div>
+            <div class="transcript-left">
+              <div class="segment-row">
+                <span class="segment-ts">00:00</span>
+                <span class="segment-text">Alright, let's get started with the daily standup.</span>
+              </div>
+              <div class="segment-row">
+                <span class="segment-ts">00:12</span>
+                <span class="segment-text">Yesterday I finished the new onboarding flow and pushed it for review.</span>
+              </div>
+              <div class="segment-row">
+                <span class="segment-ts">00:35</span>
+                <span class="segment-text">Today I'll be working on the meeting recording feature.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- State: No Permission -->
+        <div class="state-content" id="state-no-permission">
+          <div class="rec-header">
+            <span style="color:var(--color-text-secondary)" data-icon="mic.fill" data-size="16"></span>
+            <span class="title">New Meeting</span>
+            <span style="flex:1"></span>
+            <span class="pill" style="background:rgba(255,59,48,0.18); color:var(--color-recording-red)">Permission Required</span>
+          </div>
+          <div class="divider"></div>
+          <div class="type-picker">
+            <span class="type-label">Meeting type:</span>
+            <span style="font-size:var(--text-body); display:inline-flex; align-items:center; gap:4px;">
+              <span data-icon="doc.text" data-size="14" style="color:var(--color-accent)"></span> General
+            </span>
+          </div>
+          <div class="divider"></div>
+          <div class="viz-row">
+            <div class="rec-btn" style="color:var(--color-recording-red)" data-icon="record.circle" data-size="32"></div>
+            <div class="viz-placeholder" style="color:var(--color-recording-red); border:1px solid rgba(255,59,48,0.3); background:rgba(255,59,48,0.06)">
+              Screen Recording permission required
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="transcript-section">
+            <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-3); color:var(--color-text-secondary)">
+              <div data-icon="lock.fill" data-size="40" style="color:var(--color-text-tertiary)"></div>
+              <div style="font-size:var(--text-body); text-align:center; max-width:300px; line-height:1.5">
+                Enable Screen Recording in System Settings to capture system audio
+              </div>
+              <button class="btn btn-primary">Open System Settings</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /record-window -->
+    </div><!-- /screen-frame -->
+  </div>
+
+  <script src="../icons.js"></script>
+  <script>
+    function showState(id, btn) {
+      document.querySelectorAll('.state-content').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.getElementById('state-' + id).classList.add('active');
+      btn.classList.add('active');
+      initIcons();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      padding: 40px;
+      background: var(--color-bg);
+    }
+
+    /* Settings window: 750×450, NavigationSplitView */
+    .settings-window {
+      width: 750px;
+      height: 450px;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .settings-sidebar {
+      width: 200px;
+      min-width: 200px;
+      background: var(--color-surface);
+      border-right: 1px solid var(--color-separator);
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-3) var(--space-2);
+      gap: 2px;
+      overflow-y: auto;
+    }
+    .settings-sidebar .nav-title {
+      font-size: var(--text-headline);
+      font-weight: 600;
+      padding: var(--space-2) var(--space-2) var(--space-3);
+    }
+
+    /* Detail pane */
+    .settings-detail {
+      flex: 1;
+      background: var(--color-bg);
+      overflow-y: auto;
+      padding: var(--space-6);
+    }
+
+    /* Tab content areas */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* General tab */
+    .position-cards {
+      display: flex;
+      gap: var(--space-3);
+      margin-top: var(--space-1);
+    }
+    .position-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: var(--space-2);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-separator);
+      background: var(--color-surface);
+      cursor: default;
+    }
+    .position-card.selected {
+      border-color: var(--color-accent);
+      border-width: 2px;
+      background: var(--color-accent-dim);
+    }
+    .position-card .card-label {
+      font-size: var(--text-caption2);
+      color: var(--color-text-secondary);
+    }
+    .mini-screen {
+      width: 80px;
+      height: 50px;
+      background: var(--color-surface-2);
+      border-radius: 4px;
+      border: 1px solid var(--color-separator);
+      position: relative;
+      overflow: hidden;
+    }
+    .mini-waveform {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 4px;
+      background: var(--color-accent);
+      border-radius: var(--radius-pill);
+      opacity: 0.8;
+    }
+    .mini-waveform.top    { top: 4px; }
+    .mini-waveform.bottom { bottom: 4px; }
+    .mini-waveform.mid    { top: 50%; transform: translate(-50%, -50%); }
+
+    /* Recording tab */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+      font-size: var(--text-body);
+    }
+    .form-label { width: 160px; flex-shrink: 0; color: var(--color-text-secondary); }
+
+    /* Models tab */
+    .model-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-separator);
+      margin-bottom: var(--space-2);
+    }
+    .model-row .model-name { flex: 1; font-weight: 500; }
+    .model-row .model-size { font-size: var(--text-caption); color: var(--color-text-tertiary); }
+
+    /* Permissions tab */
+    .perm-grid { display: flex; flex-direction: column; gap: var(--space-3); }
+
+    /* Diagnostics tab */
+    .diag-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px solid var(--color-separator);
+      font-size: var(--text-body);
+    }
+    .diag-val { font-family: var(--font-mono); color: var(--color-text-secondary); font-size: var(--text-subhead); }
+
+    /* Vocabulary tab */
+    .vocab-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: 8px var(--space-3);
+      border-radius: var(--radius-md);
+      font-size: var(--text-body);
+    }
+    .vocab-row:hover { background: var(--color-surface-3); }
+    .vocab-phrase { width: 180px; flex-shrink: 0; font-weight: 500; }
+    .vocab-arrow  { color: var(--color-text-tertiary); }
+    .vocab-replace { flex: 1; color: var(--color-text-secondary); }
+
+    /* About tab */
+    .about-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-6) 0;
+    }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Settings</span>
+    <span class="page-title">SettingsView · 750×450 NavigationSplitView</span>
+  </nav>
+
+  <div class="catalog-bg">
+    <div class="state-controls">
+      <button class="state-btn active" onclick="switchTab('general', this)">General</button>
+      <button class="state-btn" onclick="switchTab('recording', this)">Recording</button>
+      <button class="state-btn" onclick="switchTab('vocabulary', this)">Vocabulary</button>
+      <button class="state-btn" onclick="switchTab('models', this)">Models</button>
+      <button class="state-btn" onclick="switchTab('permissions', this)">Permissions</button>
+      <button class="state-btn" onclick="switchTab('diagnostics', this)">Diagnostics</button>
+      <button class="state-btn" onclick="switchTab('about', this)">About</button>
+    </div>
+
+    <div class="screen-frame">
+      <div class="settings-window" data-swiftui-file="SettingsView.swift">
+
+        <!-- Sidebar -->
+        <nav class="settings-sidebar">
+          <div class="nav-title">Settings</div>
+          <a class="sidebar-item active" id="nav-general" onclick="switchTab('general',null)">
+            <span class="icon" data-icon="gear" data-size="15"></span> General
+          </a>
+          <a class="sidebar-item" id="nav-recording" onclick="switchTab('recording',null)">
+            <span class="icon" data-icon="mic.circle" data-size="15"></span> Recording
+          </a>
+          <a class="sidebar-item" id="nav-vocabulary" onclick="switchTab('vocabulary',null)">
+            <span class="icon" data-icon="text.book.closed" data-size="15"></span> Vocabulary
+          </a>
+          <a class="sidebar-item" id="nav-models" onclick="switchTab('models',null)">
+            <span class="icon" data-icon="cpu" data-size="15"></span> Models
+          </a>
+          <a class="sidebar-item" id="nav-permissions" onclick="switchTab('permissions',null)">
+            <span class="icon" data-icon="lock.shield" data-size="15"></span> Permissions
+          </a>
+          <a class="sidebar-item" id="nav-diagnostics" onclick="switchTab('diagnostics',null)">
+            <span class="icon" data-icon="ant.circle" data-size="15"></span> Diagnostics
+          </a>
+          <a class="sidebar-item" id="nav-about" onclick="switchTab('about',null)">
+            <span class="icon" data-icon="info.circle" data-size="15"></span> About
+          </a>
+        </nav>
+
+        <!-- Detail -->
+        <div class="settings-detail">
+
+          <!-- General -->
+          <div class="tab-content active" id="tab-general" data-swiftui-file="SettingsView.swift#generalTab">
+            <div class="section-title">Recording Waveform Visualizer</div>
+            <div class="checkbox-row" style="margin-bottom:var(--space-3)">
+              <div class="checkbox-box checked">✓</div>
+              Show recording visualiser
+            </div>
+            <div class="position-cards">
+              <div class="position-card">
+                <div class="card-label">Top</div>
+                <div class="mini-screen"><div class="mini-waveform top"></div></div>
+              </div>
+              <div class="position-card selected">
+                <div class="card-label">Follows Cursor</div>
+                <div class="mini-screen"><div class="mini-waveform mid"></div></div>
+              </div>
+              <div class="position-card">
+                <div class="card-label">Bottom</div>
+                <div class="mini-screen"><div class="mini-waveform bottom"></div></div>
+              </div>
+            </div>
+
+            <div style="margin-top:var(--space-5)">
+              <div class="section-title">Appearance</div>
+              <div class="position-cards">
+                <div class="position-card">
+                  <div class="card-label">System</div>
+                  <div class="mini-screen" style="background: linear-gradient(135deg, var(--color-surface-2) 50%, #1a1a1a 50%)"></div>
+                </div>
+                <div class="position-card selected">
+                  <div class="card-label">Dark</div>
+                  <div class="mini-screen" style="background:#1a1a1a"></div>
+                </div>
+                <div class="position-card">
+                  <div class="card-label">Light</div>
+                  <div class="mini-screen" style="background:#f0f0f0"></div>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:var(--space-5)">
+              <div class="section-title">Splash Screen at startup</div>
+              <div class="checkbox-row">
+                <div class="checkbox-box checked">✓</div>
+                Show launch splash screen
+              </div>
+            </div>
+          </div>
+
+          <!-- Recording -->
+          <div class="tab-content" id="tab-recording" data-swiftui-file="SettingsView.swift#recordingTab">
+            <div class="section-title">Hotkey</div>
+            <div class="form-row" style="margin-bottom:var(--space-4)">
+              <div class="form-label">Trigger key</div>
+              <div style="display:flex; gap:var(--space-2)">
+                <span class="keycap">⇪ Caps Lock</span>
+                <span style="color:var(--color-text-tertiary)">(recommended)</span>
+              </div>
+            </div>
+
+            <div class="section-title" style="margin-top:var(--space-4)">Audio</div>
+            <div class="form-row">
+              <div class="form-label">Input device</div>
+              <select style="background:var(--color-surface); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none;">
+                <option>MacBook Pro Microphone</option>
+                <option>External Mic</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Silence threshold</div>
+              <input type="range" min="0" max="100" value="30" style="width:140px; accent-color:var(--color-accent)">
+              <span style="font-size:var(--text-subhead); color:var(--color-text-secondary); font-family:var(--font-mono)">-30 dB</span>
+            </div>
+            <div class="form-row">
+              <div class="form-label">Max silence gap</div>
+              <input type="range" min="0" max="100" value="50" style="width:140px; accent-color:var(--color-accent)">
+              <span style="font-size:var(--text-subhead); color:var(--color-text-secondary); font-family:var(--font-mono)">1.5 s</span>
+            </div>
+            <div class="section-title" style="margin-top:var(--space-4)">Formatting</div>
+            <div class="checkbox-row" style="margin-bottom:var(--space-2)">
+              <div class="checkbox-box checked">✓</div> Auto-capitalise first word
+            </div>
+            <div class="checkbox-row">
+              <div class="checkbox-box checked">✓</div> Add period at end of sentence
+            </div>
+          </div>
+
+          <!-- Vocabulary -->
+          <div class="tab-content" id="tab-vocabulary" data-swiftui-file="SettingsView.swift#vocabularyTab">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:var(--space-3)">
+              <div class="section-title" style="margin-bottom:0">Custom Vocabulary</div>
+              <button class="btn btn-sm btn-primary">+ Add Entry</button>
+            </div>
+            <div style="border:1px solid var(--color-separator); border-radius:var(--radius-lg); overflow:hidden;">
+              <div style="display:flex; padding:6px var(--space-3); background:var(--color-surface); border-bottom:1px solid var(--color-separator)">
+                <span style="width:180px; font-size:var(--text-caption); font-weight:600; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.05em">Phrase</span>
+                <span style="width:20px"></span>
+                <span style="font-size:var(--text-caption); font-weight:600; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.05em">Replacement</span>
+              </div>
+              <div class="vocab-row">
+                <span class="vocab-phrase">whisper kit</span>
+                <span class="vocab-arrow">→</span>
+                <span class="vocab-replace">WhisperKit</span>
+              </div>
+              <div class="vocab-row">
+                <span class="vocab-phrase">look ma no hands</span>
+                <span class="vocab-arrow">→</span>
+                <span class="vocab-replace">Look Ma No Hands</span>
+              </div>
+              <div class="vocab-row">
+                <span class="vocab-phrase">swift u i</span>
+                <span class="vocab-arrow">→</span>
+                <span class="vocab-replace">SwiftUI</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Models -->
+          <div class="tab-content" id="tab-models" data-swiftui-file="SettingsView.swift#modelsTab">
+            <div class="section-title">Whisper Models</div>
+            <div class="model-row">
+              <div style="color:var(--color-green)" data-icon="checkmark.circle.fill" data-size="16"></div>
+              <div class="model-name">Base (current)</div>
+              <div class="model-size">74 MB</div>
+              <button class="btn btn-sm" style="opacity:0.4" disabled>Installed</button>
+            </div>
+            <div class="model-row">
+              <div style="color:var(--color-text-tertiary); font-size:16px">○</div>
+              <div class="model-name">Small</div>
+              <div class="model-size">244 MB</div>
+              <button class="btn btn-sm">Download</button>
+            </div>
+            <div class="model-row">
+              <div style="color:var(--color-text-tertiary); font-size:16px">○</div>
+              <div class="model-name">Large v3 Turbo</div>
+              <div class="model-size">1.5 GB</div>
+              <button class="btn btn-sm">Download</button>
+            </div>
+
+            <div class="section-title" style="margin-top:var(--space-5)">Ollama</div>
+            <div style="display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--color-surface); border-radius:var(--radius-lg); border:1px solid var(--color-separator);">
+              <span class="dot dot-green"></span>
+              <span>Connected — localhost:11434</span>
+              <span style="flex:1"></span>
+              <select style="background:var(--color-surface-2); border:1px solid var(--color-separator); border-radius:var(--radius-md); color:var(--color-text-primary); font-family:var(--font-family); font-size:var(--text-body); padding:3px 8px; outline:none;">
+                <option>llama3.2</option>
+                <option>mistral</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Permissions -->
+          <div class="tab-content" id="tab-permissions" data-swiftui-file="SettingsView.swift#permissionsTab">
+            <div class="section-title">System Permissions</div>
+            <div class="perm-grid">
+              <div class="permission-row">
+                <div class="perm-icon" style="color:var(--color-green)" data-icon="mic.fill" data-size="24"></div>
+                <div class="perm-info">
+                  <div class="perm-title">Microphone</div>
+                  <div class="perm-desc">Record your voice for dictation</div>
+                </div>
+                <div style="color:var(--color-green)" data-icon="checkmark.circle.fill" data-size="22"></div>
+              </div>
+              <div class="permission-row">
+                <div class="perm-icon" style="color:var(--color-green)" data-icon="accessibility" data-size="24"></div>
+                <div class="perm-info">
+                  <div class="perm-title">Accessibility</div>
+                  <div class="perm-desc">Monitor hotkeys and insert text into apps</div>
+                </div>
+                <div style="color:var(--color-green)" data-icon="checkmark.circle.fill" data-size="22"></div>
+              </div>
+              <div class="permission-row">
+                <div class="perm-icon" style="color:var(--color-orange)" data-icon="play.rectangle" data-size="24"></div>
+                <div class="perm-info">
+                  <div class="perm-title">Screen Recording</div>
+                  <div class="perm-desc">Capture system audio for meeting transcription</div>
+                </div>
+                <div class="perm-status">
+                  <button class="btn btn-sm">Open Settings</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diagnostics -->
+          <div class="tab-content" id="tab-diagnostics" data-swiftui-file="SettingsView.swift#diagnosticsTab">
+            <div class="section-title">Diagnostics</div>
+            <div class="diag-row"><span>App version</span><span class="diag-val">1.0.0 (42)</span></div>
+            <div class="diag-row"><span>Whisper model</span><span class="diag-val">base</span></div>
+            <div class="diag-row"><span>Ollama status</span><span class="diag-val" style="color:var(--color-green)">Connected</span></div>
+            <div class="diag-row"><span>Memory usage</span><span class="diag-val">142 MB</span></div>
+            <div class="diag-row"><span>Last dictation</span><span class="diag-val">2 min ago</span></div>
+            <div style="margin-top:var(--space-4); display:flex; gap:var(--space-3);">
+              <button class="btn"><span data-icon="doc.on.clipboard" data-size="13"></span> Copy Diagnostics</button>
+              <button class="btn btn-danger" style="font-size:var(--text-footnote)"><span data-icon="trash" data-size="12"></span> Reset All Settings</button>
+            </div>
+          </div>
+
+          <!-- About -->
+          <div class="tab-content" id="tab-about" data-swiftui-file="SettingsView.swift#aboutTab">
+            <div class="about-content">
+              <div style="font-size:64px; line-height:1">🙌🏾</div>
+              <div style="font-size:var(--text-title2); font-weight:700">Look Ma No Hands</div>
+              <div style="font-size:var(--text-body); color:var(--color-text-secondary)">Version 1.0.0 (42)</div>
+              <div style="font-size:var(--text-subhead); color:var(--color-text-secondary); text-align:center; max-width:360px; line-height:1.5;">
+                Fast, local voice dictation for macOS.<br>
+                100% private — nothing leaves your Mac.
+              </div>
+              <div style="display:flex; gap:var(--space-3); margin-top:var(--space-2);">
+                <button class="btn">Check for Updates</button>
+                <button class="btn">GitHub</button>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /settings-detail -->
+      </div><!-- /settings-window -->
+    </div><!-- /screen-frame -->
+  </div>
+
+  <script src="../icons.js"></script>
+  <script>
+    function switchTab(tab, btn) {
+      // Hide all tabs
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.settings-sidebar .sidebar-item').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+
+      document.getElementById('tab-' + tab).classList.add('active');
+      document.getElementById('nav-' + tab).classList.add('active');
+      if (btn) btn.classList.add('active');
+      else {
+        // find matching state-btn
+        document.querySelectorAll('.state-btn').forEach(b => {
+          if (b.textContent.trim().toLowerCase() === tab) b.classList.add('active');
+        });
+      }
+    }
+  </script>
+</body>
+</html>

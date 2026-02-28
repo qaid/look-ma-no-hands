@@ -1,0 +1,114 @@
+/* ============================================================
+   Look Ma No Hands — Design Tokens
+   Maps directly to macOS semantic colors and SwiftUI values.
+   Dark mode is the default; light mode via prefers-color-scheme.
+   ============================================================ */
+
+:root {
+  /* ── Colors: Background layers ─────────────────────────── */
+  --color-bg:           #1e1e1e;   /* windowBackgroundColor dark */
+  --color-surface:      #2a2a2a;   /* controlBackgroundColor dark */
+  --color-surface-2:    #323232;   /* slightly elevated surface */
+  --color-surface-3:    #3a3a3a;   /* hover / selected */
+  --color-material:     rgba(40, 40, 40, 0.82); /* ultraThinMaterial dark */
+  --color-separator:    rgba(255, 255, 255, 0.12);
+
+  /* ── Colors: Text ───────────────────────────────────────── */
+  --color-text-primary:   rgba(255, 255, 255, 0.92);
+  --color-text-secondary: rgba(255, 255, 255, 0.55);
+  --color-text-tertiary:  rgba(255, 255, 255, 0.28);
+
+  /* ── Colors: Accent (macOS blue) ────────────────────────── */
+  --color-accent:        #007AFF;
+  --color-accent-dim:    rgba(0, 122, 255, 0.20);
+
+  /* ── Colors: Status ─────────────────────────────────────── */
+  --color-green:         #30D158;  /* systemGreen */
+  --color-orange:        #FF9F0A;  /* systemOrange — notes */
+  --color-red:           #FF3B30;  /* systemRed = recording */
+  --color-blue:          #007AFF;
+  --color-purple:        #BF5AF2;  /* systemPurple */
+
+  /* Recording red matches SwiftUI Color(red:1.0, green:0.23, blue:0.19) */
+  --color-recording-red: rgb(255, 59, 48);
+
+  /* ── Spacing scale ──────────────────────────────────────── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-12: 48px;
+
+  /* ── Border radii ───────────────────────────────────────── */
+  --radius-sm:  4px;
+  --radius-md:  6px;
+  --radius-lg:  8px;
+  --radius-xl:  12px;
+  --radius-2xl: 20px;
+  --radius-pill: 9999px;
+
+  /* ── Typography — SF Pro equivalent ────────────────────── */
+  --font-family: -apple-system, "SF Pro Display", "SF Pro Text", BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:   "SF Mono", "Menlo", "Monaco", monospace;
+
+  --text-caption2:  10px;
+  --text-caption:   11px;
+  --text-footnote:  12px;
+  --text-subhead:   13px;
+  --text-body:      14px;
+  --text-callout:   15px;
+  --text-headline:  16px;
+  --text-title3:    18px;
+  --text-title2:    20px;
+  --text-title1:    24px;
+  --text-large:     28px;
+
+  /* ── Shadows ────────────────────────────────────────────── */
+  --shadow-sm:  0 2px 6px rgba(0,0,0,0.25);
+  --shadow-md:  0 4px 10px rgba(0,0,0,0.30);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.40);
+
+  /* ── Material border (glass rim) ───────────────────────── */
+  --border-material: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+/* ── Light mode overrides ────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root {
+    --color-bg:           #ececec;
+    --color-surface:      #f5f5f5;
+    --color-surface-2:    #ffffff;
+    --color-surface-3:    #e8e8e8;
+    --color-material:     rgba(240, 240, 240, 0.85);
+    --color-separator:    rgba(0, 0, 0, 0.10);
+
+    --color-text-primary:   rgba(0, 0, 0, 0.88);
+    --color-text-secondary: rgba(0, 0, 0, 0.50);
+    --color-text-tertiary:  rgba(0, 0, 0, 0.26);
+
+    --shadow-sm:  0 2px 6px rgba(0,0,0,0.10);
+    --shadow-md:  0 4px 10px rgba(0,0,0,0.12);
+    --shadow-lg:  0 8px 24px rgba(0,0,0,0.15);
+
+    --border-material: 1px solid rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* ── Base reset ──────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-family);
+  font-size: var(--text-body);
+  color: var(--color-text-primary);
+  background: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

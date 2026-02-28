@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recording Indicator — Look Ma No Hands</title>
+  <link rel="stylesheet" href="../design-tokens.css">
+  <link rel="stylesheet" href="../components.css">
+  <style>
+    .catalog-bg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 48px;
+      padding: 60px 40px;
+    }
+    /* Floating indicator: 340×60, no window chrome */
+    .indicator {
+      width: 340px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px 8px 14px;
+      background: var(--color-material);
+      backdrop-filter: blur(20px) saturate(1.4);
+      -webkit-backdrop-filter: blur(20px) saturate(1.4);
+      border-radius: var(--radius-xl);
+      border: 1.5px solid rgba(77, 153, 255, 0.50);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+    }
+    .rec-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgb(255, 59, 48);
+      box-shadow: 0 0 8px rgba(255,59,48,0.5);
+      flex-shrink: 0;
+    }
+
+    /* Smooth waveform SVG — matches WaveformLineView bezier curves */
+    .wave-container {
+      flex: 1;
+      height: 34px;
+      overflow: hidden;
+    }
+    .wave-container svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Animate the wave paths for a smooth undulation */
+    @keyframes waveShift1 {
+      0%   { d: path("M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17"); }
+      50%  { d: path("M0,17 C15,28 30,4 50,22 C70,30 85,2 110,20 C130,28 155,6 180,17 C200,26 225,8 250,18 C270,26 290,10 300,17"); }
+      100% { d: path("M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17"); }
+    }
+    @keyframes waveShiftFill1 {
+      0%   { d: path("M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z"); }
+      50%  { d: path("M0,17 C15,28 30,4 50,22 C70,30 85,2 110,20 C130,28 155,6 180,17 C200,26 225,8 250,18 C270,26 290,10 300,17 L300,34 L0,34 Z"); }
+      100% { d: path("M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z"); }
+    }
+    .wave-line {
+      animation: waveShift1 3s ease-in-out infinite;
+    }
+    .wave-fill {
+      animation: waveShiftFill1 3s ease-in-out infinite;
+    }
+
+    /* Light mode: border swap */
+    @media (prefers-color-scheme: light) {
+      .indicator {
+        border-color: rgba(26, 102, 204, 0.40);
+      }
+    }
+
+    .indicator-idle {
+      border-color: var(--color-separator) !important;
+    }
+
+    .state-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .state-label {
+      font-size: var(--text-caption);
+      color: var(--color-text-tertiary);
+      font-family: var(--font-mono);
+    }
+
+    /* Position context: mock desktop bar showing placement */
+    .mock-screen {
+      width: 420px;
+      height: 120px;
+      background: var(--color-surface);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--color-separator);
+      position: relative;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .mock-screen .indicator-top {
+      position: absolute;
+      top: 8px;
+    }
+    .mock-screen .indicator-bottom {
+      position: absolute;
+      bottom: 8px;
+    }
+    .mock-screen .indicator-cursor {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-icon {
+      position: absolute;
+      top: calc(50% - 22px);
+      left: calc(50% + 48px);
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="preview-nav">
+    <a href="../index.html">← Catalog</a>
+    <span>Recording Indicator</span>
+    <span class="page-title">RecordingIndicator · 340×60 floating</span>
+  </nav>
+
+  <div class="catalog-bg">
+
+    <!-- Isolated component -->
+    <div class="state-slot" data-swiftui-file="RecordingIndicator.swift">
+      <div class="indicator">
+        <div class="rec-dot"></div>
+        <div class="wave-container">
+          <svg viewBox="0 0 300 34" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="wg1" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stop-color="rgb(255,64,51)" stop-opacity="0.6"/>
+                <stop offset="0.35" stop-color="rgb(77,128,255)" stop-opacity="0.8"/>
+                <stop offset="1" stop-color="rgb(102,64,217)" stop-opacity="0.7"/>
+              </linearGradient>
+              <linearGradient id="wf1" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="rgb(77,128,255)" stop-opacity="0.15"/>
+                <stop offset="1" stop-color="rgb(77,128,255)" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf1)"/>
+            <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg1)" stroke-width="2.5"/>
+          </svg>
+        </div>
+      </div>
+      <div class="state-label">Active — WaveformLineView (smooth bezier curve)</div>
+    </div>
+
+    <!-- Position: Top of screen -->
+    <div class="state-slot">
+      <div class="state-label" style="margin-bottom:4px">indicatorPosition = .top</div>
+      <div class="mock-screen">
+        <div class="indicator-top">
+          <div class="indicator" style="transform:scale(0.68); transform-origin:top center; width:340px;">
+            <div class="rec-dot"></div>
+            <div class="wave-container">
+              <svg viewBox="0 0 300 34" preserveAspectRatio="none">
+                <use href="#wg1"/><use href="#wf1"/>
+                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf1)"/>
+                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg1)" stroke-width="2.5"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Position: Follow cursor -->
+    <div class="state-slot">
+      <div class="state-label" style="margin-bottom:4px">indicatorPosition = .followCursor</div>
+      <div class="mock-screen">
+        <span class="cursor-icon">&#x1F5B1;&#xFE0E;</span>
+        <div class="indicator-cursor">
+          <div class="indicator" style="transform:scale(0.68); transform-origin:center; width:340px;">
+            <div class="rec-dot"></div>
+            <div class="wave-container">
+              <svg viewBox="0 0 300 34" preserveAspectRatio="none">
+                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf1)"/>
+                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg1)" stroke-width="2.5"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
