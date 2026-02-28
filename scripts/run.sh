@@ -13,9 +13,12 @@ if [[ ! -d "$PREVIEW_DIR" ]]; then
 fi
 
 # Kill any existing server on this port
-if lsof -ti tcp:$PORT &>/dev/null; then
+if lsof -ti tcp:"$PORT" &>/dev/null; then
     echo "Stopping existing server on port $PORT..."
-    lsof -ti tcp:$PORT | xargs kill -9 2>/dev/null || true
+    lsof -ti tcp:"$PORT" | grep -E '^[0-9]+$' | xargs kill 2>/dev/null || true
+    sleep 0.3
+    # Force-kill if still running
+    lsof -ti tcp:"$PORT" | grep -E '^[0-9]+$' | xargs kill -9 2>/dev/null || true
 fi
 
 echo "Starting preview server on http://localhost:$PORT"

@@ -12,7 +12,7 @@
 
     'gear': '<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.48.48 0 0013.92 2h-3.84c-.24 0-.44.17-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.72 8.47c-.12.2-.07.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
 
-    'gearshape': '<path fill="currentColor" d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.48.48 0 0013.92 2h-3.84c-.24 0-.44.17-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.72 8.47c-.12.2-.07.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>',
+    'gearshape': null, // alias — resolved after object definition
 
     'mic.fill': '<path fill="currentColor" d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3zm7 9a1 1 0 10-2 0 5 5 0 01-10 0 1 1 0 10-2 0 7 7 0 006 6.92V20H8.5a1 1 0 100 2h7a1 1 0 100-2H13v-2.08A7 7 0 0019 11z"/>',
 
@@ -122,10 +122,22 @@
 
     'record.circle': '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="5" fill="currentColor"/>',
 
-    'arrow.clockwise': '<path d="M1 4v6h6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.51 15a9 9 0 105.64-11.36L1 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    'arrow.clockwise': null, // alias — resolved after object definition
 
     'ellipsis.circle': '<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="16" cy="12" r="1" fill="currentColor"/>'
   };
+
+  // Resolve icon aliases
+  icons['gearshape'] = icons['gear'];
+  icons['arrow.clockwise'] = icons['arrow.circlepath'];
+
+  /**
+   * Sanitize a CSS style string to prevent HTML injection via innerHTML.
+   * Only allows characters valid in CSS property/value declarations.
+   */
+  function sanitizeStyle(s) {
+    return s.replace(/[^a-zA-Z0-9:;.\-,()%# ]/g, '');
+  }
 
   /**
    * Render an SF Symbol-like SVG icon.
@@ -139,7 +151,7 @@
     var svg = icons[name];
     if (!svg) return '<span class="sf-icon" style="width:'+size+'px;height:'+size+'px;display:inline-flex"></span>';
     var style = 'width:'+size+'px;height:'+size+'px';
-    if (extraStyle) style += ';' + extraStyle;
+    if (extraStyle) style += ';' + sanitizeStyle(extraStyle);
     return '<span class="sf-icon" style="'+style+'">' +
       '<svg viewBox="0 0 24 24" width="'+size+'" height="'+size+'">' + svg + '</svg></span>';
   };
@@ -154,7 +166,7 @@
       var el = els[i];
       var name = el.getAttribute('data-icon');
       var size = parseInt(el.getAttribute('data-size')) || 16;
-      var style = el.getAttribute('data-icon-style') || '';
+      var style = sanitizeStyle(el.getAttribute('data-icon-style') || '');
       el.innerHTML = sfIcon(name, size, style);
     }
   };

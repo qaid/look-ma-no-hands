@@ -331,6 +331,10 @@
       { title: 'AI Tools Overview', type: 'videoEssay', duration: '12:04', segments: 3, hasNotes: false, date: 'Feb 24' },
     ];
 
+    function esc(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     function getTypeInfo(typeId) {
       return meetingTypes.find(function(t) { return t.id === typeId; }) || meetingTypes[6];
     }
@@ -354,16 +358,16 @@
           ? '<div class="row-check checked">' + sfIcon('checkmark', 10, 'color:#fff') + '</div>'
           : '<div class="row-check"></div>';
       }
-      var metaParts = [type.name, m.duration, m.segments + ' segments'];
+      var metaParts = [esc(type.name), esc(m.duration), esc(m.segments) + ' segments'];
       if (m.hasNotes) metaParts.push(sfIcon('sparkles', 11, 'color:var(--color-green)'));
       return '<div class="lib-meeting-row' + selectedClass + '">' +
         checkHtml +
         '<div class="row-type-icon">' + sfIcon(type.icon, 18) + '</div>' +
         '<div class="row-info">' +
-          '<div class="meeting-title">' + m.title + '</div>' +
+          '<div class="meeting-title">' + esc(m.title) + '</div>' +
           '<div class="meeting-meta">' + metaParts.join(' <span style="color:var(--color-text-tertiary)">&middot;</span> ') + '</div>' +
         '</div>' +
-        '<span class="row-date">' + m.date + '</span>' +
+        '<span class="row-date">' + esc(m.date) + '</span>' +
       '</div>';
     }
 
@@ -394,6 +398,7 @@
       document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
       document.getElementById('state-' + id).classList.add('active');
       btn.classList.add('active');
+      initIcons();
     }
   </script>
 </body>

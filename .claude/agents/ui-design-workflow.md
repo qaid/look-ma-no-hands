@@ -7,8 +7,7 @@ The `preview/` directory contains browser-renderable HTML pages representing eve
 ## Serving the catalog
 
 ```bash
-bash preview/serve.sh        # starts http://localhost:8420
-open http://localhost:8420   # open in browser
+bash scripts/run.sh          # starts http://localhost:8420 and opens browser
 ```
 
 Or open individual files directly in Safari/Chrome — they work without a server.
@@ -36,7 +35,7 @@ Or open individual files directly in Safari/Chrome — they work without a serve
 ## HTML → Figma round-trip
 
 1. Open `preview/index.html` in Chrome
-2. Use Figma DevMode or the `generate_figma_design` tool (pass the URL `http://localhost:8420/screens/<screen>.html`)
+2. Use Figma DevMode to inspect the rendered page at `http://localhost:8420/screens/<screen>.html`
 3. Figma renders the HTML as a design frame
 4. Iterate on the HTML (colors, spacing, layout) — changes immediately visible in browser
 5. When design is approved, update SwiftUI to match

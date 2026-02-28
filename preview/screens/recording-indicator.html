@@ -167,9 +167,19 @@
             <div class="rec-dot"></div>
             <div class="wave-container">
               <svg viewBox="0 0 300 34" preserveAspectRatio="none">
-                <use href="#wg1"/><use href="#wf1"/>
-                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf1)"/>
-                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg1)" stroke-width="2.5"/>
+                <defs>
+                  <linearGradient id="wg2" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="rgb(255,64,51)" stop-opacity="0.6"/>
+                    <stop offset="0.35" stop-color="rgb(77,128,255)" stop-opacity="0.8"/>
+                    <stop offset="1" stop-color="rgb(102,64,217)" stop-opacity="0.7"/>
+                  </linearGradient>
+                  <linearGradient id="wf2" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgb(77,128,255)" stop-opacity="0.15"/>
+                    <stop offset="1" stop-color="rgb(77,128,255)" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf2)"/>
+                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg2)" stroke-width="2.5"/>
               </svg>
             </div>
           </div>
@@ -187,8 +197,19 @@
             <div class="rec-dot"></div>
             <div class="wave-container">
               <svg viewBox="0 0 300 34" preserveAspectRatio="none">
-                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf1)"/>
-                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg1)" stroke-width="2.5"/>
+                <defs>
+                  <linearGradient id="wg3" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="rgb(255,64,51)" stop-opacity="0.6"/>
+                    <stop offset="0.35" stop-color="rgb(77,128,255)" stop-opacity="0.8"/>
+                    <stop offset="1" stop-color="rgb(102,64,217)" stop-opacity="0.7"/>
+                  </linearGradient>
+                  <linearGradient id="wf3" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0" stop-color="rgb(77,128,255)" stop-opacity="0.15"/>
+                    <stop offset="1" stop-color="rgb(77,128,255)" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path class="wave-fill" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17 L300,34 L0,34 Z" fill="url(#wf3)"/>
+                <path class="wave-line" d="M0,17 C15,6 30,28 50,12 C70,0 85,30 110,14 C130,4 155,26 180,17 C200,8 225,28 250,16 C270,6 290,24 300,17" fill="none" stroke="url(#wg3)" stroke-width="2.5"/>
               </svg>
             </div>
           </div>
@@ -197,5 +218,7 @@
     </div>
 
   </div>
+
+  <script src="../icons.js"></script>
 </body>
 </html>

@@ -112,6 +112,10 @@
       color: var(--color-text-tertiary);
       font-family: var(--font-mono);
     }
+    @keyframes pulse {
+      0%,100% { opacity:1; }
+      50% { opacity:0.3; }
+    }
   </style>
 </head>
 <body>
@@ -121,7 +125,6 @@
     <span class="page-title">NSMenu (AppDelegate) · 200px wide</span>
   </nav>
 
-  <script src="../icons.js"></script>
   <div class="catalog-bg">
 
     <!-- State: Ready -->
@@ -270,11 +273,7 @@
     </div>
 
   </div>
-  <style>
-    @keyframes pulse {
-      0%,100% { opacity:1; }
-      50% { opacity:0.3; }
-    }
-  </style>
+
+  <script src="../icons.js"></script>
 </body>
 </html>

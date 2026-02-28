@@ -439,16 +439,16 @@
   <script>
     function switchTab(tab, btn) {
       // Hide all tabs
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.settings-sidebar .sidebar-item').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.state-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.settings-sidebar .sidebar-item').forEach(function(el) { el.classList.remove('active'); });
+      document.querySelectorAll('.state-btn').forEach(function(b) { b.classList.remove('active'); });
 
       document.getElementById('tab-' + tab).classList.add('active');
       document.getElementById('nav-' + tab).classList.add('active');
       if (btn) btn.classList.add('active');
       else {
         // find matching state-btn
-        document.querySelectorAll('.state-btn').forEach(b => {
+        document.querySelectorAll('.state-btn').forEach(function(b) {
           if (b.textContent.trim().toLowerCase() === tab) b.classList.add('active');
         });
       }
