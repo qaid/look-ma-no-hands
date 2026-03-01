@@ -21,6 +21,7 @@ struct MeetingLibraryTab: View {
     @State private var importType: MeetingType = .general
     @State private var showImportTypeSheet = false
     @State private var pendingImportIsAudio = false
+    @State private var pendingImportIsClipboard = false
     @State private var showDeleteConfirmation = false
     @State private var recordToDelete: MeetingRecord?
 
@@ -164,6 +165,7 @@ struct MeetingLibraryTab: View {
                 Menu {
                     Button {
                         pendingImportIsAudio = false
+                        pendingImportIsClipboard = false
                         showImportTypeSheet = true
                     } label: {
                         Label("Import Transcript...", systemImage: "doc.badge.plus")
@@ -172,11 +174,21 @@ struct MeetingLibraryTab: View {
 
                     Button {
                         pendingImportIsAudio = true
+                        pendingImportIsClipboard = false
                         showImportTypeSheet = true
                     } label: {
                         Label("Import Audio...", systemImage: "waveform.badge.plus")
                     }
                     .disabled(store.isRecording || store.isImportingAudio)
+
+                    Button {
+                        pendingImportIsAudio = false
+                        pendingImportIsClipboard = true
+                        showImportTypeSheet = true
+                    } label: {
+                        Label("Paste Transcript from Clipboard", systemImage: "doc.on.clipboard")
+                    }
+                    .disabled(store.isImportingAudio || NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
                 } label: {
                     Image(systemName: "square.and.arrow.down")
                         .font(.system(size: 16))
@@ -423,7 +435,7 @@ struct MeetingLibraryTab: View {
 
     private var importTypeSheet: some View {
         VStack(spacing: 20) {
-            Text(pendingImportIsAudio ? "Import Audio File" : "Import Transcript")
+            Text(pendingImportIsClipboard ? "Paste Clipboard Transcript" : (pendingImportIsAudio ? "Import Audio File" : "Import Transcript"))
                 .font(.system(size: 18, weight: .semibold))
 
             Text("Select a meeting type for analysis:")
@@ -440,12 +452,15 @@ struct MeetingLibraryTab: View {
             HStack(spacing: 12) {
                 Button("Cancel") {
                     showImportTypeSheet = false
+                    pendingImportIsClipboard = false
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
-                Button(pendingImportIsAudio ? "Choose Audio File..." : "Choose File...") {
+                Button(pendingImportIsClipboard ? "Paste from Clipboard" : (pendingImportIsAudio ? "Choose Audio File..." : "Choose File...")) {
                     showImportTypeSheet = false
-                    if pendingImportIsAudio {
+                    if pendingImportIsClipboard {
+                        importFromClipboard()
+                    } else if pendingImportIsAudio {
                         presentAudioImportPanel()
                     } else {
                         presentTranscriptImportPanel()
@@ -526,6 +541,18 @@ struct MeetingLibraryTab: View {
                         importStatusMessage = "Failed: \(error.localizedDescription)"
                     }
                 }
+            }
+        }
+    }
+
+    private func importFromClipboard() {
+        guard let text = NSPasteboard.general.string(forType: .string),
+              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        Task {
+            do {
+                _ = try await store.importTranscriptFromText(text, type: importType)
+            } catch {
+                // Error surfaced via store state
             }
         }
     }

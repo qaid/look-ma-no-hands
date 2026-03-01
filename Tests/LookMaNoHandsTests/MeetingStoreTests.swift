@@ -222,6 +222,33 @@ final class MeetingStoreTests: XCTestCase {
         XCTAssertEqual(loadedNotes?.first?.text, "Ask about deadline")
     }
 
+    func testImportTranscriptFromText() async throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = MeetingStore(rootDirectory: root)
+        let record = try await store.importTranscriptFromText("Sample transcript text", type: .general)
+
+        XCTAssertEqual(store.meetings.count, 1)
+        XCTAssertEqual(store.meetings.first?.id, record.id)
+        XCTAssertEqual(record.source, .importedTranscript)
+        XCTAssertEqual(try store.transcriptText(for: record), "Sample transcript text")
+    }
+
+    func testImportTranscriptFromTextThrowsOnEmpty() async throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let store = MeetingStore(rootDirectory: root)
+        do {
+            _ = try await store.importTranscriptFromText("   \n  ", type: .general)
+            XCTFail("Expected throw for empty text")
+        } catch MeetingImportError.emptyTranscript {
+            // expected
+        }
+        XCTAssertTrue(store.meetings.isEmpty)
+    }
+
     func testSaveRecordedMeetingWithoutNotes() async throws {
         let root = try makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
