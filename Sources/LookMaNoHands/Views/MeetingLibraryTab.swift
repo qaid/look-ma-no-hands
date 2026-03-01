@@ -14,7 +14,7 @@ struct MeetingLibraryTab: View {
             switch self {
             case .transcript: return "Import Transcript"
             case .audio: return "Import Audio File"
-            case .clipboard: return "Paste Clipboard Transcript"
+            case .clipboard: return "Paste Transcript Text"
             }
         }
 
@@ -209,11 +209,11 @@ struct MeetingLibraryTab: View {
                     .disabled(store.isRecording || store.isImportingAudio)
 
                     Button {
-                        pendingPasteText = NSPasteboard.general.string(forType: .string) ?? ""
+                        pendingPasteText = ""
                         pendingImportMode = .clipboard
                         showImportTypeSheet = true
                     } label: {
-                        Label("Paste Transcript from Clipboard", systemImage: "doc.on.clipboard")
+                        Label("Paste Transcript Text", systemImage: "doc.on.clipboard")
                     }
                     .disabled(store.isImportingAudio)
                 } label: {
