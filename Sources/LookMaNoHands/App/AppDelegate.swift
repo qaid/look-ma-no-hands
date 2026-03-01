@@ -573,6 +573,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         Settings.shared.meetingWindowWasOpen = true
+        UserDefaults.standard.synchronize()
         NSLog("✅ Meeting Transcription window created and displayed")
     }
     
