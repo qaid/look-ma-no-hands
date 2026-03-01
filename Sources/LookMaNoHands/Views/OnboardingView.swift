@@ -567,8 +567,7 @@ struct PermissionsStepView: View {
                     actionTitle: "Open System Settings",
                     action: {
                         openAccessibilitySettings()
-                    },
-                    extraInfo: onboardingState.hasAccessibilityPermission ? nil : "You'll need to manually enable accessibility in System Settings"
+                    }
                 )
             }
             .frame(maxWidth: 550)
@@ -673,7 +672,6 @@ struct PermissionCard: View {
     let isGranted: Bool
     let actionTitle: String
     let action: () -> Void
-    var extraInfo: String? = nil
 
     var body: some View {
         HStack(spacing: 15) {
@@ -691,13 +689,6 @@ struct PermissionCard: View {
                 Text(description)
                     .font(.caption)
                     .foregroundColor(.secondary)
-
-                if let extraInfo = extraInfo {
-                    Text(extraInfo)
-                        .font(.caption2)
-                        .foregroundColor(.orange)
-                        .padding(.top, 2)
-                }
             }
 
             Spacer()
@@ -713,7 +704,6 @@ struct PermissionCard: View {
                         .font(.caption)
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
             }
         }
         .padding()
