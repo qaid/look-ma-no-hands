@@ -5,6 +5,28 @@ import UniformTypeIdentifiers
 @available(macOS 13.0, *)
 struct MeetingLibraryTab: View {
 
+    // MARK: - Types
+
+    private enum ImportMode {
+        case transcript, audio, clipboard
+
+        var sheetTitle: String {
+            switch self {
+            case .transcript: return "Import Transcript"
+            case .audio: return "Import Audio File"
+            case .clipboard: return "Paste Clipboard Transcript"
+            }
+        }
+
+        var confirmButtonLabel: String {
+            switch self {
+            case .transcript: return "Choose File..."
+            case .audio: return "Choose Audio File..."
+            case .clipboard: return "Import"
+            }
+        }
+    }
+
     // MARK: - Dependencies
 
     let store: MeetingStore
@@ -20,10 +42,12 @@ struct MeetingLibraryTab: View {
     @State private var showImportProgress = false
     @State private var importType: MeetingType = .general
     @State private var showImportTypeSheet = false
-    @State private var pendingImportIsAudio = false
-    @State private var pendingImportIsClipboard = false
+    @State private var pendingImportMode: ImportMode = .transcript
+    @State private var pendingPasteText = ""
     @State private var showDeleteConfirmation = false
     @State private var recordToDelete: MeetingRecord?
+    @State private var importErrorMessage: String?
+    @State private var showImportError = false
 
     // Rename
     @State private var recordToRename: MeetingRecord?
@@ -95,6 +119,11 @@ struct MeetingLibraryTab: View {
         } message: {
             Text("Enter a new title for this meeting.")
         }
+        .alert("Import Failed", isPresented: $showImportError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "An unknown error occurred.")
+        }
     }
 
     // MARK: - Toolbar
@@ -164,8 +193,7 @@ struct MeetingLibraryTab: View {
                 // Import menu
                 Menu {
                     Button {
-                        pendingImportIsAudio = false
-                        pendingImportIsClipboard = false
+                        pendingImportMode = .transcript
                         showImportTypeSheet = true
                     } label: {
                         Label("Import Transcript...", systemImage: "doc.badge.plus")
@@ -173,8 +201,7 @@ struct MeetingLibraryTab: View {
                     .disabled(store.isImportingAudio)
 
                     Button {
-                        pendingImportIsAudio = true
-                        pendingImportIsClipboard = false
+                        pendingImportMode = .audio
                         showImportTypeSheet = true
                     } label: {
                         Label("Import Audio...", systemImage: "waveform.badge.plus")
@@ -182,13 +209,13 @@ struct MeetingLibraryTab: View {
                     .disabled(store.isRecording || store.isImportingAudio)
 
                     Button {
-                        pendingImportIsAudio = false
-                        pendingImportIsClipboard = true
+                        pendingPasteText = NSPasteboard.general.string(forType: .string) ?? ""
+                        pendingImportMode = .clipboard
                         showImportTypeSheet = true
                     } label: {
                         Label("Paste Transcript from Clipboard", systemImage: "doc.on.clipboard")
                     }
-                    .disabled(store.isImportingAudio || NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty != false)
+                    .disabled(store.isImportingAudio)
                 } label: {
                     Image(systemName: "square.and.arrow.down")
                         .font(.system(size: 16))
@@ -434,44 +461,74 @@ struct MeetingLibraryTab: View {
     // MARK: - Import Type Sheet
 
     private var importTypeSheet: some View {
-        VStack(spacing: 20) {
-            Text(pendingImportIsClipboard ? "Paste Clipboard Transcript" : (pendingImportIsAudio ? "Import Audio File" : "Import Transcript"))
+        VStack(alignment: .leading, spacing: 20) {
+            Text(pendingImportMode.sheetTitle)
                 .font(.system(size: 18, weight: .semibold))
+                .frame(maxWidth: .infinity, alignment: .center)
 
-            Text("Select a meeting type for analysis:")
-                .font(.system(size: 14))
-                .foregroundColor(.secondary)
+            if pendingImportMode == .clipboard {
+                ZStack(alignment: .topLeading) {
+                    TextEditor(text: $pendingPasteText)
+                        .font(.system(size: 13))
+                        .frame(minHeight: 160)
+                        .scrollContentBackground(.hidden)
+                        .background(Color(nsColor: .textBackgroundColor))
+                        .cornerRadius(6)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+                        )
 
-            Picker("Meeting type", selection: $importType) {
-                ForEach(MeetingType.allCases) { type in
-                    Label(type.displayName, systemImage: type.icon).tag(type)
+                    if pendingPasteText.isEmpty {
+                        Text("Paste your transcript here...")
+                            .font(.system(size: 13))
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 8)
+                            .allowsHitTesting(false)
+                    }
                 }
             }
-            .pickerStyle(.radioGroup)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Select a meeting type for analysis:")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+
+                Picker("Meeting type", selection: $importType) {
+                    ForEach(MeetingType.allCases) { type in
+                        Label(type.displayName, systemImage: type.icon).tag(type)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+            }
 
             HStack(spacing: 12) {
+                Spacer()
+
                 Button("Cancel") {
                     showImportTypeSheet = false
-                    pendingImportIsClipboard = false
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
-                Button(pendingImportIsClipboard ? "Paste from Clipboard" : (pendingImportIsAudio ? "Choose Audio File..." : "Choose File...")) {
+                Button(pendingImportMode.confirmButtonLabel) {
                     showImportTypeSheet = false
-                    if pendingImportIsClipboard {
+                    switch pendingImportMode {
+                    case .clipboard:
                         importFromClipboard()
-                    } else if pendingImportIsAudio {
+                    case .audio:
                         presentAudioImportPanel()
-                    } else {
+                    case .transcript:
                         presentTranscriptImportPanel()
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
+                .disabled(pendingImportMode == .clipboard && pendingPasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(28)
-        .frame(width: 380)
+        .frame(width: pendingImportMode == .clipboard ? 480 : 380)
     }
 
     // MARK: - Import Progress Sheet
@@ -546,13 +603,16 @@ struct MeetingLibraryTab: View {
     }
 
     private func importFromClipboard() {
-        guard let text = NSPasteboard.general.string(forType: .string),
-              !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        let text = pendingPasteText
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         Task {
             do {
                 _ = try await store.importTranscriptFromText(text, type: importType)
             } catch {
-                // Error surfaced via store state
+                await MainActor.run {
+                    importErrorMessage = error.localizedDescription
+                    showImportError = true
+                }
             }
         }
     }
