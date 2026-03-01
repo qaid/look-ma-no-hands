@@ -283,6 +283,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let meetingRetentionCount = "meetingRetentionCount"
         static let meetingTypePrompts = "meetingTypePrompts"
         static let meetingWindowWasOpen = "meetingWindowWasOpen"
+        static let pendingScreenRecordingGrant = "pendingScreenRecordingGrant"
     }
 
     // MARK: - File Paths
@@ -457,6 +458,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether a screen recording permission grant is pending (app may be relaunched by macOS)
+    @Published var pendingScreenRecordingGrant: Bool {
+        didSet {
+            UserDefaults.standard.set(pendingScreenRecordingGrant, forKey: Keys.pendingScreenRecordingGrant)
+        }
+    }
+
     /// Whether the meeting window was open when the app last quit
     @Published var meetingWindowWasOpen: Bool {
         didSet {
@@ -575,6 +583,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
 
         // Meeting window state restoration
+        self.pendingScreenRecordingGrant = UserDefaults.standard.bool(forKey: Keys.pendingScreenRecordingGrant)
         self.meetingWindowWasOpen = UserDefaults.standard.bool(forKey: Keys.meetingWindowWasOpen)
 
         // Onboarding completion defaults to false for new users

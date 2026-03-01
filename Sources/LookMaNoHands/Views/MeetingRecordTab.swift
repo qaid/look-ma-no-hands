@@ -85,6 +85,8 @@ struct MeetingRecordTab: View {
             setupAudioRecorderCallback()
             checkStatus()
             if liveState.status == .missingPermissions {
+                Settings.shared.pendingScreenRecordingGrant = true
+                UserDefaults.standard.synchronize()
                 CGRequestScreenCaptureAccess()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { checkStatus() }
             }
@@ -593,6 +595,8 @@ struct MeetingRecordTab: View {
         if liveState.isRecording {
             Task { await stopRecording() }
         } else if liveState.status == .missingPermissions {
+            Settings.shared.pendingScreenRecordingGrant = true
+            UserDefaults.standard.synchronize()
             CGRequestScreenCaptureAccess()
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { checkStatus() }
         } else if liveState.canRecord {

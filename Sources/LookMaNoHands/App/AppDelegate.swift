@@ -134,8 +134,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             _ = await NotificationService.shared.requestPermission()
         }
 
-        // Restore meeting window if it was open when the app last quit
-        if Settings.shared.meetingWindowWasOpen {
+        // Restore meeting window if it was open when the app last quit,
+        // or if relaunched after granting screen recording permission
+        if Settings.shared.meetingWindowWasOpen || Settings.shared.pendingScreenRecordingGrant {
+            Settings.shared.pendingScreenRecordingGrant = false
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.openMeetingTranscription()
             }
