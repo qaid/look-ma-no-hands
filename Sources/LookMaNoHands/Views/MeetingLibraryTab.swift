@@ -561,7 +561,10 @@ struct MeetingLibraryTab: View {
                 do {
                     _ = try await store.importTranscript(from: url, type: importType)
                 } catch {
-                    // Error surfaced via status; no-op here
+                    await MainActor.run {
+                        importErrorMessage = error.localizedDescription
+                        showImportError = true
+                    }
                 }
             }
         }
