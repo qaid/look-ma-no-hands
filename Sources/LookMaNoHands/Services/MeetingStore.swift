@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+enum MeetingImportError: LocalizedError {
+    case emptyTranscript
+    var errorDescription: String? { "The transcript text is empty." }
+}
+
 /// Manages persistent storage of meeting records
 /// Storage: ~/Library/Application Support/LookMaNoHands/Meetings/{uuid}/
 ///   - metadata.json   — MeetingRecord
@@ -139,6 +144,35 @@ class MeetingStore {
         )
 
         try await writeRecord(record, transcript: rawText)
+
+        await MainActor.run {
+            meetings.insert(record, at: 0)
+        }
+        applyRetentionPolicy()
+        return record
+    }
+
+    /// Import a transcript from a plain string (e.g. pasted from clipboard)
+    func importTranscriptFromText(_ text: String, type: MeetingType) async throws -> MeetingRecord {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw MeetingImportError.emptyTranscript
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy h:mm a"
+        let title = "\(type.displayName) - \(formatter.string(from: Date()))"
+
+        let record = MeetingRecord(
+            id: UUID(),
+            title: title,
+            duration: 0,
+            meetingType: type,
+            source: .importedTranscript,
+            segmentCount: trimmed.components(separatedBy: "\n\n").filter { !$0.isEmpty }.count
+        )
+
+        try await writeRecord(record, transcript: trimmed)
 
         await MainActor.run {
             meetings.insert(record, at: 0)
