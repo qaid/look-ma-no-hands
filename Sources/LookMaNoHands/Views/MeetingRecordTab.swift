@@ -88,7 +88,12 @@ struct MeetingRecordTab: View {
                 Settings.shared.pendingScreenRecordingGrant = true
                 UserDefaults.standard.synchronize()
                 CGRequestScreenCaptureAccess()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { checkStatus() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    checkStatus()
+                    if liveState.status == .missingPermissions {
+                        Settings.shared.pendingScreenRecordingGrant = false
+                    }
+                }
             }
         }
         .onDisappear {
@@ -598,7 +603,12 @@ struct MeetingRecordTab: View {
             Settings.shared.pendingScreenRecordingGrant = true
             UserDefaults.standard.synchronize()
             CGRequestScreenCaptureAccess()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { checkStatus() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                checkStatus()
+                if liveState.status == .missingPermissions {
+                    Settings.shared.pendingScreenRecordingGrant = false
+                }
+            }
         } else if liveState.canRecord {
             Task { await startRecording() }
         }
