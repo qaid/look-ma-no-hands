@@ -7,8 +7,9 @@ struct MeetingLibraryTab: View {
 
     // MARK: - Types
 
-    private enum ImportMode {
+    private enum ImportMode: Identifiable {
         case transcript, audio, clipboard
+        var id: Self { self }
 
         var sheetTitle: String {
             switch self {
@@ -41,8 +42,7 @@ struct MeetingLibraryTab: View {
     @State private var importStatusMessage = ""
     @State private var showImportProgress = false
     @State private var importType: MeetingType = .general
-    @State private var showImportTypeSheet = false
-    @State private var pendingImportMode: ImportMode = .transcript
+    @State private var activeImportMode: ImportMode? = nil
     @State private var pendingPasteText = ""
     @State private var showDeleteConfirmation = false
     @State private var recordToDelete: MeetingRecord?
@@ -79,8 +79,8 @@ struct MeetingLibraryTab: View {
         .sheet(isPresented: $showImportProgress) {
             importProgressSheet
         }
-        .sheet(isPresented: $showImportTypeSheet) {
-            importTypeSheet
+        .sheet(item: $activeImportMode) { mode in
+            importTypeSheet(for: mode)
         }
         .confirmationDialog(
             "Delete Meeting?",
@@ -193,16 +193,14 @@ struct MeetingLibraryTab: View {
                 // Import menu
                 Menu {
                     Button {
-                        pendingImportMode = .transcript
-                        showImportTypeSheet = true
+                        activeImportMode = .transcript
                     } label: {
                         Label("Import Transcript...", systemImage: "doc.badge.plus")
                     }
                     .disabled(store.isImportingAudio)
 
                     Button {
-                        pendingImportMode = .audio
-                        showImportTypeSheet = true
+                        activeImportMode = .audio
                     } label: {
                         Label("Import Audio...", systemImage: "waveform.badge.plus")
                     }
@@ -210,8 +208,7 @@ struct MeetingLibraryTab: View {
 
                     Button {
                         pendingPasteText = ""
-                        pendingImportMode = .clipboard
-                        showImportTypeSheet = true
+                        activeImportMode = .clipboard
                     } label: {
                         Label("Paste Transcript Text", systemImage: "doc.on.clipboard")
                     }
@@ -460,13 +457,14 @@ struct MeetingLibraryTab: View {
 
     // MARK: - Import Type Sheet
 
-    private var importTypeSheet: some View {
+    @ViewBuilder
+    private func importTypeSheet(for mode: ImportMode) -> some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(pendingImportMode.sheetTitle)
+            Text(mode.sheetTitle)
                 .font(.system(size: 18, weight: .semibold))
                 .frame(maxWidth: .infinity, alignment: .center)
 
-            if pendingImportMode == .clipboard {
+            if mode == .clipboard {
                 ZStack(alignment: .topLeading) {
                     TextEditor(text: $pendingPasteText)
                         .font(.system(size: 13))
@@ -507,13 +505,13 @@ struct MeetingLibraryTab: View {
                 Spacer()
 
                 Button("Cancel") {
-                    showImportTypeSheet = false
+                    activeImportMode = nil
                 }
                 .keyboardShortcut(.escape, modifiers: [])
 
-                Button(pendingImportMode.confirmButtonLabel) {
-                    showImportTypeSheet = false
-                    switch pendingImportMode {
+                Button(mode.confirmButtonLabel) {
+                    activeImportMode = nil
+                    switch mode {
                     case .clipboard:
                         importFromClipboard()
                     case .audio:
@@ -524,11 +522,11 @@ struct MeetingLibraryTab: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.return, modifiers: .command)
-                .disabled(pendingImportMode == .clipboard && pendingPasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(mode == .clipboard && pendingPasteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
         .padding(28)
-        .frame(width: pendingImportMode == .clipboard ? 480 : 380)
+        .frame(width: mode == .clipboard ? 480 : 380)
     }
 
     // MARK: - Import Progress Sheet
