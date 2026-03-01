@@ -3,7 +3,7 @@ import Observation
 
 enum MeetingImportError: LocalizedError {
     case emptyTranscript
-    var errorDescription: String? { "The clipboard text is empty." }
+    var errorDescription: String? { "The transcript text is empty." }
 }
 
 /// Manages persistent storage of meeting records
