@@ -1,5 +1,11 @@
 import Foundation
 
+/// Holds the split system/user parts of an LLM prompt
+struct SplitPrompt {
+    let system: String
+    let prompt: String
+}
+
 /// Service for analyzing meeting transcripts and generating structured notes
 /// Uses Ollama LLM to extract key information from raw transcripts
 class MeetingAnalyzer {
@@ -22,17 +28,52 @@ class MeetingAnalyzer {
 IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These are the user's own observations, questions, and action items captured during the meeting. In your output, include a dedicated "## My Notes" section that lists each user note with its timestamp, preserving the user's original wording. Do not mix user notes into the main analysis prose.
 """
 
-    /// Build the full prompt, appending note instructions only when the transcript contains user note markers
-    static func buildFullPrompt(prompt: String, transcript: String) -> String {
+    /// Split the prompt into a system role and a user prompt.
+    ///
+    /// When the prompt template contains `[TRANSCRIPTION_PLACEHOLDER]`:
+    ///   - Everything before the marker becomes the `system` instruction.
+    ///   - The transcript (plus any text after the marker) becomes the user `prompt`.
+    /// When there is no placeholder, the entire prompt becomes `system` and the
+    /// transcript alone is sent as the user `prompt`.
+    ///
+    /// `/no_think` is stripped from the system prompt for models that don't
+    /// understand it (i.e. anything that isn't DeepSeek or Qwen).
+    static func buildSplitPrompt(prompt: String, transcript: String, modelName: String) -> SplitPrompt {
         let hasNotes = transcript.contains("[USER NOTE @")
         let effectivePrompt = hasNotes ? prompt + noteInstructionSuffix : prompt
-        return """
-\(effectivePrompt)
 
-# Transcript
+        let placeholder = "[TRANSCRIPTION_PLACEHOLDER]"
+        let system: String
+        let userPrompt: String
 
-\(transcript)
-"""
+        if let range = effectivePrompt.range(of: placeholder) {
+            let before = String(effectivePrompt[effectivePrompt.startIndex..<range.lowerBound])
+            let after = String(effectivePrompt[range.upperBound...])
+            system = before.trimmingCharacters(in: .whitespacesAndNewlines)
+            let suffix = after.trimmingCharacters(in: .whitespacesAndNewlines)
+            userPrompt = suffix.isEmpty ? transcript : "\(transcript)\n\n\(suffix)"
+        } else {
+            system = effectivePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            userPrompt = transcript
+        }
+
+        return SplitPrompt(
+            system: stripNoThinkIfNeeded(system, modelName: modelName),
+            prompt: userPrompt
+        )
+    }
+
+    /// Strip the `/no_think` prefix from a prompt unless the model is DeepSeek or Qwen.
+    static func stripNoThinkIfNeeded(_ text: String, modelName: String) -> String {
+        let lower = modelName.lowercased()
+        let isThinkingModel = lower.hasPrefix("deepseek") || lower.hasPrefix("qwen")
+        guard !isThinkingModel else { return text }
+        var result = text
+        if result.hasPrefix("/no_think") {
+            result = String(result.dropFirst("/no_think".count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return result
     }
 
     // MARK: - Analysis
@@ -48,11 +89,11 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
             throw AnalysisError.emptyTranscript
         }
 
-        let prompt = customPrompt ?? Settings.shared.meetingPrompt
-        let fullPrompt = Self.buildFullPrompt(prompt: prompt, transcript: transcript)
-
-        // Set the model name first
+        // Set the model name first so buildSplitPrompt can use it for /no_think stripping
         ollamaService.modelName = model ?? Settings.shared.ollamaModel
+
+        let prompt = customPrompt ?? Settings.shared.meetingPrompt
+        let splitPrompt = Self.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: ollamaService.modelName)
 
         print("MeetingAnalyzer: Starting analysis with \(ollamaService.modelName) model...")
 
@@ -63,7 +104,7 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         }
 
         // Process with Ollama
-        let structuredNotes = try await ollamaService.generate(prompt: fullPrompt)
+        let structuredNotes = try await ollamaService.generate(prompt: splitPrompt.prompt, system: splitPrompt.system)
 
         print("MeetingAnalyzer: Analysis complete, generated \(structuredNotes.count) characters")
 
@@ -91,11 +132,11 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
             throw AnalysisError.emptyTranscript
         }
 
-        let prompt = customPrompt ?? Settings.shared.meetingPrompt
-        let fullPrompt = Self.buildFullPrompt(prompt: prompt, transcript: transcript)
-
-        // Set the model name first
+        // Set the model name first so buildSplitPrompt can use it for /no_think stripping
         ollamaService.modelName = model ?? Settings.shared.ollamaModel
+
+        let prompt = customPrompt ?? Settings.shared.meetingPrompt
+        let splitPrompt = Self.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: ollamaService.modelName)
 
         print("MeetingAnalyzer: Starting streaming analysis with \(ollamaService.modelName) model...")
 
@@ -108,7 +149,7 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         var totalChars = 0
 
         // Process with Ollama streaming
-        let structuredNotes = try await ollamaService.generateStreaming(prompt: fullPrompt) { chunk in
+        let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system) { chunk in
             totalChars += chunk.count
             await onProgress(totalChars, chunk)
         }

@@ -99,19 +99,24 @@ class OllamaService {
     }
 
     /// Generate text from a prompt
-    /// - Parameter prompt: The prompt to send to the model
+    /// - Parameters:
+    ///   - prompt: The prompt to send to the model
+    ///   - system: Optional system prompt for models that support role separation
     /// - Returns: Generated text
-    func generate(prompt: String) async throws -> String {
+    func generate(prompt: String, system: String? = nil) async throws -> String {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
 
         // Build request body
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "model": modelName,
             "prompt": prompt,
             "stream": false
         ]
+        if let system = system {
+            requestBody["system"] = system
+        }
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -120,7 +125,7 @@ class OllamaService {
         request.httpBody = jsonData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        print("OllamaService: Sending request to \(modelName)...")
+        print("OllamaService: Sending request to \(modelName) (system: \(system != nil ? "yes" : "no"))...")
 
         let (data, response) = try await session.data(for: request)
 
@@ -144,19 +149,23 @@ class OllamaService {
     /// Generate text from a prompt with streaming support
     /// - Parameters:
     ///   - prompt: The prompt to send to the model
+    ///   - system: Optional system prompt for models that support role separation
     ///   - onChunk: Callback invoked for each text chunk received
     /// - Returns: Complete generated text
-    func generateStreaming(prompt: String, onChunk: @escaping (String) async -> Void) async throws -> String {
+    func generateStreaming(prompt: String, system: String? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
 
         // Build request body with streaming enabled
-        let requestBody: [String: Any] = [
+        var requestBody: [String: Any] = [
             "model": modelName,
             "prompt": prompt,
             "stream": true
         ]
+        if let system = system {
+            requestBody["system"] = system
+        }
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -165,7 +174,7 @@ class OllamaService {
         request.httpBody = jsonData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        print("OllamaService: Sending streaming request to \(modelName)...")
+        print("OllamaService: Sending streaming request to \(modelName) (system: \(system != nil ? "yes" : "no"))...")
 
         let (bytes, response) = try await session.bytes(for: request)
 
