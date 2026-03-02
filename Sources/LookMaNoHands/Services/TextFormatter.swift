@@ -83,7 +83,7 @@ class TextFormatter {
     /// Remove common Whisper hallucination artifacts
     private func removeWhisperArtifacts(_ text: String) -> String {
         let artifacts = ["[BLANK_AUDIO]", "[MUSIC]", "(mumbles)", "(overlapping chatter)",
-                         "[silence]", "[music]", "[blank_audio]"]
+                         "[silence]"]
         var result = text
         for artifact in artifacts {
             result = result.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
@@ -96,8 +96,8 @@ class TextFormatter {
     /// Remove immediately-repeated phrases (e.g., "the focus. the focus." → "the focus.")
     /// Uses word-level matching: captures 3+ words and removes immediate repetition.
     private func removeRepeatedPhrases(_ text: String) -> String {
-        // Match 3+ word sequences that are immediately repeated
-        let pattern = "\\b((?:\\S+\\s+){2,}\\S+)(\\s+\\1)+"
+        // Match 3-9 word sequences that are immediately repeated (capped to avoid slow matching on long text)
+        let pattern = "\\b((?:\\S+\\s+){2,8}\\S+)(\\s+\\1)+"
         var result = text
         var previous = ""
         // Iterate since removing one repetition may reveal another

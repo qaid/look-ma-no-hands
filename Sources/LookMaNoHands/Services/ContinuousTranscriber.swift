@@ -20,7 +20,7 @@ class ContinuousTranscriber {
     private let whisperService: WhisperService
 
     /// Buffer of transcribed segments
-    private var segments: [TranscriptSegment] = []
+    private(set) var segments: [TranscriptSegment] = []
 
     /// Audio buffer for chunking
     private var audioBuffer: [Float] = []
@@ -220,7 +220,7 @@ class ContinuousTranscriber {
 
     /// Remove text from the start of `newText` that overlaps with the end of the previous segment.
     /// Finds the longest suffix of the previous segment that matches a prefix of the new text.
-    private func deduplicateAgainstPrevious(_ newText: String) -> String {
+    func deduplicateAgainstPrevious(_ newText: String) -> String {
         guard let lastText = segments.last?.text else { return newText }
 
         let lastWords = lastText.split(separator: " ")
@@ -266,6 +266,11 @@ class ContinuousTranscriber {
     }
 
     // MARK: - Transcript Access
+
+    /// Append a segment directly (used for testing deduplication logic)
+    func appendSegment(_ segment: TranscriptSegment) {
+        segments.append(segment)
+    }
 
     /// Clear all segments (for user-initiated transcript clearing)
     func clearSegments() {

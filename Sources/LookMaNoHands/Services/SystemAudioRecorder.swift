@@ -31,10 +31,17 @@ class SystemAudioRecorder: NSObject {
     private(set) var isRecording = false
 
     /// Chunk duration in seconds for streaming transcription (default 5s)
-    var chunkDuration: TimeInterval = 5
+    let chunkDuration: TimeInterval
 
     /// Callback for audio data chunks
     var onAudioChunk: (([Float]) -> Void)?
+
+    // MARK: - Initialization
+
+    init(chunkDuration: TimeInterval = 5) {
+        self.chunkDuration = chunkDuration
+        super.init()
+    }
 
     deinit {
         if isRecording {

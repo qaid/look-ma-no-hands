@@ -6,26 +6,74 @@ final class TranscriptDeduplicationTests: XCTestCase {
 
     // MARK: - ContinuousTranscriber Deduplication
 
-    /// Test that overlapping words between segments are removed
-    func testDeduplicateRemovesOverlappingWords() async throws {
-        let whisperService = WhisperService()
+    private func makeTranscriber() -> ContinuousTranscriber {
+        ContinuousTranscriber(whisperService: WhisperService())
+    }
 
-        // The deduplication logic is private, so we verify via integration:
-        // Verify the transcriber initializes with configurable chunk duration.
-        let transcriber = ContinuousTranscriber(whisperService: whisperService, chunkDuration: 10)
-        XCTAssertNotNil(transcriber)
+    private func makeSegment(_ text: String) -> TranscriptSegment {
+        TranscriptSegment(text: text, startTime: 0, endTime: 5, timestamp: Date())
+    }
+
+    /// Test that overlapping words between segments are removed
+    func testDeduplicateRemovesOverlappingWords() {
+        let transcriber = makeTranscriber()
+        transcriber.appendSegment(makeSegment("The quick brown fox jumps over"))
+
+        let result = transcriber.deduplicateAgainstPrevious("fox jumps over the lazy dog")
+        XCTAssertEqual(result, "the lazy dog")
+    }
+
+    /// Test that non-overlapping text is returned unchanged
+    func testDeduplicatePreservesNonOverlappingText() {
+        let transcriber = makeTranscriber()
+        transcriber.appendSegment(makeSegment("Hello world"))
+
+        let result = transcriber.deduplicateAgainstPrevious("Goodbye moon")
+        XCTAssertEqual(result, "Goodbye moon")
+    }
+
+    /// Test deduplication with no previous segment
+    func testDeduplicateWithNoPreviousSegment() {
+        let transcriber = makeTranscriber()
+
+        let result = transcriber.deduplicateAgainstPrevious("First segment text")
+        XCTAssertEqual(result, "First segment text")
+    }
+
+    /// Test that fully duplicated segment returns empty string
+    func testDeduplicateFullyDuplicatedSegment() {
+        let transcriber = makeTranscriber()
+        transcriber.appendSegment(makeSegment("this is a test"))
+
+        let result = transcriber.deduplicateAgainstPrevious("this is a test")
+        XCTAssertEqual(result, "")
+    }
+
+    /// Test case-insensitive overlap matching
+    func testDeduplicateCaseInsensitive() {
+        let transcriber = makeTranscriber()
+        transcriber.appendSegment(makeSegment("The meeting ended"))
+
+        let result = transcriber.deduplicateAgainstPrevious("the meeting ended with applause")
+        XCTAssertEqual(result, "with applause")
+    }
+
+    /// Test that single-word overlap is detected
+    func testDeduplicateSingleWordOverlap() {
+        let transcriber = makeTranscriber()
+        transcriber.appendSegment(makeSegment("preparing the slides"))
+
+        let result = transcriber.deduplicateAgainstPrevious("slides for tomorrow")
+        XCTAssertEqual(result, "for tomorrow")
     }
 
     /// Test that configurable chunk duration works
     func testConfigurableChunkDuration() {
-        let whisperService = WhisperService()
+        let defaultTranscriber = ContinuousTranscriber(whisperService: WhisperService())
+        let meetingTranscriber = ContinuousTranscriber(whisperService: WhisperService(), chunkDuration: 10)
 
-        // Default chunk duration
-        let defaultTranscriber = ContinuousTranscriber(whisperService: whisperService)
+        // Verify they're distinct instances with different config
         XCTAssertNotNil(defaultTranscriber)
-
-        // Custom chunk duration for meeting mode
-        let meetingTranscriber = ContinuousTranscriber(whisperService: whisperService, chunkDuration: 10)
         XCTAssertNotNil(meetingTranscriber)
     }
 
