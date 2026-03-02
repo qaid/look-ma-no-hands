@@ -10,7 +10,7 @@ struct TranscriptSegment {
 }
 
 /// Service for continuous transcription of long-form audio
-/// Handles chunking, overlapping windows, and segment stitching
+/// Handles chunking, segment deduplication, and segment stitching
 @available(macOS 13.0, *)
 class ContinuousTranscriber {
 
@@ -28,11 +28,8 @@ class ContinuousTranscriber {
     /// Sample rate (should match recorder, Whisper expects 16kHz)
     private let sampleRate: Double = 16000
 
-    /// Chunk size in seconds (5 seconds for fast, responsive transcription)
-    private let chunkDuration: TimeInterval = 5
-
-    /// Overlap between chunks in seconds (1 second to prevent word clipping)
-    private let overlapDuration: TimeInterval = 1
+    /// Chunk size in seconds (default 5s for dictation, 10s recommended for meetings)
+    private let chunkDuration: TimeInterval
 
     /// Minimum audio energy threshold for silence detection
     private let silenceThreshold: Float = 0.01
@@ -60,8 +57,9 @@ class ContinuousTranscriber {
 
     // MARK: - Initialization
 
-    init(whisperService: WhisperService) {
+    init(whisperService: WhisperService, chunkDuration: TimeInterval = 5) {
         self.whisperService = whisperService
+        self.chunkDuration = chunkDuration
     }
 
     deinit {
@@ -185,12 +183,20 @@ class ContinuousTranscriber {
                 return
             }
 
+            // Remove text that overlaps with the previous segment
+            let dedupedText = deduplicateAgainstPrevious(text)
+            guard !dedupedText.isEmpty else {
+                print("ContinuousTranscriber: Segment fully duplicated, skipping")
+                totalSamplesProcessed += samples.count
+                return
+            }
+
             // Calculate timing for this segment
             let startTime = Double(totalSamplesProcessed) / sampleRate
             let endTime = startTime + duration
 
             let segment = TranscriptSegment(
-                text: text,
+                text: dedupedText,
                 startTime: startTime,
                 endTime: endTime,
                 timestamp: Date()
@@ -208,6 +214,36 @@ class ContinuousTranscriber {
             print("ContinuousTranscriber: Transcription error - \(error)")
             onStatusUpdate?("Transcription error: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Segment Deduplication
+
+    /// Remove text from the start of `newText` that overlaps with the end of the previous segment.
+    /// Finds the longest suffix of the previous segment that matches a prefix of the new text.
+    private func deduplicateAgainstPrevious(_ newText: String) -> String {
+        guard let lastText = segments.last?.text else { return newText }
+
+        let lastWords = lastText.split(separator: " ")
+        let newWords = newText.split(separator: " ")
+        guard !lastWords.isEmpty, !newWords.isEmpty else { return newText }
+
+        // Check up to 15 words of overlap
+        let maxCheck = min(lastWords.count, newWords.count, 15)
+        var bestOverlap = 0
+        for len in 1...maxCheck {
+            let suffix = lastWords.suffix(len)
+            let prefix = newWords.prefix(len)
+            if Array(suffix).map({ $0.lowercased() }) == Array(prefix).map({ $0.lowercased() }) {
+                bestOverlap = len
+            }
+        }
+
+        if bestOverlap > 0 {
+            let result = newWords.dropFirst(bestOverlap).joined(separator: " ")
+            print("ContinuousTranscriber: Deduped \(bestOverlap) overlapping words")
+            return result
+        }
+        return newText
     }
 
     // MARK: - Silence Detection

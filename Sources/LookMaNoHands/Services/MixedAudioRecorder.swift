@@ -29,8 +29,9 @@ class MixedAudioRecorder {
 
     // MARK: - Initialization
 
-    init() {
+    init(chunkDuration: TimeInterval = 5) {
         self.systemAudioRecorder = SystemAudioRecorder()
+        self.systemAudioRecorder.chunkDuration = chunkDuration
         self.microphoneRecorder = AudioRecorder()
 
         setupSystemAudioCallback()

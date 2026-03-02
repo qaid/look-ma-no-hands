@@ -23,6 +23,12 @@ class TextFormatter {
     /// Whether to apply custom vocabulary replacements
     var applyVocabulary = true
 
+    /// Whether to remove Whisper hallucination artifacts ([BLANK_AUDIO], [MUSIC], etc.)
+    var removeArtifacts = true
+
+    /// Whether to remove immediately-repeated phrases
+    var removeRepetitions = true
+
     // MARK: - Public Methods
 
     /// Format transcribed text with rule-based processing
@@ -39,22 +45,32 @@ class TextFormatter {
             result = result.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         }
 
-        // 2. Fix common transcription errors
+        // 2. Remove Whisper hallucination artifacts
+        if removeArtifacts {
+            result = removeWhisperArtifacts(result)
+        }
+
+        // 3. Remove immediately-repeated phrases
+        if removeRepetitions {
+            result = removeRepeatedPhrases(result)
+        }
+
+        // 4. Fix common transcription errors
         if fixCommonErrors {
             result = fixCommonTranscriptionErrors(result)
         }
 
-        // 3. Apply custom vocabulary replacements
+        // 5. Apply custom vocabulary replacements
         if applyVocabulary {
             result = applyVocabularyReplacements(result)
         }
 
-        // 4. Smart capitalization
+        // 6. Smart capitalization
         if smartCapitalization {
             result = applySmartCapitalization(result)
         }
 
-        // 5. Add final punctuation if missing
+        // 7. Add final punctuation if missing
         if addFinalPunctuation {
             result = ensureFinalPunctuation(result)
         }
@@ -63,6 +79,34 @@ class TextFormatter {
     }
 
     // MARK: - Private Helpers
+
+    /// Remove common Whisper hallucination artifacts
+    private func removeWhisperArtifacts(_ text: String) -> String {
+        let artifacts = ["[BLANK_AUDIO]", "[MUSIC]", "(mumbles)", "(overlapping chatter)",
+                         "[silence]", "[music]", "[blank_audio]"]
+        var result = text
+        for artifact in artifacts {
+            result = result.replacingOccurrences(of: artifact, with: "", options: .caseInsensitive)
+        }
+        // Collapse resulting double-spaces and trim
+        result = result.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+        return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Remove immediately-repeated phrases (e.g., "the focus. the focus." → "the focus.")
+    /// Uses word-level matching: captures 3+ words and removes immediate repetition.
+    private func removeRepeatedPhrases(_ text: String) -> String {
+        // Match 3+ word sequences that are immediately repeated
+        let pattern = "\\b((?:\\S+\\s+){2,}\\S+)(\\s+\\1)+"
+        var result = text
+        var previous = ""
+        // Iterate since removing one repetition may reveal another
+        while result != previous {
+            previous = result
+            result = result.replacingOccurrences(of: pattern, with: "$1", options: .regularExpression)
+        }
+        return result
+    }
 
     /// Apply custom vocabulary replacements from user settings
     /// Only entries with a non-empty `phrase` get regex replacement
@@ -209,18 +253,24 @@ extension TextFormatter {
                 formatter.addFinalPunctuation = false
                 formatter.fixCommonErrors = false
                 formatter.trimWhitespace = true
+                formatter.removeArtifacts = true
+                formatter.removeRepetitions = false
 
             case .standard:
                 formatter.smartCapitalization = false  // Context-aware in TextInsertionService
                 formatter.addFinalPunctuation = false  // Context-aware in TextInsertionService
                 formatter.fixCommonErrors = true
                 formatter.trimWhitespace = true
+                formatter.removeArtifacts = true
+                formatter.removeRepetitions = true
 
             case .maximum:
                 formatter.smartCapitalization = false  // Context-aware in TextInsertionService
                 formatter.addFinalPunctuation = false  // Context-aware in TextInsertionService
                 formatter.fixCommonErrors = true
                 formatter.trimWhitespace = true
+                formatter.removeArtifacts = true
+                formatter.removeRepetitions = true
             }
         }
     }

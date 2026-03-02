@@ -123,9 +123,9 @@ class WhisperService: @unchecked Sendable {
         var options = DecodingOptions(
             language: "en",
             temperature: 0.0,
-            suppressBlank: false,
-            compressionRatioThreshold: 2.4,
-            noSpeechThreshold: 0.6
+            suppressBlank: true,
+            compressionRatioThreshold: 2.0,
+            noSpeechThreshold: 0.4
         )
 
         // Token-based prompt (converted from string)

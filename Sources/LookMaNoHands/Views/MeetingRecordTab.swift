@@ -49,8 +49,9 @@ struct MeetingRecordTab: View {
         self.recordingIndicator = recordingIndicator
         self.appDelegate = appDelegate
         self.onRecordingFinished = onRecordingFinished
-        _mixedAudioRecorder = State(initialValue: MixedAudioRecorder())
-        _continuousTranscriber = State(initialValue: ContinuousTranscriber(whisperService: whisperService))
+        let meetingChunkDuration: TimeInterval = 10
+        _mixedAudioRecorder = State(initialValue: MixedAudioRecorder(chunkDuration: meetingChunkDuration))
+        _continuousTranscriber = State(initialValue: ContinuousTranscriber(whisperService: whisperService, chunkDuration: meetingChunkDuration))
     }
 
     // MARK: - Body
