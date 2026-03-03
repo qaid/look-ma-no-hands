@@ -59,8 +59,8 @@ if [ -n "$APP_PID" ]; then
     osascript -e 'tell application "Look Ma No Hands" to quit' 2>/dev/null || true
     sleep 2
 
-    # Check if app is still running
-    if kill -0 "$APP_PID" 2>/dev/null; then
+    # Re-check that the PID is still our app before force-killing
+    if kill -0 "$APP_PID" 2>/dev/null && pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null | grep -q "^${APP_PID}$"; then
         echo "   ⚠️  App still running, force terminating..."
         kill -9 "$APP_PID" 2>/dev/null || true
         sleep 1
@@ -71,9 +71,11 @@ else
     echo "   ℹ️  App not currently running"
 fi
 
-# Remove old app bundle if it exists
+# Remove old app bundle if it exists (legacy name without spaces)
 if [ -d ~/Applications/LookMaNoHands.app ]; then
     echo "🗑️ Removing old app bundle..."
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+        -u ~/Applications/LookMaNoHands.app 2>/dev/null || true
     rm -rf ~/Applications/LookMaNoHands.app
 fi
 
@@ -115,10 +117,18 @@ fi
 
 # App defaults (conditional based on flag)
 if [ "$RESET_DEFAULTS" = true ]; then
-    echo "🧹 Resetting app defaults..."
-    defaults delete com.lookmanohands.app 2>/dev/null || true
+    echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
+    # Delete all preference keys EXCEPT user data worth preserving
+    PRESERVE_KEYS="customVocabulary|meetingTypePrompts|toggleHotkeyShortcut"
+    ALL_KEYS=$(defaults read com.lookmanohands.app 2>/dev/null | grep -oE '^\s{4}[a-zA-Z][a-zA-Z0-9]*' | sed 's/^ *//' || true)
+    for key in $ALL_KEYS; do
+        if ! echo "$key" | grep -qE "^($PRESERVE_KEYS)$"; then
+            defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
+        fi
+    done
     defaults write com.lookmanohands.app triggerKey "Right Option"
-    echo "   ✅ App defaults reset to factory settings"
+    echo "   ✅ App preferences reset to factory settings"
+    echo "   ℹ️  Vocabulary and custom prompts preserved"
 else
     echo "ℹ️  Preserving existing app defaults"
     echo "   (use './deploy.sh --reset-defaults' to reset)"
