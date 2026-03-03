@@ -1,14 +1,14 @@
 import Foundation
 
-/// Holds the split system/user parts of an LLM prompt
-struct SplitPrompt {
-    let system: String
-    let prompt: String
-}
-
 /// Service for analyzing meeting transcripts and generating structured notes
 /// Uses Ollama LLM to extract key information from raw transcripts
 class MeetingAnalyzer {
+
+    /// Holds the split system/user parts of an LLM prompt
+    struct SplitPrompt {
+        let system: String
+        let prompt: String
+    }
 
     // MARK: - Properties
 
@@ -39,22 +39,26 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
     /// `/no_think` is stripped from the system prompt for models that don't
     /// understand it (i.e. anything that isn't DeepSeek or Qwen).
     static func buildSplitPrompt(prompt: String, transcript: String, modelName: String) -> SplitPrompt {
-        let hasNotes = transcript.contains("[USER NOTE @")
-        let effectivePrompt = hasNotes ? prompt + noteInstructionSuffix : prompt
-
         let placeholder = "[TRANSCRIPTION_PLACEHOLDER]"
-        let system: String
+        var system: String
         let userPrompt: String
 
-        if let range = effectivePrompt.range(of: placeholder) {
-            let before = String(effectivePrompt[effectivePrompt.startIndex..<range.lowerBound])
-            let after = String(effectivePrompt[range.upperBound...])
+        if let range = prompt.range(of: placeholder) {
+            let before = String(prompt[prompt.startIndex..<range.lowerBound])
+            let after = String(prompt[range.upperBound...])
             system = before.trimmingCharacters(in: .whitespacesAndNewlines)
             let suffix = after.trimmingCharacters(in: .whitespacesAndNewlines)
             userPrompt = suffix.isEmpty ? transcript : "\(transcript)\n\n\(suffix)"
         } else {
-            system = effectivePrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            system = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
             userPrompt = transcript
+        }
+
+        // Append note instructions to system so the LLM always sees them as
+        // system-level guidance, regardless of whether a placeholder was used.
+        let hasNotes = transcript.contains("[USER NOTE @")
+        if hasNotes {
+            system += noteInstructionSuffix
         }
 
         return SplitPrompt(
@@ -63,10 +67,10 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         )
     }
 
-    /// Strip the `/no_think` prefix from a prompt unless the model is DeepSeek or Qwen.
+    /// Strip the `/no_think` prefix from a prompt unless the model name contains DeepSeek or Qwen.
     static func stripNoThinkIfNeeded(_ text: String, modelName: String) -> String {
         let lower = modelName.lowercased()
-        let isThinkingModel = lower.hasPrefix("deepseek") || lower.hasPrefix("qwen")
+        let isThinkingModel = lower.contains("deepseek") || lower.contains("qwen")
         guard !isThinkingModel else { return text }
         var result = text
         if result.hasPrefix("/no_think") {

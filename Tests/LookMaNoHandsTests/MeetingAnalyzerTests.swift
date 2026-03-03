@@ -103,6 +103,19 @@ final class MeetingAnalyzerTests: XCTestCase {
         XCTAssertTrue(split.system.contains("Analyze this meeting"))
     }
 
+    func testBuildSplitPromptIncludesNoteInstructionInSystemWithPlaceholder() {
+        let transcript = "Hello team\n\n[USER NOTE @ 01:30] Check timeline\n\nLet's continue"
+        let prompt = "You are an assistant.\n\n## Transcript\n[TRANSCRIPTION_PLACEHOLDER]\n\nNow produce notes."
+
+        let split = MeetingAnalyzer.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: "llama3.1:8b")
+
+        // Note instruction should land in system, not user prompt
+        XCTAssertTrue(split.system.contains("## My Notes"))
+        XCTAssertTrue(split.system.contains("You are an assistant."))
+        XCTAssertTrue(split.prompt.contains("[USER NOTE @"))
+        XCTAssertTrue(split.prompt.contains("Now produce notes."))
+    }
+
     func testBuildSplitPromptOmitsNoteInstructionWhenNoMarkers() {
         let transcript = "Hello team\n\nLet's continue"
         let prompt = "Analyze this meeting"
@@ -132,6 +145,12 @@ final class MeetingAnalyzerTests: XCTestCase {
     func testNoThinkKeptForDeepSeek() {
         let prompt = "/no_think\n\nYou are an assistant."
         let split = MeetingAnalyzer.buildSplitPrompt(prompt: prompt, transcript: "t", modelName: "deepseek-r1:8b")
+        XCTAssertTrue(split.system.hasPrefix("/no_think"))
+    }
+
+    func testNoThinkKeptForNamespacedDeepSeek() {
+        let prompt = "/no_think\n\nYou are an assistant."
+        let split = MeetingAnalyzer.buildSplitPrompt(prompt: prompt, transcript: "t", modelName: "huggingface/deepseek-r1:8b")
         XCTAssertTrue(split.system.hasPrefix("/no_think"))
     }
 
