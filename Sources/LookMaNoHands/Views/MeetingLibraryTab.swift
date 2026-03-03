@@ -761,6 +761,19 @@ private struct MeetingLibraryRow: View {
 
             Spacer()
 
+            if record.notesFilename != nil,
+               let url = store.notesFileURL(for: record) {
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
+                    Label("Open Note", systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 11))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Open note in your default Markdown app")
+            }
+
             Text(record.createdAt, style: .relative)
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
