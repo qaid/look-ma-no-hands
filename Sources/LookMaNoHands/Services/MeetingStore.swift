@@ -277,6 +277,29 @@ class MeetingStore {
         return dest
     }
 
+    /// Returns the URL of the notes file to open — prefers the auto-exported copy,
+    /// falls back to the internal notes.md in Application Support.
+    func notesFileURL(for record: MeetingRecord) -> URL? {
+        guard record.notesFilename != nil else { return nil }
+
+        // Prefer auto-exported file in user's configured folder
+        if Settings.shared.autoSaveNotes {
+            let folderURL = URL(fileURLWithPath: Settings.shared.autoSaveFolder)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let dateStr = formatter.string(from: record.createdAt)
+            let filename = sanitizeFilename(record.title) + "-\(dateStr)-notes.md"
+            let dest = folderURL.appendingPathComponent(filename)
+            if FileManager.default.fileExists(atPath: dest.path) {
+                return dest
+            }
+        }
+
+        // Fall back to internal notes.md
+        let internalURL = meetingDirectory(for: record).appendingPathComponent("notes.md")
+        return FileManager.default.fileExists(atPath: internalURL.path) ? internalURL : nil
+    }
+
     /// Rename a meeting's title and persist to disk
     func renameMeeting(_ record: MeetingRecord, to newTitle: String) throws {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)

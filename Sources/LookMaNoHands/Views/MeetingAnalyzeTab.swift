@@ -454,6 +454,21 @@ struct MeetingAnalyzeTab: View {
                         .background(Color.accentColor)
                         .clipShape(Capsule())
                 }
+                Spacer()
+                if hasProcessed, let meeting = selectedMeeting,
+                   store.notesFileURL(for: meeting) != nil {
+                    Button {
+                        if let url = store.notesFileURL(for: meeting) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    } label: {
+                        Label("Open Note", systemImage: "arrow.up.forward.app")
+                            .font(.system(size: 12))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Open note in your default Markdown app")
+                }
             }
 
             ScrollView {
