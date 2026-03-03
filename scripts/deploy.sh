@@ -115,10 +115,35 @@ fi
 
 # App defaults (conditional based on flag)
 if [ "$RESET_DEFAULTS" = true ]; then
-    echo "🧹 Resetting app defaults..."
-    defaults delete com.lookmanohands.app 2>/dev/null || true
+    echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
+    # Selectively delete preference keys, NOT user data like vocabulary
+    # User data keys preserved: customVocabulary (legacy), meetingTypePrompts, toggleHotkeyShortcut
+    PREF_KEYS=(
+        triggerKey
+        customHotkey
+        whisperModel
+        ollamaModel
+        meetingPrompt
+        hasCompletedOnboarding
+        showIndicator
+        indicatorPosition
+        appearanceTheme
+        showLaunchConfirmation
+        checkForUpdatesOnLaunch
+        lastUpdateCheckDate
+        pauseMediaDuringDictation
+        hotkeyEnabled
+        meetingRetentionDays
+        meetingRetentionCount
+        meetingWindowWasOpen
+        pendingScreenRecordingGrant
+    )
+    for key in "${PREF_KEYS[@]}"; do
+        defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
+    done
     defaults write com.lookmanohands.app triggerKey "Right Option"
-    echo "   ✅ App defaults reset to factory settings"
+    echo "   ✅ App preferences reset to factory settings"
+    echo "   ℹ️  Vocabulary and custom prompts preserved"
 else
     echo "ℹ️  Preserving existing app defaults"
     echo "   (use './deploy.sh --reset-defaults' to reset)"
