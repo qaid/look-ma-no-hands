@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+BUNDLE_ID="com.lookmanohands.app"
+
 # Parse command-line flags
 RESET_DEFAULTS=false
 if [[ "$1" == "--reset-defaults" ]]; then
@@ -74,7 +76,7 @@ fi
 # Reset Accessibility TCC entry to force clean permission state for new binary
 # Ad-hoc signing changes binary identity each build, causing stale TCC entries
 echo "🔐 Resetting Accessibility permission for clean re-grant..."
-tccutil reset Accessibility "com.lookmanohands.app" 2>/dev/null || true
+tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
 
 # Remove old app bundle if it exists (legacy name without spaces)
 if [ -d ~/Applications/LookMaNoHands.app ]; then

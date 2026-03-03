@@ -124,6 +124,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     userInfo: nil
                 ) {
                     CGEvent.tapEnable(tap: testTap, enable: false)
+                    CFMachPortInvalidate(testTap)
                 } else {
                     NSLog("⚠️ AXIsProcessTrusted() returned true but event tap creation failed — stale TCC entry detected")
                     hasAccessibility = false
