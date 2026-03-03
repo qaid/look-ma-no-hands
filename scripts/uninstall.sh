@@ -49,12 +49,30 @@ for APP in ~/Applications/"Look Ma No Hands.app" ~/Applications/LookMaNoHands.ap
 done
 
 # Reset TCC privacy permissions (removes ghost entries from System Settings)
-# Note: This clears permissions for this bundle ID only.
+# Note: tccutil reset may silently fail on macOS 15+ for Accessibility.
 echo "Clearing privacy permissions..."
+
+# Try broad reset first (best-effort; "All" is undocumented and may not work on all macOS versions)
+tccutil reset All "$BUNDLE_ID" 2>/dev/null || true
+
+# Then per-service resets as fallback
 tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
 tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
 tccutil reset ScreenCapture "$BUNDLE_ID" 2>/dev/null || true
-echo "   Cleared Microphone, Accessibility, and Screen Recording entries"
+
+# On macOS 15+ (Sequoia/Tahoe), tccutil often silently fails for Accessibility.
+# The system TCC database (/Library/Application Support/com.apple.TCC/TCC.db) is
+# SIP-protected and unreadable, so we cannot verify removal. Always warn on macOS 15+.
+MACOS_MAJOR=$(sw_vers -productVersion | cut -d. -f1)
+if [[ "$MACOS_MAJOR" -ge 15 ]]; then
+    echo "   Cleared Microphone and Screen Recording entries"
+    echo ""
+    echo "   ⚠️  Could not verify Accessibility permission removal (macOS $MACOS_MAJOR)."
+    echo "   Please check and manually remove \"Look Ma No Hands\" from:"
+    echo "   System Settings > Privacy & Security > Accessibility"
+else
+    echo "   Cleared Microphone, Accessibility, and Screen Recording entries"
+fi
 
 # Remove UserDefaults (current and legacy bundle IDs)
 echo "Removing preferences..."
