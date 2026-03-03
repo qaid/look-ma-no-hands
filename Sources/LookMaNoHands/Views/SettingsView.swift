@@ -6,6 +6,7 @@ import ApplicationServices
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general = "General"
     case recording = "Recording"
+    case meetingRecordings = "Meeting Recordings"
     case vocabulary = "Vocabulary"
     case models = "Models"
     case permissions = "Permissions"
@@ -18,6 +19,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gear"
         case .recording: return "mic.circle"
+        case .meetingRecordings: return "doc.text"
         case .vocabulary: return "text.book.closed"
         case .models: return "cpu"
         case .permissions: return "lock.shield"
@@ -142,6 +144,7 @@ struct SettingsView: View {
         switch tab {
         case .general: generalTab
         case .recording: recordingTab
+        case .meetingRecordings: meetingRecordingsTab
         case .vocabulary: vocabularyTab
         case .models: modelsTab
         case .permissions: permissionsTab
@@ -492,6 +495,76 @@ struct SettingsView: View {
             }
 
             Spacer()
+        }
+    }
+
+    // MARK: - Meeting Recordings Tab
+
+    private var meetingRecordingsTab: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Auto-Save Meeting Notes")
+                    .font(.headline)
+
+                Toggle("Automatically save notes to folder after analysis", isOn: $settings.autoSaveNotes)
+                    .toggleStyle(.checkbox)
+
+                if settings.autoSaveNotes {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Save Location")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+
+                        HStack(spacing: 12) {
+                            Text(autoSaveFolderDisplay)
+                                .font(.system(size: 13))
+                                .foregroundColor(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 6)
+                                                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
+                                        )
+                                )
+
+                            Button("Choose...") {
+                                chooseAutoSaveFolder()
+                            }
+                        }
+
+                        Text("Meeting notes are saved as Markdown files after LLM analysis completes.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 20)
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    private var autoSaveFolderDisplay: String {
+        (settings.autoSaveFolder as NSString).abbreviatingWithTildeInPath
+    }
+
+    private func chooseAutoSaveFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        panel.message = "Select a folder for auto-saved meeting notes"
+        panel.directoryURL = URL(fileURLWithPath: settings.autoSaveFolder)
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            settings.autoSaveFolder = url.path
         }
     }
 

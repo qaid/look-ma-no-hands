@@ -258,6 +258,12 @@ If not discussed, write "No follow-up meeting was scheduled."
 Now produce the complete meeting notes following the format above. Ensure every section is included, even if the content is "None identified" or "Not discussed."
 """
 
+    /// Default folder for auto-saved meeting notes
+    static let defaultAutoSaveFolder: String = {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return docs.appendingPathComponent("Look Ma No Hands").path
+    }()
+
     // MARK: - Keys
 
     private enum Keys {
@@ -284,6 +290,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let meetingTypePrompts = "meetingTypePrompts"
         static let meetingWindowWasOpen = "meetingWindowWasOpen"
         static let pendingScreenRecordingGrant = "pendingScreenRecordingGrant"
+        static let autoSaveNotes = "autoSaveNotes"
+        static let autoSaveFolder = "autoSaveFolder"
     }
 
     // MARK: - File Paths
@@ -472,6 +480,20 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to automatically save meeting notes to a user-accessible folder
+    @Published var autoSaveNotes: Bool {
+        didSet {
+            UserDefaults.standard.set(autoSaveNotes, forKey: Keys.autoSaveNotes)
+        }
+    }
+
+    /// Folder path for auto-saved meeting notes (default: ~/Documents/Look Ma No Hands)
+    @Published var autoSaveFolder: String {
+        didSet {
+            UserDefaults.standard.set(autoSaveFolder, forKey: Keys.autoSaveFolder)
+        }
+    }
+
     /// Date of the last successful update check
     var lastUpdateCheckDate: Date? {
         get { UserDefaults.standard.object(forKey: Keys.lastUpdateCheckDate) as? Date }
@@ -585,6 +607,15 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Meeting window state restoration
         self.pendingScreenRecordingGrant = UserDefaults.standard.bool(forKey: Keys.pendingScreenRecordingGrant)
         self.meetingWindowWasOpen = UserDefaults.standard.bool(forKey: Keys.meetingWindowWasOpen)
+
+        // Auto-save notes defaults to false (opt-in)
+        if UserDefaults.standard.object(forKey: Keys.autoSaveNotes) != nil {
+            self.autoSaveNotes = UserDefaults.standard.bool(forKey: Keys.autoSaveNotes)
+        } else {
+            self.autoSaveNotes = false
+        }
+        self.autoSaveFolder = UserDefaults.standard.string(forKey: Keys.autoSaveFolder)
+            ?? Self.defaultAutoSaveFolder
 
         // Onboarding completion defaults to false for new users
         if UserDefaults.standard.object(forKey: Keys.hasCompletedOnboarding) != nil {
@@ -741,5 +772,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         meetingRetentionCount = 0
         meetingTypePrompts = [:]
         meetingWindowWasOpen = false
+        autoSaveNotes = false
+        autoSaveFolder = Settings.defaultAutoSaveFolder
     }
 }

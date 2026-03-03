@@ -249,6 +249,83 @@ final class MeetingStoreTests: XCTestCase {
         XCTAssertTrue(store.meetings.isEmpty)
     }
 
+    // MARK: - Auto-Export Tests
+
+    func testAutoExportNotesWritesFileWhenEnabled() async throws {
+        let root = try makeTempRoot()
+        let exportDir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("LookMaNoHandsTests")
+            .appendingPathComponent("export-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: exportDir)
+        }
+
+        let record = MeetingRecord(
+            id: UUID(),
+            title: "Test Meeting",
+            createdAt: Date(),
+            duration: 60,
+            meetingType: .general,
+            source: .recorded,
+            segmentCount: 1
+        )
+        try writeRecord(record, transcript: "test", to: root)
+
+        let settings = Settings.shared
+        let originalAutoSave = settings.autoSaveNotes
+        let originalFolder = settings.autoSaveFolder
+        defer {
+            settings.autoSaveNotes = originalAutoSave
+            settings.autoSaveFolder = originalFolder
+        }
+
+        settings.autoSaveNotes = true
+        settings.autoSaveFolder = exportDir.path
+
+        let store = MeetingStore(rootDirectory: root)
+        let result = try await store.autoExportNotes("# Meeting Notes", for: record)
+
+        XCTAssertNotNil(result)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: result!.path))
+        let content = try String(contentsOf: result!, encoding: .utf8)
+        XCTAssertEqual(content, "# Meeting Notes")
+
+        // Filename should include date component for uniqueness
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let expectedDate = formatter.string(from: record.createdAt)
+        XCTAssertTrue(result!.lastPathComponent.contains(expectedDate))
+        XCTAssertTrue(result!.lastPathComponent.hasSuffix("-notes.md"))
+    }
+
+    func testAutoExportNotesReturnsNilWhenDisabled() async throws {
+        let root = try makeTempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let record = MeetingRecord(
+            id: UUID(),
+            title: "Test Meeting",
+            createdAt: Date(),
+            duration: 60,
+            meetingType: .general,
+            source: .recorded,
+            segmentCount: 1
+        )
+        try writeRecord(record, transcript: "test", to: root)
+
+        let settings = Settings.shared
+        let originalAutoSave = settings.autoSaveNotes
+        defer { settings.autoSaveNotes = originalAutoSave }
+
+        settings.autoSaveNotes = false
+
+        let store = MeetingStore(rootDirectory: root)
+        let result = try await store.autoExportNotes("# Meeting Notes", for: record)
+
+        XCTAssertNil(result)
+    }
+
     func testSaveRecordedMeetingWithoutNotes() async throws {
         let root = try makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

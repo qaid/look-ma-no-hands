@@ -259,6 +259,24 @@ class MeetingStore {
         }
     }
 
+    /// Auto-export notes to the user-configured folder when auto-save is enabled.
+    /// Returns the destination URL on success, nil when auto-save is disabled.
+    func autoExportNotes(_ notes: String, for record: MeetingRecord) async throws -> URL? {
+        guard Settings.shared.autoSaveNotes else { return nil }
+
+        let folderPath = Settings.shared.autoSaveFolder
+        let folderURL = URL(fileURLWithPath: folderPath)
+        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: record.createdAt)
+        let filename = sanitizeFilename(record.title) + "-\(dateStr)-notes.md"
+        let dest = folderURL.appendingPathComponent(filename)
+        try notes.write(to: dest, atomically: true, encoding: .utf8)
+        return dest
+    }
+
     /// Rename a meeting's title and persist to disk
     func renameMeeting(_ record: MeetingRecord, to newTitle: String) throws {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)

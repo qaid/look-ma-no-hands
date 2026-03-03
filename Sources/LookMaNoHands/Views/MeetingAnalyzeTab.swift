@@ -562,9 +562,22 @@ struct MeetingAnalyzeTab: View {
                     showPrompt = false
                 }
 
-                // Persist notes to disk
+                // Persist notes to disk and auto-export if enabled
                 if let meeting = selectedMeeting {
                     try? await store.saveNotes(result, for: meeting)
+
+                    do {
+                        if let exportedURL = try await store.autoExportNotes(result, for: meeting) {
+                            let filename = exportedURL.lastPathComponent
+                            await MainActor.run {
+                                statusMessage = "Notes generated and saved to \(filename)"
+                            }
+                        }
+                    } catch {
+                        await MainActor.run {
+                            statusMessage = "Notes generated (auto-save failed: \(error.localizedDescription))"
+                        }
+                    }
                 }
 
                 // Notify user

@@ -688,11 +688,6 @@ struct MeetingLibraryTab: View {
         selectedIDs.removeAll()
     }
 
-    private func sanitizeFilename(_ name: String) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
-        return name.components(separatedBy: illegal).joined(separator: "-")
-    }
-
     // MARK: - Export Helpers
 
     private func exportTranscript(for record: MeetingRecord) {
