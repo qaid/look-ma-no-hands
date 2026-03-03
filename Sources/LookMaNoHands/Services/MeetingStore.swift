@@ -268,11 +268,7 @@ class MeetingStore {
         let folderURL = URL(fileURLWithPath: folderPath)
         try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateStr = formatter.string(from: record.createdAt)
-        let filename = sanitizeFilename(record.title) + "-\(dateStr)-notes.md"
-        let dest = folderURL.appendingPathComponent(filename)
+        let dest = folderURL.appendingPathComponent(autoExportFilename(for: record))
         try notes.write(to: dest, atomically: true, encoding: .utf8)
         return dest
     }
@@ -285,11 +281,7 @@ class MeetingStore {
         // Prefer auto-exported file in user's configured folder
         if Settings.shared.autoSaveNotes {
             let folderURL = URL(fileURLWithPath: Settings.shared.autoSaveFolder)
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy-MM-dd"
-            let dateStr = formatter.string(from: record.createdAt)
-            let filename = sanitizeFilename(record.title) + "-\(dateStr)-notes.md"
-            let dest = folderURL.appendingPathComponent(filename)
+            let dest = folderURL.appendingPathComponent(autoExportFilename(for: record))
             if FileManager.default.fileExists(atPath: dest.path) {
                 return dest
             }
@@ -365,6 +357,18 @@ class MeetingStore {
     }
 
     // MARK: - Private Helpers
+
+    private static let exportDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// Canonical auto-export filename for a meeting's notes.
+    private func autoExportFilename(for record: MeetingRecord) -> String {
+        let dateStr = Self.exportDateFormatter.string(from: record.createdAt)
+        return sanitizeFilename(record.title) + "-\(dateStr)-notes.md"
+    }
 
     private func writeRecord(_ record: MeetingRecord, transcript: String) async throws {
         let dir = meetingDirectory(for: record)

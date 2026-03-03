@@ -456,11 +456,9 @@ struct MeetingAnalyzeTab: View {
                 }
                 Spacer()
                 if hasProcessed, let meeting = selectedMeeting,
-                   store.notesFileURL(for: meeting) != nil {
+                   let url = store.notesFileURL(for: meeting) {
                     Button {
-                        if let url = store.notesFileURL(for: meeting) {
-                            NSWorkspace.shared.open(url)
-                        }
+                        NSWorkspace.shared.open(url)
                     } label: {
                         Label("Open Note", systemImage: "arrow.up.forward.app")
                             .font(.system(size: 12))
