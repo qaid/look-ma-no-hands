@@ -108,7 +108,7 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         }
 
         // Process with Ollama
-        let structuredNotes = try await ollamaService.generate(prompt: splitPrompt.prompt, system: splitPrompt.system)
+        let structuredNotes = try await ollamaService.generate(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: 16384)
 
         print("MeetingAnalyzer: Analysis complete, generated \(structuredNotes.count) characters")
 
@@ -153,7 +153,7 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         var totalChars = 0
 
         // Process with Ollama streaming
-        let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system) { chunk in
+        let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: 16384) { chunk in
             totalChars += chunk.count
             await onProgress(totalChars, chunk)
         }

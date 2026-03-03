@@ -11,13 +11,13 @@ final class MeetingAnalyzerTests: XCTestCase {
             true
         }
 
-        override func generate(prompt: String, system: String? = nil) async throws -> String {
+        override func generate(prompt: String, system: String? = nil, numCtx: Int? = nil) async throws -> String {
             lastPrompt = prompt
             lastSystem = system
             return "notes"
         }
 
-        override func generateStreaming(prompt: String, system: String? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
+        override func generateStreaming(prompt: String, system: String? = nil, numCtx: Int? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
             lastPrompt = prompt
             lastSystem = system
             await onChunk("notes")

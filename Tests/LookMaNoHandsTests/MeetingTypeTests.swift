@@ -33,6 +33,7 @@ final class MeetingTypeTests: XCTestCase {
         // Verify quality guards
         XCTAssertTrue(prompt.contains("Never Invent"), "Missing 'Never Invent' quality guard")
         XCTAssertTrue(prompt.contains("[Unclear]"), "Missing [Unclear] marker instruction")
+        XCTAssertTrue(prompt.contains("Complete All Sections"), "Missing 'Complete All Sections' quality guard")
     }
 
     func testDefaultPromptBehavior() {

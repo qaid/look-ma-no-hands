@@ -102,8 +102,9 @@ class OllamaService {
     /// - Parameters:
     ///   - prompt: The prompt to send to the model
     ///   - system: Optional system prompt for models that support role separation
+    ///   - numCtx: Optional context window size (tokens). When nil, uses the model's default.
     /// - Returns: Generated text
-    func generate(prompt: String, system: String? = nil) async throws -> String {
+    func generate(prompt: String, system: String? = nil, numCtx: Int? = nil) async throws -> String {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
@@ -117,7 +118,9 @@ class OllamaService {
         if let system = system {
             requestBody["system"] = system
         }
-        requestBody["options"] = ["num_ctx": 16384]
+        if let numCtx = numCtx {
+            requestBody["options"] = ["num_ctx": numCtx]
+        }
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -151,9 +154,10 @@ class OllamaService {
     /// - Parameters:
     ///   - prompt: The prompt to send to the model
     ///   - system: Optional system prompt for models that support role separation
+    ///   - numCtx: Optional context window size (tokens). When nil, uses the model's default.
     ///   - onChunk: Callback invoked for each text chunk received
     /// - Returns: Complete generated text
-    func generateStreaming(prompt: String, system: String? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
+    func generateStreaming(prompt: String, system: String? = nil, numCtx: Int? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
@@ -167,7 +171,9 @@ class OllamaService {
         if let system = system {
             requestBody["system"] = system
         }
-        requestBody["options"] = ["num_ctx": 16384]
+        if let numCtx = numCtx {
+            requestBody["options"] = ["num_ctx": numCtx]
+        }
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 

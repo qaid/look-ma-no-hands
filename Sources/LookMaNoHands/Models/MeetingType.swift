@@ -143,6 +143,8 @@ Before generating output, apply these rules to the transcript:
 
 5. **Never Invent**: Only include information actually present in the transcript. If something is ambiguous or hard to hear, mark it as [Unclear] rather than guessing.
 
+6. **Complete All Sections**: Every section in the output format below must be included, even if the content is "None identified."
+
 ---
 
 ## Required Output Format
@@ -223,7 +225,7 @@ If the transcript quality makes verbatim quotes unreliable, write "Transcript qu
 
 ---
 
-Now produce the complete video essay notes following the format above. Be thorough — aim for comprehensive detail, not a brief summary. Every section must be included, even if the content is "None identified."
+Now produce the complete video essay notes following the format above. Be thorough — aim for comprehensive detail, not a brief summary.
 
 ## Transcript
 
