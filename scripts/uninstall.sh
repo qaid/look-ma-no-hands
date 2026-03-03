@@ -49,12 +49,39 @@ for APP in ~/Applications/"Look Ma No Hands.app" ~/Applications/LookMaNoHands.ap
 done
 
 # Reset TCC privacy permissions (removes ghost entries from System Settings)
-# Note: This clears permissions for this bundle ID only.
+# Note: tccutil reset may silently fail on macOS 15+ for Accessibility.
 echo "Clearing privacy permissions..."
+
+# Try broad reset first (may work better on some macOS versions)
+tccutil reset All "$BUNDLE_ID" 2>/dev/null || true
+
+# Then per-service resets as fallback
 tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
 tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true
 tccutil reset ScreenCapture "$BUNDLE_ID" 2>/dev/null || true
-echo "   Cleared Microphone, Accessibility, and Screen Recording entries"
+
+# Verify Accessibility entry was actually removed
+TCC_DB="$HOME/Library/Application Support/com.apple.TCC/TCC.db"
+ACCESSIBILITY_CLEARED=true
+if [ -f "$TCC_DB" ]; then
+    REMAINING=$(sqlite3 "$TCC_DB" "SELECT COUNT(*) FROM access WHERE client='$BUNDLE_ID' AND service='kTCCServiceAccessibility'" 2>/dev/null || echo "error")
+    if [ "$REMAINING" = "error" ]; then
+        # sqlite3 query failed (SIP-protected or schema changed) — can't verify
+        ACCESSIBILITY_CLEARED=unknown
+    elif [ "$REMAINING" -gt 0 ] 2>/dev/null; then
+        ACCESSIBILITY_CLEARED=false
+    fi
+fi
+
+if [ "$ACCESSIBILITY_CLEARED" = "false" ] || [ "$ACCESSIBILITY_CLEARED" = "unknown" ]; then
+    echo "   Cleared Microphone and Screen Recording entries"
+    echo ""
+    echo "   ⚠️  Could not automatically remove Accessibility permission."
+    echo "   Please manually remove \"Look Ma No Hands\" from:"
+    echo "   System Settings > Privacy & Security > Accessibility"
+else
+    echo "   Cleared Microphone, Accessibility, and Screen Recording entries"
+fi
 
 # Remove UserDefaults (current and legacy bundle IDs)
 echo "Removing preferences..."

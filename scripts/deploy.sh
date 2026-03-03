@@ -71,6 +71,11 @@ else
     echo "   ℹ️  App not currently running"
 fi
 
+# Reset Accessibility TCC entry to force clean permission state for new binary
+# Ad-hoc signing changes binary identity each build, causing stale TCC entries
+echo "🔐 Resetting Accessibility permission for clean re-grant..."
+tccutil reset Accessibility "com.lookmanohands.app" 2>/dev/null || true
+
 # Remove old app bundle if it exists (legacy name without spaces)
 if [ -d ~/Applications/LookMaNoHands.app ]; then
     echo "🗑️ Removing old app bundle..."

@@ -108,8 +108,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Check for missing permissions after app update (permissions were reset)
         if Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
             let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-            let hasAccessibility = AXIsProcessTrusted()
+            var hasAccessibility = AXIsProcessTrusted()
             let hasMicrophone = (micStatus == .authorized)
+
+            // Validate accessibility actually works (detects stale TCC entries)
+            // AXIsProcessTrusted() can return true for stale entries after ad-hoc re-signing
+            if hasAccessibility {
+                let testMask: CGEventMask = 1 << CGEventType.keyDown.rawValue
+                if let testTap = CGEvent.tapCreate(
+                    tap: .cgSessionEventTap,
+                    place: .headInsertEventTap,
+                    options: .listenOnly,
+                    eventsOfInterest: testMask,
+                    callback: { _, _, event, _ in Unmanaged.passUnretained(event) },
+                    userInfo: nil
+                ) {
+                    CGEvent.tapEnable(tap: testTap, enable: false)
+                } else {
+                    NSLog("⚠️ AXIsProcessTrusted() returned true but event tap creation failed — stale TCC entry detected")
+                    hasAccessibility = false
+                }
+            }
 
             if !hasMicrophone || !hasAccessibility {
                 NSLog("⚠️ Permissions lost detected (likely after app update) - showing permissions onboarding")
