@@ -243,6 +243,14 @@ struct MeetingLibraryTab: View {
                             Text("100 meetings").tag(100)
                         }
                     }
+                    Section("Auto-Save") {
+                        Toggle("Save notes to folder", isOn: autoSaveBinding)
+                        if Settings.shared.autoSaveNotes {
+                            Button("Folder: \(autoSaveFolderDisplayName)...") {
+                                chooseAutoSaveFolder()
+                            }
+                        }
+                    }
                     Divider()
                     Text("\(store.meetings.count) meetings stored")
                 } label: {
@@ -688,9 +696,32 @@ struct MeetingLibraryTab: View {
         selectedIDs.removeAll()
     }
 
-    private func sanitizeFilename(_ name: String) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
-        return name.components(separatedBy: illegal).joined(separator: "-")
+    // MARK: - Auto-Save Helpers
+
+    private var autoSaveBinding: Binding<Bool> {
+        Binding(
+            get: { Settings.shared.autoSaveNotes },
+            set: { Settings.shared.autoSaveNotes = $0 }
+        )
+    }
+
+    private var autoSaveFolderDisplayName: String {
+        let path = Settings.shared.autoSaveFolder
+        return (path as NSString).abbreviatingWithTildeInPath
+    }
+
+    private func chooseAutoSaveFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.prompt = "Choose"
+        panel.message = "Select a folder for auto-saved meeting notes"
+        panel.directoryURL = URL(fileURLWithPath: Settings.shared.autoSaveFolder)
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Settings.shared.autoSaveFolder = url.path
+        }
     }
 
     // MARK: - Export Helpers
