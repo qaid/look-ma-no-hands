@@ -198,6 +198,7 @@ When creating a pull request:
    - **Title**: < 70 characters, descriptive
    - **Summary**: 2-3 bullet points of what changed
    - **Test Plan**: How to verify the changes work
+   - **Issue link**: If created from a GitHub issue, include `Closes #NNN` so GitHub auto-closes the issue on merge
 
 3. **Push and create**:
    ```bash
@@ -216,7 +217,11 @@ When creating a pull request:
    - [ ] Step 1 to test
    - [ ] Step 2 to test
    - [ ] Step 3 to test
+
+   Closes #NNN
    ```
+
+   > **Note**: Replace `#NNN` with the actual issue number. Omit the `Closes` line if the PR is not associated with an issue. GitHub recognizes: `Closes`, `Fixes`, `Resolves` (case-insensitive).
 
 ## Git Troubleshooting Guide
 

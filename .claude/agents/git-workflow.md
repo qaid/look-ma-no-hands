@@ -193,6 +193,7 @@ When user wants to create a PR:
 2. **Draft PR components**:
    - **Title**: < 70 characters, descriptive
    - **Body**: Summary (2-3 bullets) + Test Plan
+   - **Issue link**: If the PR was created from a GitHub issue, include `Closes #NNN` so GitHub auto-closes the issue on merge
 
 3. **Get push confirmation** (use AskUserQuestion)
 
@@ -208,9 +209,13 @@ When user wants to create a PR:
    ## Test Plan
    - [ ] Test step 1
    - [ ] Test step 2
+
+   Closes #NNN
    EOF
    )"
    ```
+
+   > **Note**: Replace `#NNN` with the actual issue number. Omit the `Closes` line if the PR is not associated with an issue. GitHub recognizes these keywords: `Closes`, `Fixes`, `Resolves` (case-insensitive).
 
 5. **Return PR URL** to user
 
