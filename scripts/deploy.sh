@@ -71,9 +71,11 @@ else
     echo "   ℹ️  App not currently running"
 fi
 
-# Remove old app bundle if it exists
+# Remove old app bundle if it exists (legacy name without spaces)
 if [ -d ~/Applications/LookMaNoHands.app ]; then
     echo "🗑️ Removing old app bundle..."
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
+        -u ~/Applications/LookMaNoHands.app 2>/dev/null || true
     rm -rf ~/Applications/LookMaNoHands.app
 fi
 
