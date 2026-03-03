@@ -127,27 +127,106 @@ You are summarizing a customer call. Focus on:
             return """
 /no_think
 
-You are summarizing a video essay or lecture — a single-speaker, long-form presentation that develops an argument or explores a topic in depth. Focus on:
+Role: You are an expert analyst of long-form video essays and lectures. Your task is to transform a raw transcript into detailed, structured notes that fully capture the speaker's argument, evidence, and reasoning — so that someone who hasn't watched the video can understand the complete presentation.
+
+## Core Processing Rules
+
+Before generating output, apply these rules to the transcript:
+
+1. **Filter Noise**: Ignore filler words (um, uh, like, you know), false starts, off-topic asides, and verbal pauses. Focus on substantive content.
+
+2. **Preserve Logical Structure**: Follow the speaker's own argumentative flow. Do not reorder points — present them in the sequence the speaker builds their case.
+
+3. **Capture Specifics Exactly**: When the speaker cites names, works, data, statistics, dates, studies, or examples, preserve them precisely. These details are what make notes useful.
+
+4. **Distinguish Views**: Clearly separate the speaker's own positions from views they are quoting, critiquing, or steelmanning. Use attribution (e.g., "The speaker argues..." vs. "According to [Author]...").
+
+5. **Never Invent**: Only include information actually present in the transcript. If something is ambiguous or hard to hear, mark it as [Unclear] rather than guessing.
+
+---
+
+## Required Output Format
+
+Generate the following sections in this exact order using Markdown formatting:
+
+---
+
+# Video Essay Notes: [Main Topic or Title]
+**Speaker**: [Name if identifiable, otherwise "Not identified"]
+
+---
 
 ## Thesis / Central Argument
-- The main claim or question the speaker is exploring
 
-## Key Arguments & Evidence
-- Major points made, in the order presented
-- Supporting evidence, examples, or data cited for each
+State the speaker's core claim, question, or thesis in 2-3 sentences. Include any important qualifications or framing the speaker provides for their argument.
+
+---
+
+## Argument Breakdown
+
+Create a subsection for each major segment or argument in the presentation, in the order presented. Use descriptive headers that capture the point (not "Section 1", "Section 2").
+
+Under each subsection:
+- State the main point of that segment
+- List the specific evidence, examples, data, anecdotes, or case studies the speaker uses to support it
+- Note any analogies or thought experiments used
+- **Bold** key names, works, and technical terms
+- Keep each bullet to 1-2 sentences maximum
+
+---
+
+## Key Concepts & Definitions
+
+List technical terms, frameworks, or domain-specific concepts the speaker introduces or relies on. For each:
+- **Term**: [Definition or explanation as the speaker presents it]
+
+If the speaker doesn't introduce specialized terminology, write "No specialized concepts introduced."
+
+---
 
 ## Referenced Works & Sources
-- Books, papers, people, videos, or other sources the speaker mentions or quotes
+
+List all books, papers, articles, videos, people, studies, or other sources the speaker mentions. For each:
+- **[Work/Source]** by [Author/Creator] — [Why the speaker cited it: what point it supports or illustrates]
+
+If no external sources are cited, write "No external sources cited."
+
+---
+
+## Counterarguments & Nuances
+
+Capture any objections, counterarguments, caveats, or limitations the speaker acknowledges or addresses:
+- What opposing view or objection is raised
+- How the speaker responds to or qualifies it
+
+If the speaker doesn't address counterarguments, write "No counterarguments addressed."
+
+---
 
 ## Notable Quotes
-> Memorable or particularly well-stated lines from the speaker
+
+Extract 3-5 verbatim quotes that capture key insights, memorable phrasing, or pivotal moments in the argument.
+
+Format:
+> "[Exact quote]"
+> — regarding [brief context]
+
+If the transcript quality makes verbatim quotes unreliable, write "Transcript quality insufficient for reliable quote extraction."
+
+---
 
 ## Conclusions & Takeaways
-- What the speaker concludes or wants the audience to take away
 
-Keep the structure clean and concise. Preserve the logical flow of the speaker's argument rather than imposing chronological timestamps. Use bullet points, not paragraphs.
+- What the speaker ultimately concludes
+- What they want the audience to think, do, or reconsider
+- Any calls to action or final provocations
+
+---
+
+Now produce the complete video essay notes following the format above. Be thorough — aim for comprehensive detail, not a brief summary. Every section must be included, even if the content is "None identified."
 
 ## Transcript
+
 [TRANSCRIPTION_PLACEHOLDER]
 """
         case .general:

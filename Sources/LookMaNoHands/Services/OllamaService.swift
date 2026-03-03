@@ -117,6 +117,7 @@ class OllamaService {
         if let system = system {
             requestBody["system"] = system
         }
+        requestBody["options"] = ["num_ctx": 16384]
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 
@@ -166,6 +167,7 @@ class OllamaService {
         if let system = system {
             requestBody["system"] = system
         }
+        requestBody["options"] = ["num_ctx": 16384]
 
         let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
 

@@ -20,6 +20,21 @@ final class MeetingTypeTests: XCTestCase {
         XCTAssertEqual(MeetingType.custom.icon, "slider.horizontal.3")
     }
 
+    func testVideoEssayPromptSections() {
+        let prompt = MeetingType.videoEssay.defaultPrompt
+        // Verify all required output sections exist
+        XCTAssertTrue(prompt.contains("Thesis / Central Argument"), "Missing Thesis section")
+        XCTAssertTrue(prompt.contains("Argument Breakdown"), "Missing Argument Breakdown section")
+        XCTAssertTrue(prompt.contains("Key Concepts & Definitions"), "Missing Key Concepts section")
+        XCTAssertTrue(prompt.contains("Referenced Works & Sources"), "Missing Referenced Works section")
+        XCTAssertTrue(prompt.contains("Counterarguments & Nuances"), "Missing Counterarguments section")
+        XCTAssertTrue(prompt.contains("Notable Quotes"), "Missing Notable Quotes section")
+        XCTAssertTrue(prompt.contains("Conclusions & Takeaways"), "Missing Conclusions section")
+        // Verify quality guards
+        XCTAssertTrue(prompt.contains("Never Invent"), "Missing 'Never Invent' quality guard")
+        XCTAssertTrue(prompt.contains("[Unclear]"), "Missing [Unclear] marker instruction")
+    }
+
     func testDefaultPromptBehavior() {
         XCTAssertTrue(MeetingType.standup.defaultPrompt.contains("[TRANSCRIPTION_PLACEHOLDER]"))
         XCTAssertTrue(MeetingType.oneOnOne.defaultPrompt.contains("[TRANSCRIPTION_PLACEHOLDER]"))
