@@ -15,10 +15,11 @@ echo ""
 # Kill any running instances
 APP_PID=$(pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null || true)
 if [ -n "$APP_PID" ]; then
-    echo "⏹️  Stopping running instance..."
+    echo "⏹️  Stopping running instance (PID: $APP_PID)..."
     osascript -e 'tell application "Look Ma No Hands" to quit' 2>/dev/null || true
     sleep 2
-    if kill -0 "$APP_PID" 2>/dev/null; then
+    # Re-check that the PID is still our app before force-killing
+    if kill -0 "$APP_PID" 2>/dev/null && pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null | grep -q "^${APP_PID}$"; then
         kill -9 "$APP_PID" 2>/dev/null || true
         sleep 1
     fi
@@ -47,6 +48,8 @@ rm -rf ~/Library/Application\ Support/LookMaNoHands
 echo "   ✓ Removed app support data"
 
 # Reset TCC privacy permissions (removes ghost entries from System Settings)
+# Note: This clears permissions for this bundle ID only. The user will need to
+# re-grant Microphone, Accessibility, and Screen Recording on next launch.
 echo "🗑️  Clearing privacy permissions..."
 tccutil reset Microphone "$BUNDLE_ID" 2>/dev/null || true
 tccutil reset Accessibility "$BUNDLE_ID" 2>/dev/null || true

@@ -59,8 +59,8 @@ if [ -n "$APP_PID" ]; then
     osascript -e 'tell application "Look Ma No Hands" to quit' 2>/dev/null || true
     sleep 2
 
-    # Check if app is still running
-    if kill -0 "$APP_PID" 2>/dev/null; then
+    # Re-check that the PID is still our app before force-killing
+    if kill -0 "$APP_PID" 2>/dev/null && pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null | grep -q "^${APP_PID}$"; then
         echo "   ⚠️  App still running, force terminating..."
         kill -9 "$APP_PID" 2>/dev/null || true
         sleep 1
@@ -118,30 +118,13 @@ fi
 # App defaults (conditional based on flag)
 if [ "$RESET_DEFAULTS" = true ]; then
     echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
-    # Selectively delete preference keys, NOT user data like vocabulary
-    # User data keys preserved: customVocabulary (legacy), meetingTypePrompts, toggleHotkeyShortcut
-    PREF_KEYS=(
-        triggerKey
-        customHotkey
-        whisperModel
-        ollamaModel
-        meetingPrompt
-        hasCompletedOnboarding
-        showIndicator
-        indicatorPosition
-        appearanceTheme
-        showLaunchConfirmation
-        checkForUpdatesOnLaunch
-        lastUpdateCheckDate
-        pauseMediaDuringDictation
-        hotkeyEnabled
-        meetingRetentionDays
-        meetingRetentionCount
-        meetingWindowWasOpen
-        pendingScreenRecordingGrant
-    )
-    for key in "${PREF_KEYS[@]}"; do
-        defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
+    # Delete all preference keys EXCEPT user data worth preserving
+    PRESERVE_KEYS="customVocabulary|meetingTypePrompts|toggleHotkeyShortcut"
+    ALL_KEYS=$(defaults read com.lookmanohands.app 2>/dev/null | grep -oE '^\s{4}[a-zA-Z][a-zA-Z0-9]*' | sed 's/^ *//' || true)
+    for key in $ALL_KEYS; do
+        if ! echo "$key" | grep -qE "^($PRESERVE_KEYS)$"; then
+            defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
+        fi
     done
     defaults write com.lookmanohands.app triggerKey "Right Option"
     echo "   ✅ App preferences reset to factory settings"
