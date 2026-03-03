@@ -576,7 +576,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.synchronize()
         NSLog("✅ Meeting Transcription window created and displayed")
     }
-    
+
+    /// Minimize the meeting window so macOS System Settings permission prompt is visible
+    func minimizeMeetingWindowForPermission() {
+        meetingWindow?.miniaturize(nil)
+    }
+
     // MARK: - Permission Checks
 
     /// Update permission status without triggering any system dialogs (read-only status check)

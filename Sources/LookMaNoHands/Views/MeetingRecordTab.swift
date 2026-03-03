@@ -88,6 +88,7 @@ struct MeetingRecordTab: View {
             if liveState.status == .missingPermissions {
                 Settings.shared.pendingScreenRecordingGrant = true
                 UserDefaults.standard.synchronize()
+                appDelegate?.minimizeMeetingWindowForPermission()
                 CGRequestScreenCaptureAccess()
             }
         }
@@ -597,6 +598,7 @@ struct MeetingRecordTab: View {
         } else if liveState.status == .missingPermissions {
             Settings.shared.pendingScreenRecordingGrant = true
             UserDefaults.standard.synchronize()
+            appDelegate?.minimizeMeetingWindowForPermission()
             CGRequestScreenCaptureAccess()
         } else if liveState.canRecord {
             Task { await startRecording() }
