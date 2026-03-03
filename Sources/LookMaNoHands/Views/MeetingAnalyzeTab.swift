@@ -567,7 +567,7 @@ struct MeetingAnalyzeTab: View {
                     try? await store.saveNotes(result, for: meeting)
 
                     do {
-                        if let exportedURL = try store.autoExportNotes(result, for: meeting) {
+                        if let exportedURL = try await store.autoExportNotes(result, for: meeting) {
                             let filename = exportedURL.lastPathComponent
                             await MainActor.run {
                                 statusMessage = "Notes generated and saved to \(filename)"

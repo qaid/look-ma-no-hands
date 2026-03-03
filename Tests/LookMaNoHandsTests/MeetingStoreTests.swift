@@ -251,7 +251,7 @@ final class MeetingStoreTests: XCTestCase {
 
     // MARK: - Auto-Export Tests
 
-    func testAutoExportNotesWritesFileWhenEnabled() throws {
+    func testAutoExportNotesWritesFileWhenEnabled() async throws {
         let root = try makeTempRoot()
         let exportDir = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("LookMaNoHandsTests")
@@ -284,16 +284,22 @@ final class MeetingStoreTests: XCTestCase {
         settings.autoSaveFolder = exportDir.path
 
         let store = MeetingStore(rootDirectory: root)
-        let result = try store.autoExportNotes("# Meeting Notes", for: record)
+        let result = try await store.autoExportNotes("# Meeting Notes", for: record)
 
         XCTAssertNotNil(result)
         XCTAssertTrue(FileManager.default.fileExists(atPath: result!.path))
         let content = try String(contentsOf: result!, encoding: .utf8)
         XCTAssertEqual(content, "# Meeting Notes")
+
+        // Filename should include date component for uniqueness
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let expectedDate = formatter.string(from: record.createdAt)
+        XCTAssertTrue(result!.lastPathComponent.contains(expectedDate))
         XCTAssertTrue(result!.lastPathComponent.hasSuffix("-notes.md"))
     }
 
-    func testAutoExportNotesReturnsNilWhenDisabled() throws {
+    func testAutoExportNotesReturnsNilWhenDisabled() async throws {
         let root = try makeTempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
 
@@ -315,7 +321,7 @@ final class MeetingStoreTests: XCTestCase {
         settings.autoSaveNotes = false
 
         let store = MeetingStore(rootDirectory: root)
-        let result = try store.autoExportNotes("# Meeting Notes", for: record)
+        let result = try await store.autoExportNotes("# Meeting Notes", for: record)
 
         XCTAssertNil(result)
     }
