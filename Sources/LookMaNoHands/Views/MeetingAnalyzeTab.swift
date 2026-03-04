@@ -207,61 +207,56 @@ struct MeetingAnalyzeTab: View {
         }
     }
 
-    // MARK: - Type Picker
+    // MARK: - Toolbar
 
     private var typePicker: some View {
-        VStack(spacing: 10) {
-            // Configuration
-            HStack(spacing: 12) {
-                HStack(spacing: 6) {
-                    Text("TYPE")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .tracking(0.5)
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Text("TYPE")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.5)
 
-                    Picker("", selection: typePickerBinding) {
-                        ForEach(MeetingType.allCases) { type in
-                            Label(type.displayName, systemImage: type.icon).tag(type)
+                Picker("", selection: typePickerBinding) {
+                    ForEach(MeetingType.allCases) { type in
+                        Label(type.displayName, systemImage: type.icon).tag(type)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+            Rectangle()
+                .fill(Color(nsColor: .separatorColor).opacity(0.3))
+                .frame(width: 1, height: 20)
+
+            HStack(spacing: 6) {
+                Text("MODEL")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                    .tracking(0.5)
+
+                if availableModels.isEmpty {
+                    TextField("", text: $selectedModel)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 160)
+                } else {
+                    Picker("", selection: $selectedModel) {
+                        ForEach(availableModels, id: \.self) { model in
+                            Text(model).tag(model)
                         }
                     }
                     .pickerStyle(.menu)
                     .labelsHidden()
+                    .frame(width: 160)
                 }
-
-                Rectangle()
-                    .fill(Color(nsColor: .separatorColor).opacity(0.3))
-                    .frame(width: 1, height: 20)
-
-                HStack(spacing: 6) {
-                    Text("MODEL")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .tracking(0.5)
-
-                    if availableModels.isEmpty {
-                        TextField("", text: $selectedModel)
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 160)
-                    } else {
-                        Picker("", selection: $selectedModel) {
-                            ForEach(availableModels, id: \.self) { model in
-                                Text(model).tag(model)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .frame(width: 160)
-                    }
-                }
-
-                Spacer()
             }
 
-            // Actions
-            HStack(spacing: 8) {
-                actionRow
-                Spacer()
-            }
+            actionRow
+
+            Spacer()
+
+            utilityButtons
         }
     }
 
@@ -319,28 +314,34 @@ struct MeetingAnalyzeTab: View {
             .disabled(transcript.isEmpty)
             .keyboardShortcut("n", modifiers: .command)
         }
+    }
 
-        Divider()
-            .frame(height: 20)
-
-        HStack(spacing: 4) {
+    @ViewBuilder
+    private var utilityButtons: some View {
+        HStack(spacing: 8) {
             Button {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(notes, forType: .string)
                 statusMessage = "Notes copied to clipboard"
             } label: {
-                Image(systemName: "doc.on.doc")
+                Label("Copy Notes", systemImage: "doc.on.doc")
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
             .disabled(notes.isEmpty)
             .help("Copy notes to clipboard")
 
             Button {
                 if let meeting = selectedMeeting { saveNotes(for: meeting) }
             } label: {
-                Image(systemName: "square.and.arrow.down")
+                Label("Export", systemImage: "square.and.arrow.down")
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
             .disabled(notes.isEmpty)
             .help("Export notes to file")
 
@@ -349,9 +350,12 @@ struct MeetingAnalyzeTab: View {
                 NSPasteboard.general.setString(transcript, forType: .string)
                 statusMessage = "Transcript copied to clipboard"
             } label: {
-                Image(systemName: "doc.text")
+                Label("Copy Transcript", systemImage: "doc.text")
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .buttonStyle(.bordered)
+            .controlSize(.small)
             .disabled(transcript.isEmpty)
             .help("Copy transcript to clipboard")
         }
