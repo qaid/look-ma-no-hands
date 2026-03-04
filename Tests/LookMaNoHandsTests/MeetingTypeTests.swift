@@ -36,6 +36,25 @@ final class MeetingTypeTests: XCTestCase {
         XCTAssertTrue(prompt.contains("Complete All Sections"), "Missing 'Complete All Sections' quality guard")
     }
 
+    func testOneOnOnePromptSections() {
+        let prompt = MeetingType.oneOnOne.defaultPrompt
+        // Verify all required output sections exist
+        XCTAssertTrue(prompt.contains("Meeting Context"), "Missing Meeting Context section")
+        XCTAssertTrue(prompt.contains("Key Discussion Points"), "Missing Key Discussion Points section")
+        XCTAssertTrue(prompt.contains("Feedback & Recognition"), "Missing Feedback & Recognition section")
+        XCTAssertTrue(prompt.contains("Goals & Career Development"), "Missing Goals & Career Development section")
+        XCTAssertTrue(prompt.contains("Concerns & Blockers"), "Missing Concerns & Blockers section")
+        XCTAssertTrue(prompt.contains("Decisions Made"), "Missing Decisions Made section")
+        XCTAssertTrue(prompt.contains("Action Items"), "Missing Action Items section")
+        XCTAssertTrue(prompt.contains("Open Questions"), "Missing Open Questions section")
+        XCTAssertTrue(prompt.contains("Notable Quotes"), "Missing Notable Quotes section")
+        XCTAssertTrue(prompt.contains("Follow-Up"), "Missing Follow-Up section")
+        // Verify quality guards
+        XCTAssertTrue(prompt.contains("Never Invent"), "Missing 'Never Invent' quality guard")
+        XCTAssertTrue(prompt.contains("[Unclear]"), "Missing [Unclear] marker instruction")
+        XCTAssertTrue(prompt.contains("Complete All Sections"), "Missing 'Complete All Sections' quality guard")
+    }
+
     func testDefaultPromptBehavior() {
         XCTAssertTrue(MeetingType.standup.defaultPrompt.contains("[TRANSCRIPTION_PLACEHOLDER]"))
         XCTAssertTrue(MeetingType.oneOnOne.defaultPrompt.contains("[TRANSCRIPTION_PLACEHOLDER]"))
