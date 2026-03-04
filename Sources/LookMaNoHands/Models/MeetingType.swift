@@ -62,22 +62,144 @@ Keep it brief and actionable. One bullet per person where identifiable.
             return """
 /no_think
 
-You are summarizing a 1:1 meeting. Focus on:
+Role: You are an expert at capturing the substance of 1:1 meetings. Your task is to transform a raw transcript into detailed, structured notes that preserve specific feedback, commitments, and discussion nuance — so that both participants have a reliable record of what was said and agreed.
+
+## Core Processing Rules
+
+Before generating output, apply these rules to the transcript:
+
+1. **Filter Noise**: Ignore filler words (um, uh, like, you know), false starts, and verbal pauses. Focus on substantive content.
+
+2. **Attribute Statements**: Identify who said what. Use names if identifiable, otherwise "Speaker 1" / "Speaker 2" or roles (e.g., "Manager", "Report") if inferable from context.
+
+3. **Capture Specifics Exactly**: When participants mention names, projects, dates, metrics, deadlines, or commitments, preserve them precisely. These details are what make 1:1 notes useful.
+
+4. **Preserve Tone & Sentiment**: Note when topics are raised with urgency, concern, enthusiasm, or frustration. This context matters for follow-up.
+
+5. **Never Invent**: Only include information actually present in the transcript. If something is ambiguous or hard to hear, mark it as [Unclear] rather than guessing.
+
+6. **Complete All Sections**: Every section in the output format below must be included, even if the content is "Not discussed."
+
+---
+
+## Required Output Format
+
+Generate the following sections in this exact order using Markdown formatting:
+
+---
+
+# 1:1 Meeting Notes: [Topic or Participants]
+**Date**: [Date if mentioned, otherwise "Not specified"]
+**Participants**: [Names/roles if identifiable]
+
+---
+
+## Meeting Context
+
+Briefly note the relationship context (manager/report, peer, cross-team, mentor/mentee) and meeting cadence if mentioned (weekly, biweekly, ad-hoc).
+
+---
+
+## Key Discussion Points
+
+Create a subsection for each major topic discussed, in the order they came up. Use descriptive headers that capture the topic (not "Topic 1", "Topic 2").
+
+Under each subsection:
+- Summarize what was discussed with specific references to what was said
+- Attribute key points to the person who raised them
+- **Bold** key names, projects, and terms
+- Keep each bullet to 1-2 sentences maximum
+
+---
 
 ## Feedback & Recognition
-- Positive feedback and areas for growth
 
-## Goals & Progress
-- Career or project goal updates
+Capture specific feedback exchanged between participants:
+- What feedback was given (positive or constructive)
+- Who gave it and in what context
+- Use exact language where possible (e.g., "Manager said the demo was 'exactly what the client needed'")
+- Note the tone and delivery if apparent
+
+If no feedback was exchanged, write "No feedback exchanged in this meeting."
+
+---
+
+## Goals & Career Development
+
+- Specific goals discussed, with concrete details on current status
+- Progress updates on previously set goals, with measurable outcomes where mentioned
+- New goals set, including timelines and success criteria
+- Career aspirations, growth areas, or development opportunities discussed
+
+If not discussed, write "Not discussed."
+
+---
+
+## Concerns & Blockers
+
+- Issues raised by either participant, with specific details
+- Note the emotional tone or urgency (e.g., "raised with visible frustration", "mentioned as a growing risk")
+- Any suggested resolutions or workarounds discussed
+- Who owns resolving each concern
+
+If none raised, write "No concerns or blockers raised."
+
+---
+
+## Decisions Made
+
+List explicit decisions reached during the meeting:
+- What was decided
+- The rationale or context behind the decision
+- Who owns the decision or is responsible for execution
+
+If no decisions were made, write "No explicit decisions made."
+
+---
 
 ## Action Items
-| Owner | Action | Deadline |
-|-------|--------|----------|
 
-## Open Topics
-- Any unresolved questions or items to revisit
+| Owner | Action Item | Deadline | Context |
+|-------|-------------|----------|---------|
+
+List every commitment or follow-up task mentioned. Include the context column to capture why the action item exists.
+
+---
+
+## Open Questions
+
+- Unresolved items or questions that need further discussion
+- Why each matters and what depends on it
+- Suggested next steps for resolution
+
+If none, write "No open questions."
+
+---
+
+## Notable Quotes
+
+Extract 2-3 verbatim quotes that capture key feedback, commitments, or sentiments.
+
+Format:
+> "[Exact quote]"
+> — [Speaker], regarding [brief context]
+
+If the transcript quality makes verbatim quotes unreliable, write "Transcript quality insufficient for reliable quote extraction."
+
+---
+
+## Follow-Up
+
+- Next 1:1 date if discussed
+- Topics to carry over or revisit next time
+- Any preparation needed before the next meeting
+
+---
+
+Now produce the complete 1:1 meeting notes following the format above. Be thorough and specific — reference what was actually said in the transcript rather than summarizing generically. Include every section even if the content is "Not discussed."
 
 ## Transcript
+
 [TRANSCRIPTION_PLACEHOLDER]
 """
         case .allHands:
