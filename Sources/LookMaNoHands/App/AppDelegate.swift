@@ -408,7 +408,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Meeting transcription
         let meetingItem = NSMenuItem(
-            title: "Start Meeting Transcription...",
+            title: "Meeting Recordings...",
             action: #selector(openMeetingTranscription),
             keyEquivalent: "m"
         )
@@ -556,6 +556,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        // Switch to regular app mode so window appears in Dock and Cmd+Tab
+        NSApp.setActivationPolicy(.regular)
+
         // If window already exists, just bring it to front
         if let window = meetingWindow {
             window.makeKeyAndOrderFront(nil)
@@ -585,9 +588,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.contentView = hostingView
 
         self.meetingWindow = window
-
-        // Change activation policy to regular app so window appears in Cmd+Tab
-        NSApp.setActivationPolicy(.regular)
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
