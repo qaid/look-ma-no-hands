@@ -92,6 +92,44 @@ class MeetingStore {
         return record
     }
 
+    /// Update an existing meeting record with new transcript data (used when continuing a recording)
+    func updateRecordedMeeting(
+        id: UUID,
+        segments: [TranscriptSegment],
+        userNotes: [UserNote],
+        duration: TimeInterval
+    ) async throws -> MeetingRecord {
+        guard let (existingIndex, existing) = await MainActor.run(body: {
+            guard let idx = meetings.firstIndex(where: { $0.id == id }) else { return nil as (Int, MeetingRecord)? }
+            return (idx, meetings[idx])
+        }) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+
+        var updated = existing
+        updated.duration = duration
+        updated.segmentCount = segments.count
+        updated.userNotesFilename = userNotes.isEmpty ? nil : "user-notes.json"
+
+        let transcript = Self.buildMergedTranscript(segments: segments, userNotes: userNotes)
+        try await writeRecord(updated, transcript: transcript)
+
+        let dir = meetingDirectory(for: updated)
+        let notesURL = dir.appendingPathComponent("user-notes.json")
+        if !userNotes.isEmpty {
+            let notesData = try JSONEncoder().encode(userNotes)
+            try notesData.write(to: notesURL, options: .atomic)
+        } else if FileManager.default.fileExists(atPath: notesURL.path) {
+            try? FileManager.default.removeItem(at: notesURL)
+        }
+
+        let finalRecord = updated
+        await MainActor.run {
+            meetings[existingIndex] = finalRecord
+        }
+        return finalRecord
+    }
+
     /// Build a merged transcript that interleaves user notes at their timestamp positions
     static func buildMergedTranscript(segments: [TranscriptSegment], userNotes: [UserNote]) -> String {
         guard !userNotes.isEmpty else {
