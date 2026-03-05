@@ -224,6 +224,7 @@ struct MeetingAnalyzeTab: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+                .frame(minWidth: 140)
             }
 
             Rectangle()
