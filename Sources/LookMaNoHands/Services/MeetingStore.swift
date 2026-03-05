@@ -99,11 +99,14 @@ class MeetingStore {
         userNotes: [UserNote],
         duration: TimeInterval
     ) async throws -> MeetingRecord {
-        guard let existingIndex = await MainActor.run(body: { meetings.firstIndex(where: { $0.id == id }) }) else {
+        guard let (existingIndex, existing) = await MainActor.run(body: {
+            guard let idx = meetings.firstIndex(where: { $0.id == id }) else { return nil as (Int, MeetingRecord)? }
+            return (idx, meetings[idx])
+        }) else {
             throw CocoaError(.fileNoSuchFile)
         }
 
-        var updated = await MainActor.run { meetings[existingIndex] }
+        var updated = existing
         updated.duration = duration
         updated.segmentCount = segments.count
         updated.userNotesFilename = userNotes.isEmpty ? nil : "user-notes.json"
@@ -111,10 +114,13 @@ class MeetingStore {
         let transcript = Self.buildMergedTranscript(segments: segments, userNotes: userNotes)
         try await writeRecord(updated, transcript: transcript)
 
+        let dir = meetingDirectory(for: updated)
+        let notesURL = dir.appendingPathComponent("user-notes.json")
         if !userNotes.isEmpty {
-            let dir = meetingDirectory(for: updated)
             let notesData = try JSONEncoder().encode(userNotes)
-            try notesData.write(to: dir.appendingPathComponent("user-notes.json"), options: .atomic)
+            try notesData.write(to: notesURL, options: .atomic)
+        } else if FileManager.default.fileExists(atPath: notesURL.path) {
+            try? FileManager.default.removeItem(at: notesURL)
         }
 
         let finalRecord = updated

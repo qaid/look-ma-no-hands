@@ -772,10 +772,8 @@ struct MeetingRecordTab: View {
     }
 
     private func continueRecording() {
-        let cumulativeTime = totalDuration
         Task {
             await startRecording()
-            liveState.elapsedTime = cumulativeTime
         }
     }
 
