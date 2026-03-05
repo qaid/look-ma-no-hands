@@ -153,7 +153,25 @@ struct MeetingRecordTab: View {
     private var recordingVisualizationView: some View {
         HStack(spacing: 12) {
             if liveState.status == .completed {
-                // Pill-shaped "New" button replaces the record button after completion
+                // Continue recording — primary action
+                Button {
+                    continueRecording()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "mic.badge.plus")
+                            .font(.system(size: 13, weight: .bold))
+                        Text("Continue")
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .frame(height: 36)
+                    .background(Capsule().fill(Color.red))
+                }
+                .buttonStyle(.plain)
+                .help("Continue recording, appending to existing transcript")
+
+                // New recording — secondary action
                 Button {
                     resetForNewRecording()
                 } label: {
@@ -163,10 +181,10 @@ struct MeetingRecordTab: View {
                         Text("New")
                             .font(.system(size: 13, weight: .semibold))
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(.secondary)
                     .padding(.horizontal, 16)
                     .frame(height: 36)
-                    .background(Capsule().fill(Color.red))
+                    .background(Capsule().stroke(Color.secondary, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .help("Start a new recording")
@@ -187,7 +205,7 @@ struct MeetingRecordTab: View {
             // Hidden button for Space shortcut — disabled when note input has focus
             Button("") {
                 if liveState.status == .completed {
-                    resetForNewRecording()
+                    continueRecording()
                 } else {
                     handleRecordingToggle()
                 }
@@ -243,8 +261,13 @@ struct MeetingRecordTab: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 16))
                 .foregroundStyle(.green)
-            Text("Recording saved")
-                .font(.system(size: 14, weight: .medium))
+            if liveState.recordingSessions.count > 1 {
+                Text("Recording saved (\(liveState.recordingSessions.count) sessions)")
+                    .font(.system(size: 14, weight: .medium))
+            } else {
+                Text("Recording saved")
+                    .font(.system(size: 14, weight: .medium))
+            }
             Text(formatTime(totalDuration))
                 .font(.system(size: 13, weight: .medium, design: .monospaced))
                 .foregroundStyle(.secondary)
@@ -664,15 +687,26 @@ struct MeetingRecordTab: View {
         store.isRecording = false
         appDelegate?.isMeetingRecording = false
 
-        // Auto-save to library
+        // Auto-save to library (update existing record if continuing, otherwise create new)
         do {
             let duration = totalDuration
-            let record = try await store.saveRecordedMeeting(
-                segments: liveState.segments,
-                userNotes: liveState.userNotes,
-                duration: duration,
-                type: selectedType
-            )
+            let record: MeetingRecord
+            if let existingID = liveState.lastSavedRecordID {
+                record = try await store.updateRecordedMeeting(
+                    id: existingID,
+                    segments: liveState.segments,
+                    userNotes: liveState.userNotes,
+                    duration: duration
+                )
+            } else {
+                record = try await store.saveRecordedMeeting(
+                    segments: liveState.segments,
+                    userNotes: liveState.userNotes,
+                    duration: duration,
+                    type: selectedType
+                )
+            }
+            liveState.lastSavedRecordID = record.id
             onRecordingFinished(record)
         } catch {
             liveState.statusMessage = "Auto-save failed: \(error.localizedDescription)"
@@ -723,6 +757,7 @@ struct MeetingRecordTab: View {
         liveState.recordingSessions.removeAll()
         liveState.elapsedTime = 0
         liveState.sessionStartDate = nil
+        liveState.lastSavedRecordID = nil
         liveState.statusMessage = "Ready to start"
         liveState.status = .ready
         showNoteAboveIndicator = false
@@ -734,6 +769,14 @@ struct MeetingRecordTab: View {
     private func resetForNewRecording() {
         clearTranscript()
         Task { await startRecording() }
+    }
+
+    private func continueRecording() {
+        let cumulativeTime = totalDuration
+        Task {
+            await startRecording()
+            liveState.elapsedTime = cumulativeTime
+        }
     }
 
     // MARK: - Status Check

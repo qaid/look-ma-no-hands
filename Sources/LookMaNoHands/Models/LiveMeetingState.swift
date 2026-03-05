@@ -62,6 +62,7 @@ class LiveMeetingState {
     var statusMessage = "Ready to start"
     var elapsedTime: TimeInterval = 0
     var sessionStartDate: Date?
+    var lastSavedRecordID: UUID?
     var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
     var isActive = true
 
