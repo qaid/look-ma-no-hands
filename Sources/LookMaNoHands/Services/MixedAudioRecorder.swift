@@ -24,7 +24,6 @@ class MixedAudioRecorder {
     /// Callback for mixed audio chunks (for real-time transcription)
     var onAudioChunk: (([Float]) -> Void)?
 
-
     // MARK: - Initialization
 
     init(chunkDuration: TimeInterval = 5) {
@@ -98,20 +97,16 @@ class MixedAudioRecorder {
         systemAudioRecorder.onAudioChunk = { [weak self] systemChunk in
             guard let self = self else { return }
 
-            Task {
-                // Drain only new mic samples (already resampled to 16kHz, old samples removed)
-                let micChunk = self.microphoneRecorder.drainAvailableSamples()
+            // Drain only new mic samples (already resampled to 16kHz, old samples removed)
+            let micChunk = self.microphoneRecorder.drainAvailableSamples()
 
-                print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
+            print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
 
-                // Mix the chunks
-                let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
+            // Mix the chunks
+            let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
 
-                // Send the mixed chunk to the callback
-                if let onAudioChunk = self.onAudioChunk {
-                    onAudioChunk(mixedChunk)
-                }
-            }
+            // Send the mixed chunk to the callback
+            self.onAudioChunk?(mixedChunk)
         }
     }
 

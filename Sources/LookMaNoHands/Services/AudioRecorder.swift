@@ -78,10 +78,14 @@ class AudioRecorder {
         guard !rawSamples.isEmpty else { return [] }
 
         // Resample to 16kHz if needed
+        let resampled: [Float]
         if abs(inputSampleRate - targetSampleRate) > 0.1 {
-            return resampleToTarget(rawSamples)
+            resampled = resampleToTarget(rawSamples)
+        } else {
+            resampled = rawSamples
         }
-        return rawSamples
+
+        return normalizeAudio(resampled)
     }
 
     /// Get frequency band levels for waveform visualization
