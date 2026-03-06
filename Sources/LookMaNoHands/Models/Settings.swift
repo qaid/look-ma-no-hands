@@ -91,6 +91,8 @@ class Settings: ObservableObject {
     // MARK: - Singleton
 
     static let shared = Settings()
+    /// Prevents recursive didSet when restoring vocabulary from file
+    private var isSuppressingVocabSave = false
     private static let isRunningTests = NSClassFromString("XCTestCase") != nil
         || ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         || ProcessInfo.processInfo.environment["XCTestBundlePath"] != nil
@@ -721,12 +723,25 @@ Now produce the complete meeting notes following the format above. Ensure every 
 
     /// Save custom vocabulary to Application Support directory
     private func saveVocabularyToFile() {
-        let fileURL = Self.vocabularyFileURL
+        guard !isSuppressingVocabSave else { return }
+
+        // Guard against accidentally overwriting a populated file with an empty array
+        if customVocabulary.isEmpty && FileManager.default.fileExists(atPath: Self.vocabularyFileURL.path) {
+            if let existingData = try? Data(contentsOf: Self.vocabularyFileURL), !existingData.isEmpty,
+               let existing = try? JSONDecoder().decode([VocabularyEntry].self, from: existingData),
+               !existing.isEmpty {
+                log("⚠️ Blocked saving empty vocabulary over \(existing.count) existing entries — restoring from file")
+                isSuppressingVocabSave = true
+                customVocabulary = existing
+                isSuppressingVocabSave = false
+                return
+            }
+        }
 
         do {
             let data = try JSONEncoder().encode(customVocabulary)
-            try data.write(to: fileURL, options: .atomic)
-            log("💾 Saved \(customVocabulary.count) vocabulary entries to \(fileURL.path)")
+            try data.write(to: Self.vocabularyFileURL, options: .atomic)
+            log("💾 Saved \(customVocabulary.count) vocabulary entries to \(Self.vocabularyFileURL.path)")
         } catch {
             log("❌ Failed to save vocabulary to file: \(error.localizedDescription)")
         }
@@ -762,6 +777,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         indicatorPosition = .followCursor
         appearanceTheme = .system
         showLaunchConfirmation = true
+        // Delete the vocabulary file first so the save guard doesn't block clearing
+        try? FileManager.default.removeItem(at: Self.vocabularyFileURL)
         customVocabulary = []
         checkForUpdatesOnLaunch = false
         lastUpdateCheckDate = nil
