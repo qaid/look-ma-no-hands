@@ -86,11 +86,13 @@ struct MeetingRecordTab: View {
             setupAudioRecorderCallback()
             checkStatus()
             if liveState.status == .missingPermissions {
-                Settings.shared.pendingScreenRecordingGrant = true
-                UserDefaults.standard.synchronize()
-                appDelegate?.minimizeMeetingWindowForPermission()
-                CGRequestScreenCaptureAccess()
+                requestScreenRecordingPermission()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard Settings.shared.pendingScreenRecordingGrant else { return }
+            checkStatus()
+            appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onDisappear {
             liveState.isActive = false
@@ -615,14 +617,22 @@ struct MeetingRecordTab: View {
 
     // MARK: - Recording Control
 
+    private func requestScreenRecordingPermission() {
+        Settings.shared.pendingScreenRecordingGrant = true
+        UserDefaults.standard.synchronize()
+        appDelegate?.minimizeMeetingWindowForPermission()
+        // Delay permission request so the window hides first, ensuring the
+        // macOS System Settings dialog appears visibly in the foreground
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            CGRequestScreenCaptureAccess()
+        }
+    }
+
     private func handleRecordingToggle() {
         if liveState.isRecording {
             Task { await stopRecording() }
         } else if liveState.status == .missingPermissions {
-            Settings.shared.pendingScreenRecordingGrant = true
-            UserDefaults.standard.synchronize()
-            appDelegate?.minimizeMeetingWindowForPermission()
-            CGRequestScreenCaptureAccess()
+            requestScreenRecordingPermission()
         } else if liveState.canRecord {
             Task { await startRecording() }
         }
