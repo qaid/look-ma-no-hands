@@ -799,13 +799,13 @@ struct MeetingRecordTab: View {
     // MARK: - Callbacks
 
     private func setupTranscriberCallbacks() {
-        continuousTranscriber.onSegmentTranscribed = { [weak liveState] segment in
-            Task { @MainActor in
+        continuousTranscriber.onSegmentTranscribed = { segment in
+            Task { @MainActor [weak liveState] in
                 liveState?.segments.append(segment)
             }
         }
-        continuousTranscriber.onStatusUpdate = { [weak liveState] status in
-            Task { @MainActor in
+        continuousTranscriber.onStatusUpdate = { status in
+            Task { @MainActor [weak liveState] in
                 guard let state = liveState, state.isRecording else { return }
                 state.statusMessage = status
             }
