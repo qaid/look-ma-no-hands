@@ -60,26 +60,28 @@ class AudioRecorder {
         print("AudioRecorder: Started recording")
     }
     
-    /// Get current buffer without stopping recording (for mixing scenarios)
-    /// - Returns: Audio samples as Float array at 16kHz
-    func getCurrentBuffer() -> [Float] {
+    /// Drain buffered microphone samples for mixing, keeping only recent samples for visualization.
+    /// Returns resampled audio at 16kHz. Drained samples are removed from the buffer.
+    func drainAvailableSamples() -> [Float] {
         guard isRecording else { return [] }
 
-        // Thread-safe copy of buffer
-        let bufferCopy = bufferLock.withLock { audioBuffer }
-
-        // Resample to 16kHz if needed
-        let resampled: [Float]
-        if abs(inputSampleRate - targetSampleRate) > 0.1 {
-            resampled = resampleToTarget(bufferCopy)
-        } else {
-            resampled = bufferCopy
+        let rawSamples: [Float] = bufferLock.withLock {
+            // Keep last 2048 samples for frequency visualization
+            let vizSamples = 2048
+            let drainCount = max(0, audioBuffer.count - vizSamples)
+            guard drainCount > 0 else { return [] }
+            let samples = Array(audioBuffer.prefix(drainCount))
+            audioBuffer.removeFirst(drainCount)
+            return samples
         }
 
-        // Normalize audio levels
-        let normalized = normalizeAudio(resampled)
+        guard !rawSamples.isEmpty else { return [] }
 
-        return normalized
+        // Resample to 16kHz if needed
+        if abs(inputSampleRate - targetSampleRate) > 0.1 {
+            return resampleToTarget(rawSamples)
+        }
+        return rawSamples
     }
 
     /// Get frequency band levels for waveform visualization

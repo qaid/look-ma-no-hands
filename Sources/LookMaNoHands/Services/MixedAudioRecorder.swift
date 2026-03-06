@@ -24,8 +24,6 @@ class MixedAudioRecorder {
     /// Callback for mixed audio chunks (for real-time transcription)
     var onAudioChunk: (([Float]) -> Void)?
 
-    /// Track how many mic samples we've already processed
-    private var micSamplesProcessed: Int = 0
 
     // MARK: - Initialization
 
@@ -51,9 +49,6 @@ class MixedAudioRecorder {
             print("MixedAudioRecorder: Already recording")
             return
         }
-
-        // Reset tracking
-        micSamplesProcessed = 0
 
         // Start both recorders
         // Note: microphoneRecorder.startRecording() will activate the audio session
@@ -89,7 +84,6 @@ class MixedAudioRecorder {
         _ = microphoneRecorder.stopRecording()
 
         isRecording = false
-        micSamplesProcessed = 0
 
         print("MixedAudioRecorder: Stopped recording")
 
@@ -99,41 +93,19 @@ class MixedAudioRecorder {
     // MARK: - Audio Mixing
 
     /// Setup callback from system audio recorder
-    /// When system audio has a 30-second chunk, mix it with corresponding microphone audio
+    /// When system audio has a chunk, drain corresponding microphone audio and mix
     private func setupSystemAudioCallback() {
         systemAudioRecorder.onAudioChunk = { [weak self] systemChunk in
             guard let self = self else { return }
 
             Task {
-                // Get current full microphone buffer
-                let fullMicBuffer = self.microphoneRecorder.getCurrentBuffer()
+                // Drain only new mic samples (already resampled to 16kHz, old samples removed)
+                let micChunk = self.microphoneRecorder.drainAvailableSamples()
 
-                print("MixedAudioRecorder: System chunk arrived: \(systemChunk.count) samples")
-                print("MixedAudioRecorder: Microphone buffer size: \(fullMicBuffer.count) samples")
-                print("MixedAudioRecorder: Mic samples already processed: \(self.micSamplesProcessed)")
-
-                // Extract the portion of mic audio that corresponds to this system chunk
-                // (from where we left off to the length of the system chunk)
-                let micChunkStart = self.micSamplesProcessed
-                let micChunkEnd = min(micChunkStart + systemChunk.count, fullMicBuffer.count)
-                let micChunk: [Float]
-
-                if micChunkStart < fullMicBuffer.count {
-                    micChunk = Array(fullMicBuffer[micChunkStart..<micChunkEnd])
-                    print("MixedAudioRecorder: Extracted mic chunk from \(micChunkStart) to \(micChunkEnd)")
-                } else {
-                    // If we don't have enough mic audio yet, use silence
-                    micChunk = []
-                    print("MixedAudioRecorder: WARNING - Not enough mic audio! Using silence.")
-                }
-
-                // Update processed count
-                self.micSamplesProcessed = micChunkEnd
+                print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
 
                 // Mix the chunks
                 let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
-
-                print("MixedAudioRecorder: Mixed chunk - system: \(systemChunk.count) samples, mic: \(micChunk.count) samples → \(mixedChunk.count) mixed")
 
                 // Send the mixed chunk to the callback
                 if let onAudioChunk = self.onAudioChunk {

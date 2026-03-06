@@ -51,7 +51,6 @@ class LiveMeetingState {
     var status: MeetingStatus = .ready
     var isRecording = false
     var isPaused = false
-    var currentTranscript = ""
     var segments: [TranscriptSegment] = [] {
         didSet { isTimelineDirty = true }
     }

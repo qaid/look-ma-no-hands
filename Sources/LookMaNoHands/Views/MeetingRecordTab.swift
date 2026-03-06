@@ -728,10 +728,13 @@ struct MeetingRecordTab: View {
 
     private func startAudioLevelUpdates() {
         stopAudioLevelUpdates()
-        let recorder = mixedAudioRecorder
-        let state = liveState
+        weak var weakRecorder: MixedAudioRecorder? = mixedAudioRecorder
+        weak var weakState: LiveMeetingState? = liveState
         audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { t in
-            guard t.isValid, state.isActive else { t.invalidate(); return }
+            guard let recorder = weakRecorder, let state = weakState, t.isValid, state.isActive else {
+                t.invalidate()
+                return
+            }
             let bands = recorder.getFrequencyBands(bandCount: 40)
             Task { @MainActor in
                 guard state.isActive else { return }
@@ -798,16 +801,16 @@ struct MeetingRecordTab: View {
     // MARK: - Callbacks
 
     private func setupTranscriberCallbacks() {
+        weak var weakState: LiveMeetingState? = liveState
         continuousTranscriber.onSegmentTranscribed = { segment in
             Task { @MainActor in
-                self.liveState.segments.append(segment)
+                weakState?.segments.append(segment)
             }
         }
         continuousTranscriber.onStatusUpdate = { status in
             Task { @MainActor in
-                if self.liveState.isRecording {
-                    self.liveState.statusMessage = status
-                }
+                guard let state = weakState, state.isRecording else { return }
+                state.statusMessage = status
             }
         }
     }
