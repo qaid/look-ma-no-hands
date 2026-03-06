@@ -604,9 +604,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         meetingWindow?.orderOut(nil)
     }
 
-    /// Restore the meeting window after the user returns from the permission flow
+    /// Restore the meeting window after the user returns from the permission flow.
+    /// Guards against redundant activation when the window is already visible.
     func restoreMeetingWindowAfterPermission() {
-        meetingWindow?.makeKeyAndOrderFront(nil)
+        guard let window = meetingWindow, !window.isVisible else { return }
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
