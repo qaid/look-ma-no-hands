@@ -46,6 +46,9 @@ class ContinuousTranscriber {
     /// Total samples processed in current session
     private var totalSamplesProcessed: Int = 0
 
+    /// Accumulated time offset from previous sessions (for Continue Recording)
+    private var timeOffset: TimeInterval = 0
+
     /// Queue for processing audio chunks
     private let processingQueue = DispatchQueue(label: "com.lookmanohands.transcription", qos: .userInitiated)
 
@@ -97,6 +100,9 @@ class ContinuousTranscriber {
         if !audioBuffer.isEmpty {
             await processChunk(audioBuffer, isFinal: true)
         }
+
+        // Accumulate time offset so next session's timestamps continue from here
+        timeOffset += Double(totalSamplesProcessed) / sampleRate
 
         isTranscribing = false
         sessionStartTime = nil
@@ -192,7 +198,7 @@ class ContinuousTranscriber {
             }
 
             // Calculate timing for this segment
-            let startTime = Double(totalSamplesProcessed) / sampleRate
+            let startTime = Double(totalSamplesProcessed) / sampleRate + timeOffset
             let endTime = startTime + duration
 
             let segment = TranscriptSegment(
@@ -276,6 +282,7 @@ class ContinuousTranscriber {
     func clearSegments() {
         segments.removeAll()
         totalSamplesProcessed = 0
+        timeOffset = 0
         print("ContinuousTranscriber: Cleared all segments")
     }
 
