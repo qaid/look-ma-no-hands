@@ -55,7 +55,7 @@ jobs:
 
       - name: Notarize DMG
         if: env.HAS_SIGNING_CERT == 'true'
-        timeout-minutes: 15
+        timeout-minutes: 30
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
