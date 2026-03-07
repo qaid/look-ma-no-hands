@@ -71,42 +71,9 @@ if [ -n "${DEVELOPER_ID_APPLICATION}" ]; then
     codesign --force --sign "${DEVELOPER_ID_APPLICATION}" "${BUILD_DIR}/${DMG_NAME}"
 fi
 
-# Notarize and staple if credentials are provided
-if [ -n "${DEVELOPER_ID_APPLICATION}" ] && [ -n "${APPLE_ID}" ] && [ -n "${APPLE_TEAM_ID}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD}" ]; then
-    echo "Submitting DMG for notarization..."
-    NOTARY_OUTPUT=$(xcrun notarytool submit "${BUILD_DIR}/${DMG_NAME}" \
-        --apple-id "${APPLE_ID}" \
-        --team-id "${APPLE_TEAM_ID}" \
-        --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
-        --wait \
-        --timeout 30m 2>&1) || {
-        echo "❌ Notarization failed"
-        echo "${NOTARY_OUTPUT}"
-        # Extract submission ID and fetch detailed log
-        SUBMISSION_ID=$(echo "${NOTARY_OUTPUT}" | grep -o 'id: [0-9a-f-]*' | head -1 | cut -d' ' -f2)
-        if [ -n "${SUBMISSION_ID}" ]; then
-            echo "Fetching notarization log for submission ${SUBMISSION_ID}..."
-            xcrun notarytool log "${SUBMISSION_ID}" \
-                --apple-id "${APPLE_ID}" \
-                --team-id "${APPLE_TEAM_ID}" \
-                --password "${APPLE_APP_SPECIFIC_PASSWORD}" 2>&1 || true
-        else
-            echo "Could not extract submission ID from notarytool output"
-        fi
-        exit 1
-    }
-    echo "${NOTARY_OUTPUT}"
-
-    echo "Stapling notarization ticket to DMG..."
-    xcrun stapler staple "${BUILD_DIR}/${DMG_NAME}"
-
-    echo "Verifying notarization..."
-    spctl --assess --type open --context context:primary-signature "${BUILD_DIR}/${DMG_NAME}"
-    echo "✅ Notarization verified"
-else
-    if [ -n "${DEVELOPER_ID_APPLICATION}" ]; then
-        echo "Notarization credentials not set — skipping notarization (APPLE_ID, APPLE_TEAM_ID, APPLE_APP_SPECIFIC_PASSWORD required)"
-    fi
+# Notarization is handled separately (see notarize-dmg.sh or CI workflow)
+if [ -n "${DEVELOPER_ID_APPLICATION}" ]; then
+    echo "DMG is Developer ID signed. Run scripts/notarize-dmg.sh to notarize."
 fi
 
 echo "DMG created: ${BUILD_DIR}/${DMG_NAME}"

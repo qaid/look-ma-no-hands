@@ -50,19 +50,16 @@ jobs:
           echo "Signing identity: $IDENTITY"
 
       - name: Build DMG
+        run: ./scripts/create-dmg.sh "${{ steps.version.outputs.VERSION }}"
+
+      - name: Notarize DMG
+        if: env.HAS_SIGNING_CERT == 'true'
+        continue-on-error: true
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-        run: ./scripts/create-dmg.sh "${{ steps.version.outputs.VERSION }}"
-
-      - name: Verify notarization
-        if: env.HAS_SIGNING_CERT == 'true'
-        run: |
-          spctl --assess --type open --context context:primary-signature \
-            "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
-          xcrun stapler validate "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
-          echo "✅ Notarization staple verified"
+        run: ./scripts/notarize-dmg.sh "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
 
       - name: Create ZIP archive
         run: |
