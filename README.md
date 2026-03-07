@@ -11,7 +11,8 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 | |  | |
 |:--|:--|:--|
 | ✨ | **[Features](#-features)** | Voice dictation, meeting transcription, and core capabilities |
-| 🚀 | **[Quick Start](#-quick-start)** | Install, download a model, and run in under 5 minutes |
+| 📦 | **[Install](#-install)** | Homebrew, direct download, or build from source |
+| 🚀 | **[Quick Start](#-quick-start)** | Download a model, grant permissions, and run in under 5 minutes |
 | 🎯 | **[Usage](#-usage)** | Hotkey dictation, menu bar control, meeting recording, and settings |
 | ⚡ | **[Performance](#-performance)** | Model comparison and Core ML acceleration benchmarks |
 | 🛠️ | **[Requirements](#-requirements)** | macOS compatibility, hardware, and disk space |
@@ -61,24 +62,34 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 - **Automatic model management**: Download and switch between Whisper models from the UI
 - **Persistent vocabulary**: Custom vocabulary stored locally and survives app reinstalls
 
+## 📦 Install
+
+### Option 1: Homebrew (recommended)
+
+```bash
+brew tap qaid/lmnh
+brew install --cask look-ma-no-hands
+```
+
+### Option 2: Direct Download
+
+Download the latest signed and notarized `.dmg` from [GitHub Releases](https://github.com/qaid/look-ma-no-hands/releases/latest). Open the DMG and drag the app to your Applications folder.
+
+### Option 3: Build from Source
+
+```bash
+git clone https://github.com/qaid/look-ma-no-hands.git
+cd look-ma-no-hands
+./scripts/deploy.sh
+```
+
 ## 🚀 Quick Start
 
 <p align="center">
   <img src="app-screenshots/onboarding-welcome.png" alt="Onboarding welcome screen" width="500">
 </p>
 
-### 1. Install Dependencies
-
-```bash
-# Clone the repository
-git clone https://github.com/qaid/lookmanohands.git
-cd lookmanohands
-
-# Build
-swift build -c release
-```
-
-### 2. Download Whisper Model
+### 1. Download Whisper Model
 
 **Easy Way**: Look Ma No Hands will prompt you to download a model on first launch. Choose "tiny" for best speed.
 

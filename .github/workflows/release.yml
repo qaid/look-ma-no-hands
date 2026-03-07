@@ -112,6 +112,37 @@ jobs:
             build/sbom.spdx.json
           generate_release_notes: true
 
+      - name: Update Homebrew tap
+        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          # Extract SHA256 of the ZIP from checksums.txt
+          ZIP_SHA256=$(grep "LookMaNoHands-${VERSION}.zip" build/checksums.txt | awk '{print $1}')
+          if [ -z "${ZIP_SHA256}" ]; then
+            echo "Error: Could not find SHA256 for LookMaNoHands-${VERSION}.zip in checksums.txt"
+            exit 1
+          fi
+          echo "ZIP SHA256: ${ZIP_SHA256}"
+
+          # Clone the Homebrew tap repo
+          git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/qaid/homebrew-lmnh.git" /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+
+          # Update version and SHA256 in the Cask formula
+          sed -i '' "s/version \".*\"/version \"${VERSION}\"/" Casks/look-ma-no-hands.rb
+          sed -i '' "s/sha256 \".*\"/sha256 \"${ZIP_SHA256}\"/" Casks/look-ma-no-hands.rb
+
+          # Commit and push
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/look-ma-no-hands.rb
+          git diff --cached --quiet && echo "No changes to commit" || {
+            git commit -m "Update to v${VERSION}"
+            git push
+          }
+
       - name: Cleanup keychain
         if: always()
         run: |

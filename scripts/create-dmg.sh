@@ -21,8 +21,10 @@ mkdir -p "${APP_PATH}/Contents/Resources"
 cp ".build/release/LookMaNoHands" "${APP_PATH}/Contents/MacOS/LookMaNoHands"
 chmod +x "${APP_PATH}/Contents/MacOS/LookMaNoHands"
 
-# Copy Info.plist
+# Copy Info.plist and inject version from build argument
 cp "Resources/Info.plist" "${APP_PATH}/Contents/Info.plist"
+plutil -replace CFBundleShortVersionString -string "${VERSION}" "${APP_PATH}/Contents/Info.plist"
+plutil -replace CFBundleVersion -string "${VERSION}" "${APP_PATH}/Contents/Info.plist"
 
 # Copy icon
 if [ -f "Resources/AppIcon.icns" ]; then
@@ -35,7 +37,6 @@ if [ -n "${DEVELOPER_ID_APPLICATION}" ]; then
     codesign --force --options runtime \
         --sign "${DEVELOPER_ID_APPLICATION}" \
         --entitlements "${ENTITLEMENTS}" \
-        --deep \
         "${APP_PATH}"
     # Verify signature
     codesign --verify --deep --strict "${APP_PATH}"
@@ -73,12 +74,28 @@ fi
 # Notarize and staple if credentials are provided
 if [ -n "${DEVELOPER_ID_APPLICATION}" ] && [ -n "${APPLE_ID}" ] && [ -n "${APPLE_TEAM_ID}" ] && [ -n "${APPLE_APP_SPECIFIC_PASSWORD}" ]; then
     echo "Submitting DMG for notarization..."
-    xcrun notarytool submit "${BUILD_DIR}/${DMG_NAME}" \
+    NOTARY_OUTPUT=$(xcrun notarytool submit "${BUILD_DIR}/${DMG_NAME}" \
         --apple-id "${APPLE_ID}" \
         --team-id "${APPLE_TEAM_ID}" \
         --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
         --wait \
-        --timeout 30m
+        --timeout 30m 2>&1) || {
+        echo "❌ Notarization failed"
+        echo "${NOTARY_OUTPUT}"
+        # Extract submission ID and fetch detailed log
+        SUBMISSION_ID=$(echo "${NOTARY_OUTPUT}" | grep -o 'id: [0-9a-f-]*' | head -1 | cut -d' ' -f2)
+        if [ -n "${SUBMISSION_ID}" ]; then
+            echo "Fetching notarization log for submission ${SUBMISSION_ID}..."
+            xcrun notarytool log "${SUBMISSION_ID}" \
+                --apple-id "${APPLE_ID}" \
+                --team-id "${APPLE_TEAM_ID}" \
+                --password "${APPLE_APP_SPECIFIC_PASSWORD}" 2>&1 || true
+        else
+            echo "Could not extract submission ID from notarytool output"
+        fi
+        exit 1
+    }
+    echo "${NOTARY_OUTPUT}"
 
     echo "Stapling notarization ticket to DMG..."
     xcrun stapler staple "${BUILD_DIR}/${DMG_NAME}"
