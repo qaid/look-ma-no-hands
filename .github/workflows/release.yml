@@ -12,6 +12,9 @@ permissions:
 jobs:
   build-and-release:
     runs-on: macos-14
+    env:
+      HAS_SIGNING_CERT: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION != '' }}
+      HAS_HOMEBREW_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -21,7 +24,7 @@ jobs:
 
       - name: Import Developer ID certificate
         # Skip gracefully when secrets are not configured (e.g. forks)
-        if: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION != '' }}
+        if: env.HAS_SIGNING_CERT == 'true'
         env:
           CERTIFICATE_P12: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION }}
           CERTIFICATE_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION_PASSWORD }}
@@ -54,7 +57,7 @@ jobs:
         run: ./scripts/create-dmg.sh "${{ steps.version.outputs.VERSION }}"
 
       - name: Verify notarization
-        if: ${{ secrets.APPLE_DEVELOPER_ID_APPLICATION != '' }}
+        if: env.HAS_SIGNING_CERT == 'true'
         run: |
           spctl --assess --type open --context context:primary-signature \
             "build/Look Ma No Hands ${{ steps.version.outputs.VERSION }}.dmg"
@@ -113,7 +116,7 @@ jobs:
           generate_release_notes: true
 
       - name: Update Homebrew tap
-        if: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+        if: env.HAS_HOMEBREW_TOKEN == 'true'
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ steps.version.outputs.VERSION }}
