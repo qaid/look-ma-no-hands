@@ -597,9 +597,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("✅ Meeting Transcription window created and displayed")
     }
 
-    /// Minimize the meeting window so macOS System Settings permission prompt is visible
+    /// Hide the meeting window so macOS System Settings permission prompt is visible.
+    /// Uses orderOut instead of miniaturize because the app runs as a menu bar app
+    /// with .accessory activation policy — miniaturize hides to an invisible Dock.
     func minimizeMeetingWindowForPermission() {
-        meetingWindow?.miniaturize(nil)
+        meetingWindow?.orderOut(nil)
+    }
+
+    /// Restore the meeting window after the user returns from the permission flow.
+    /// Guards against redundant activation when the window is already visible.
+    func restoreMeetingWindowAfterPermission() {
+        guard let window = meetingWindow, !window.isVisible else { return }
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     // MARK: - Permission Checks

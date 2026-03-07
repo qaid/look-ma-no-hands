@@ -34,6 +34,7 @@ struct MeetingRecordTab: View {
     @State private var lastSubmittedNoteID: UUID?
     @State private var noteAboveCount = 0
     @State private var scrollViewHeight: CGFloat = 0
+    @State private var permissionWorkItem: DispatchWorkItem?
 
     // MARK: - Init
 
@@ -86,14 +87,18 @@ struct MeetingRecordTab: View {
             setupAudioRecorderCallback()
             checkStatus()
             if liveState.status == .missingPermissions {
-                Settings.shared.pendingScreenRecordingGrant = true
-                UserDefaults.standard.synchronize()
-                appDelegate?.minimizeMeetingWindowForPermission()
-                CGRequestScreenCaptureAccess()
+                requestScreenRecordingPermission()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            guard Settings.shared.pendingScreenRecordingGrant else { return }
+            checkStatus()
+            appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onDisappear {
             liveState.isActive = false
+            permissionWorkItem?.cancel()
+            permissionWorkItem = nil
             stopAudioLevelUpdates()
             if liveState.isRecording {
                 Task { await stopRecording() }
@@ -615,14 +620,24 @@ struct MeetingRecordTab: View {
 
     // MARK: - Recording Control
 
+    private func requestScreenRecordingPermission() {
+        Settings.shared.pendingScreenRecordingGrant = true
+        UserDefaults.standard.synchronize()
+        appDelegate?.minimizeMeetingWindowForPermission()
+        // Delay permission request so the window hides first, ensuring the
+        // macOS System Settings dialog appears visibly in the foreground.
+        // Use a cancellable work item so disappearing the view cancels the request.
+        permissionWorkItem?.cancel()
+        let workItem = DispatchWorkItem { CGRequestScreenCaptureAccess() }
+        permissionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+    }
+
     private func handleRecordingToggle() {
         if liveState.isRecording {
             Task { await stopRecording() }
         } else if liveState.status == .missingPermissions {
-            Settings.shared.pendingScreenRecordingGrant = true
-            UserDefaults.standard.synchronize()
-            appDelegate?.minimizeMeetingWindowForPermission()
-            CGRequestScreenCaptureAccess()
+            requestScreenRecordingPermission()
         } else if liveState.canRecord {
             Task { await startRecording() }
         }
