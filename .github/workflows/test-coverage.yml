@@ -1,13 +1,6 @@
 name: Test Coverage
 
 on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - 'LICENSE'
-      - '.gitignore'
   pull_request:
     branches: [ main ]
     paths-ignore:
