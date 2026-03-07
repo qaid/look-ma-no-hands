@@ -90,6 +90,8 @@ if [ -n "${DEVELOPER_ID_APPLICATION}" ] && [ -n "${APPLE_ID}" ] && [ -n "${APPLE
                 --apple-id "${APPLE_ID}" \
                 --team-id "${APPLE_TEAM_ID}" \
                 --password "${APPLE_APP_SPECIFIC_PASSWORD}" 2>&1 || true
+        else
+            echo "Could not extract submission ID from notarytool output"
         fi
         exit 1
     }
