@@ -184,7 +184,7 @@ class MeetingStore {
         var insertPositions = Set<Int>()
         for offset in changes {
             let ratio = min(max(offset / segmentDuration, 0), 1)
-            let wordIndex = max(1, Int((ratio * Double(words.count)).rounded()))
+            let wordIndex = min(max(1, Int((ratio * Double(words.count)).rounded())), words.count - 1)
             insertPositions.insert(wordIndex)
         }
 

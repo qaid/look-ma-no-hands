@@ -50,7 +50,9 @@ class ContinuousTranscriber {
     /// Chunk size in seconds (default 5s for dictation, 10s recommended for meetings)
     private let chunkDuration: TimeInterval
 
-    /// Minimum audio energy threshold for silence detection
+    /// Minimum audio energy threshold for early chunk processing (higher = less sensitive).
+    /// Intentionally higher than detectPauses' threshold (0.005) because this controls
+    /// when to flush the buffer early, where false positives waste processing time.
     private let silenceThreshold: Float = 0.01
 
     /// Duration of silence (in seconds) before processing chunk early
@@ -71,8 +73,10 @@ class ContinuousTranscriber {
     /// Queue for processing audio chunks
     private let processingQueue = DispatchQueue(label: "com.lookmanohands.transcription", qos: .userInitiated)
 
-    /// Source classification for the chunk currently being processed
-    private var currentChunkSource: DiarizationSource = .unknown
+    /// Accumulated source classifications for chunks in the current audio buffer.
+    /// Each entry records (sampleCount, source) so we can pick the dominant source
+    /// when the buffer is finally processed (multiple small chunks may fill one buffer).
+    private var sourceAccumulator: [(sampleCount: Int, source: DiarizationSource)] = []
 
     /// Callback for new transcript segments
     var onSegmentTranscribed: ((TranscriptSegment) -> Void)?
@@ -105,6 +109,7 @@ class ContinuousTranscriber {
         sessionStartTime = Date()
         totalSamplesProcessed = 0
         audioBuffer.removeAll()
+        sourceAccumulator.removeAll()
         // Don't remove existing segments - preserve them to append new transcription
 
         print("ContinuousTranscriber: Started new session")
@@ -163,7 +168,7 @@ class ContinuousTranscriber {
 
     /// Add a source-classified audio chunk for processing
     func addAudio(_ chunk: AudioChunkWithSource) async {
-        currentChunkSource = chunk.source
+        sourceAccumulator.append((sampleCount: chunk.samples.count, source: chunk.source))
         await addAudio(chunk.samples)
     }
 
@@ -208,8 +213,9 @@ class ContinuousTranscriber {
 
         onStatusUpdate?("Transcribing...")
 
-        // Capture source for this chunk before any async suspension
-        let chunkSource = currentChunkSource
+        // Resolve the dominant source from accumulated classifications weighted by sample count
+        let chunkSource = resolveDominantSource()
+        sourceAccumulator.removeAll()
 
         // Detect speaker changes for remote/mixed audio before transcribing
         let pauseOffsets: [TimeInterval]
@@ -233,7 +239,6 @@ class ContinuousTranscriber {
             guard !dedupedText.isEmpty else {
                 print("ContinuousTranscriber: Segment fully duplicated, skipping")
                 totalSamplesProcessed += samples.count
-                currentChunkSource = .unknown
                 return
             }
 
@@ -252,7 +257,6 @@ class ContinuousTranscriber {
 
             segments.append(segment)
             totalSamplesProcessed += samples.count
-            currentChunkSource = .unknown
 
             print("ContinuousTranscriber: Transcribed segment [\(String(format: "%.1f", startTime))s - \(String(format: "%.1f", endTime))s]: \"\(text)\"")
 
@@ -260,10 +264,22 @@ class ContinuousTranscriber {
             onStatusUpdate?("Recording")
 
         } catch {
-            currentChunkSource = .unknown
             print("ContinuousTranscriber: Transcription error - \(error)")
             onStatusUpdate?("Transcription error: \(error.localizedDescription)")
         }
+    }
+
+    /// Resolve the dominant diarization source from accumulated chunk classifications.
+    /// Uses sample-count-weighted voting so longer chunks have proportional influence.
+    private func resolveDominantSource() -> DiarizationSource {
+        guard !sourceAccumulator.isEmpty else { return .unknown }
+
+        var weights: [DiarizationSource: Int] = [:]
+        for entry in sourceAccumulator {
+            weights[entry.source, default: 0] += entry.sampleCount
+        }
+
+        return weights.max(by: { $0.value < $1.value })?.key ?? .unknown
     }
 
     // MARK: - Pause Detection

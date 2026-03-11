@@ -142,9 +142,12 @@ class MixedAudioRecorder {
             // Mix the chunks
             let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
 
-            // Send the mixed chunk to both callbacks
-            self.onAudioChunk?(mixedChunk)
-            self.onAudioChunkWithSource?(AudioChunkWithSource(samples: mixedChunk, source: source))
+            // Send the mixed chunk via the source-aware callback if set, otherwise fall back
+            if self.onAudioChunkWithSource != nil {
+                self.onAudioChunkWithSource?(AudioChunkWithSource(samples: mixedChunk, source: source))
+            } else {
+                self.onAudioChunk?(mixedChunk)
+            }
         }
     }
 
