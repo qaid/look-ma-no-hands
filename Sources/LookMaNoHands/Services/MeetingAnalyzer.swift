@@ -28,6 +28,23 @@ class MeetingAnalyzer {
 IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These are the user's own observations, questions, and action items captured during the meeting. In your output, include a dedicated "## My Notes" section that lists each user note with its timestamp, preserving the user's original wording. Do not mix user notes into the main analysis prose.
 """
 
+    /// Instruction suffix appended when transcript contains speaker diarization markers
+    static let diarizationInstructionSuffix = """
+
+SPEAKER DIARIZATION RULES: The transcript uses the following markers for speaker attribution:
+- [Me] — spoken by the local user (the person who recorded this meeting)
+- [Remote] — spoken by one or more remote participants
+- [SPEAKER_CHANGE] — a likely turn change among remote participants (a pause was detected)
+
+When attributing speech:
+1. [Me] always refers to the local user recording the meeting.
+2. [SPEAKER_CHANGE] inside a [Remote] block suggests a new speaker may have started — but not every change means a new person; use context to decide.
+3. Infer speaker names from greetings, introductions, or context clues in the transcript when possible.
+4. Assign consistent labels throughout (e.g., if "Sarah" is introduced, use "Sarah" not "Remote Speaker 1" afterwards).
+5. Fall back to "Remote Speaker 1", "Remote Speaker 2", etc. when names are not identifiable.
+6. Do not manufacture content — only attribute what is clearly in the transcript.
+"""
+
     /// Split the prompt into a system role and a user prompt.
     ///
     /// When the prompt template contains `[TRANSCRIPTION_PLACEHOLDER]`:
@@ -59,6 +76,12 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
         let hasNotes = transcript.contains("[USER NOTE @")
         if hasNotes {
             system += noteInstructionSuffix
+        }
+
+        // Append diarization instructions when speaker markers are present
+        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Remote]")
+        if hasDiarization {
+            system += diarizationInstructionSuffix
         }
 
         return SplitPrompt(

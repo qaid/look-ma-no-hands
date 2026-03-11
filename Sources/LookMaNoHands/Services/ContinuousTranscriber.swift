@@ -1,5 +1,6 @@
 import Foundation
 import AVFoundation
+import Accelerate
 
 /// Segment of transcribed audio with timing information
 struct TranscriptSegment {
@@ -7,6 +8,24 @@ struct TranscriptSegment {
     let startTime: TimeInterval
     let endTime: TimeInterval
     let timestamp: Date
+    let source: DiarizationSource
+    let speakerChangeOffsets: [TimeInterval]
+
+    init(
+        text: String,
+        startTime: TimeInterval,
+        endTime: TimeInterval,
+        timestamp: Date,
+        source: DiarizationSource = .unknown,
+        speakerChangeOffsets: [TimeInterval] = []
+    ) {
+        self.text = text
+        self.startTime = startTime
+        self.endTime = endTime
+        self.timestamp = timestamp
+        self.source = source
+        self.speakerChangeOffsets = speakerChangeOffsets
+    }
 }
 
 /// Service for continuous transcription of long-form audio
@@ -31,7 +50,9 @@ class ContinuousTranscriber {
     /// Chunk size in seconds (default 5s for dictation, 10s recommended for meetings)
     private let chunkDuration: TimeInterval
 
-    /// Minimum audio energy threshold for silence detection
+    /// Minimum audio energy threshold for early chunk processing (higher = less sensitive).
+    /// Intentionally higher than detectPauses' threshold (0.005) because this controls
+    /// when to flush the buffer early, where false positives waste processing time.
     private let silenceThreshold: Float = 0.01
 
     /// Duration of silence (in seconds) before processing chunk early
@@ -51,6 +72,11 @@ class ContinuousTranscriber {
 
     /// Queue for processing audio chunks
     private let processingQueue = DispatchQueue(label: "com.lookmanohands.transcription", qos: .userInitiated)
+
+    /// Accumulated source classifications for chunks in the current audio buffer.
+    /// Each entry records (sampleCount, source) so we can pick the dominant source
+    /// when the buffer is finally processed (multiple small chunks may fill one buffer).
+    private var sourceAccumulator: [(sampleCount: Int, source: DiarizationSource)] = []
 
     /// Callback for new transcript segments
     var onSegmentTranscribed: ((TranscriptSegment) -> Void)?
@@ -83,6 +109,7 @@ class ContinuousTranscriber {
         sessionStartTime = Date()
         totalSamplesProcessed = 0
         audioBuffer.removeAll()
+        sourceAccumulator.removeAll()
         // Don't remove existing segments - preserve them to append new transcription
 
         print("ContinuousTranscriber: Started new session")
@@ -139,6 +166,12 @@ class ContinuousTranscriber {
         }
     }
 
+    /// Add a source-classified audio chunk for processing
+    func addAudio(_ chunk: AudioChunkWithSource) async {
+        sourceAccumulator.append((sampleCount: chunk.samples.count, source: chunk.source))
+        await addAudio(chunk.samples)
+    }
+
     // MARK: - Chunk Processing
 
     /// Process the next chunk from the buffer
@@ -180,6 +213,18 @@ class ContinuousTranscriber {
 
         onStatusUpdate?("Transcribing...")
 
+        // Resolve the dominant source from accumulated classifications weighted by sample count
+        let chunkSource = resolveDominantSource()
+        sourceAccumulator.removeAll()
+
+        // Detect speaker changes for remote/mixed audio before transcribing
+        let pauseOffsets: [TimeInterval]
+        if chunkSource == .remote || chunkSource == .mixed {
+            pauseOffsets = detectPauses(in: samples)
+        } else {
+            pauseOffsets = []
+        }
+
         do {
             // Transcribe the chunk
             let text = try await whisperService.transcribe(samples: samples)
@@ -205,7 +250,9 @@ class ContinuousTranscriber {
                 text: dedupedText,
                 startTime: startTime,
                 endTime: endTime,
-                timestamp: Date()
+                timestamp: Date(),
+                source: chunkSource,
+                speakerChangeOffsets: pauseOffsets
             )
 
             segments.append(segment)
@@ -220,6 +267,75 @@ class ContinuousTranscriber {
             print("ContinuousTranscriber: Transcription error - \(error)")
             onStatusUpdate?("Transcription error: \(error.localizedDescription)")
         }
+    }
+
+    /// Resolve the dominant diarization source from accumulated chunk classifications.
+    /// Uses sample-count-weighted voting so longer chunks have proportional influence.
+    private func resolveDominantSource() -> DiarizationSource {
+        guard !sourceAccumulator.isEmpty else { return .unknown }
+
+        var weights: [DiarizationSource: Int] = [:]
+        for entry in sourceAccumulator {
+            weights[entry.source, default: 0] += entry.sampleCount
+        }
+
+        return weights.max(by: { $0.value < $1.value })?.key ?? .unknown
+    }
+
+    // MARK: - Pause Detection
+
+    /// Detect silence gaps >= 500ms in a chunk that indicate potential speaker changes.
+    /// Returns offsets (relative to chunk start, in seconds) at the midpoint of each detected pause.
+    func detectPauses(
+        in samples: [Float],
+        minPauseDuration: TimeInterval = 0.5,
+        silenceThreshold: Float = 0.005
+    ) -> [TimeInterval] {
+        let windowSize = Int(0.05 * sampleRate)  // 50ms analysis windows
+        guard samples.count >= windowSize else { return [] }
+
+        var pauseOffsets: [TimeInterval] = []
+        var silenceStartIndex: Int? = nil
+
+        var windowIndex = 0
+        while windowIndex + windowSize <= samples.count {
+            let window = Array(samples[windowIndex..<(windowIndex + windowSize)])
+
+            var rms: Float = 0
+            vDSP_rmsqv(window, 1, &rms, vDSP_Length(window.count))
+
+            if rms < silenceThreshold {
+                if silenceStartIndex == nil {
+                    silenceStartIndex = windowIndex
+                }
+            } else {
+                if let startIdx = silenceStartIndex {
+                    let pauseSamples = windowIndex - startIdx
+                    let pauseDuration = Double(pauseSamples) / sampleRate
+                    if pauseDuration >= minPauseDuration {
+                        let midSample = startIdx + pauseSamples / 2
+                        let midOffset = Double(midSample) / sampleRate
+                        pauseOffsets.append(midOffset)
+                    }
+                    silenceStartIndex = nil
+                }
+            }
+
+            windowIndex += windowSize
+        }
+
+        // Handle trailing silence
+        if let startIdx = silenceStartIndex {
+            let pauseSamples = samples.count - startIdx
+            let pauseDuration = Double(pauseSamples) / sampleRate
+            if pauseDuration >= minPauseDuration {
+                let midSample = startIdx + pauseSamples / 2
+                let midOffset = Double(midSample) / sampleRate
+                pauseOffsets.append(midOffset)
+            }
+        }
+
+        return pauseOffsets
     }
 
     // MARK: - Segment Deduplication

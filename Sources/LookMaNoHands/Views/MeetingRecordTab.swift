@@ -386,6 +386,18 @@ struct MeetingRecordTab: View {
                                         .foregroundColor(.secondary)
                                         .frame(width: 60, alignment: .leading)
 
+                                    if segment.source != .unknown {
+                                        Text(segment.source == .local ? "Me" : "Remote")
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(
+                                                Capsule()
+                                                    .fill(segment.source == .local ? Color.blue : Color.green)
+                                            )
+                                    }
+
                                     Text(segment.text)
                                         .font(.system(size: 16))
                                         .textSelection(.enabled)
@@ -828,7 +840,7 @@ struct MeetingRecordTab: View {
     }
 
     private func setupAudioRecorderCallback() {
-        mixedAudioRecorder.onAudioChunk = { [weak continuousTranscriber] chunk in
+        mixedAudioRecorder.onAudioChunkWithSource = { [weak continuousTranscriber] chunk in
             guard let transcriber = continuousTranscriber else { return }
             Task { await transcriber.addAudio(chunk) }
         }
