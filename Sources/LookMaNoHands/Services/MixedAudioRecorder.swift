@@ -24,6 +24,38 @@ class MixedAudioRecorder {
     /// Callback for mixed audio chunks (for real-time transcription)
     var onAudioChunk: (([Float]) -> Void)?
 
+    /// Callback for source-classified audio chunks (preferred over onAudioChunk for diarization)
+    var onAudioChunkWithSource: ((AudioChunkWithSource) -> Void)?
+
+    // MARK: - Source Classification
+
+    /// Compute root-mean-square energy of audio samples
+    static func computeRMS(_ samples: [Float]) -> Float {
+        guard !samples.isEmpty else { return 0 }
+        var rms: Float = 0
+        vDSP_rmsqv(samples, 1, &rms, vDSP_Length(samples.count))
+        return rms
+    }
+
+    /// Classify the dominant audio source based on pre-mix RMS values
+    static func classifySource(
+        micRMS: Float,
+        systemRMS: Float,
+        dominanceRatio: Float = 1.5,
+        silenceThreshold: Float = 0.005
+    ) -> DiarizationSource {
+        let micSilent = micRMS < silenceThreshold
+        let systemSilent = systemRMS < silenceThreshold
+
+        if micSilent && systemSilent { return .mixed }
+        if micSilent { return .remote }
+        if systemSilent { return .local }
+
+        if micRMS >= systemRMS * dominanceRatio { return .local }
+        if systemRMS >= micRMS * dominanceRatio { return .remote }
+        return .mixed
+    }
+
     // MARK: - Initialization
 
     init(chunkDuration: TimeInterval = 5) {
@@ -102,11 +134,17 @@ class MixedAudioRecorder {
 
             print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
 
+            // Classify source using pre-mix RMS values
+            let micRMS = Self.computeRMS(micChunk)
+            let systemRMS = Self.computeRMS(systemChunk)
+            let source = Self.classifySource(micRMS: micRMS, systemRMS: systemRMS)
+
             // Mix the chunks
             let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
 
-            // Send the mixed chunk to the callback
+            // Send the mixed chunk to both callbacks
             self.onAudioChunk?(mixedChunk)
+            self.onAudioChunkWithSource?(AudioChunkWithSource(samples: mixedChunk, source: source))
         }
     }
 

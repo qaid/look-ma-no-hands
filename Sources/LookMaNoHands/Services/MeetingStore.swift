@@ -131,8 +131,11 @@ class MeetingStore {
     }
 
     /// Build a merged transcript that interleaves user notes at their timestamp positions
+    /// and prefixes segments with speaker labels when source information is available
     static func buildMergedTranscript(segments: [TranscriptSegment], userNotes: [UserNote]) -> String {
-        guard !userNotes.isEmpty else {
+        let hasDiarization = segments.contains { $0.source != .unknown }
+
+        guard !userNotes.isEmpty || hasDiarization else {
             return segments.map { $0.text }.joined(separator: "\n\n")
         }
 
@@ -141,7 +144,22 @@ class MeetingStore {
         for entry in entries {
             switch entry {
             case .segment(let seg, _):
-                lines.append(seg.text)
+                let labeledText: String
+                switch seg.source {
+                case .local:
+                    labeledText = "[Me] \(seg.text)"
+                case .remote, .mixed:
+                    let duration = seg.endTime - seg.startTime
+                    let withChanges = insertSpeakerChangeMarkers(
+                        text: seg.text,
+                        changes: seg.speakerChangeOffsets,
+                        segmentDuration: duration > 0 ? duration : 1
+                    )
+                    labeledText = "[Remote] \(withChanges)"
+                case .unknown:
+                    labeledText = seg.text
+                }
+                lines.append(labeledText)
             case .note(let note):
                 let mm = Int(note.timestamp) / 60
                 let ss = Int(note.timestamp) % 60
@@ -149,6 +167,36 @@ class MeetingStore {
             }
         }
         return lines.joined(separator: "\n\n")
+    }
+
+    /// Insert [SPEAKER_CHANGE] markers into text at positions proportional to pause offsets
+    static func insertSpeakerChangeMarkers(
+        text: String,
+        changes: [TimeInterval],
+        segmentDuration: TimeInterval
+    ) -> String {
+        guard !changes.isEmpty, !text.isEmpty, segmentDuration > 0 else { return text }
+
+        let words = text.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+        guard words.count > 1 else { return text }
+
+        // Calculate word insertion positions from time offsets
+        var insertPositions = Set<Int>()
+        for offset in changes {
+            let ratio = min(max(offset / segmentDuration, 0), 1)
+            let wordIndex = max(1, Int((ratio * Double(words.count)).rounded()))
+            insertPositions.insert(wordIndex)
+        }
+
+        var result: [String] = []
+        for (index, word) in words.enumerated() {
+            if insertPositions.contains(index) {
+                result.append("[SPEAKER_CHANGE]")
+            }
+            result.append(word)
+        }
+
+        return result.joined(separator: " ")
     }
 
     /// Read user notes for a meeting (nil if no inline notes were captured)
