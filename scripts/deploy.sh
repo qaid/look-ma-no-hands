@@ -53,6 +53,18 @@ swift build -c release
 
 echo "📦 Deploying to ~/Applications..."
 
+# Backup user data files before killing the app (vocabulary, hotkey config)
+# These live in Application Support and must survive deploy + --reset-defaults
+APP_SUPPORT_DIR=~/Library/Application\ Support/LookMaNoHands
+BACKUP_DIR=$(mktemp -d)
+if [ -d "$APP_SUPPORT_DIR" ]; then
+    for f in vocabulary.json toggleHotkey.json; do
+        if [ -f "$APP_SUPPORT_DIR/$f" ]; then
+            cp "$APP_SUPPORT_DIR/$f" "$BACKUP_DIR/$f"
+        fi
+    done
+fi
+
 # Graceful shutdown instead of killall (Security Fix: BUILD-002)
 echo "🛑 Attempting graceful app shutdown..."
 APP_PID=$(pgrep -f "Look Ma No Hands.app/Contents/MacOS" 2>/dev/null || true)
@@ -71,6 +83,21 @@ if [ -n "$APP_PID" ]; then
     fi
 else
     echo "   ℹ️  App not currently running"
+fi
+
+# Restore user data files after app shutdown (protects against wipe during quit)
+if [ -d "$BACKUP_DIR" ]; then
+    for f in vocabulary.json toggleHotkey.json; do
+        if [ -f "$BACKUP_DIR/$f" ]; then
+            # Only restore if the backup has actual data (not just "[]")
+            CONTENT=$(cat "$BACKUP_DIR/$f" 2>/dev/null || true)
+            if [ -n "$CONTENT" ] && [ "$CONTENT" != "[]" ]; then
+                mkdir -p "$APP_SUPPORT_DIR"
+                cp "$BACKUP_DIR/$f" "$APP_SUPPORT_DIR/$f"
+            fi
+        fi
+    done
+    rm -rf "$BACKUP_DIR"
 fi
 
 # Reset Accessibility TCC entry to force clean permission state for new binary
@@ -126,7 +153,11 @@ fi
 if [ "$RESET_DEFAULTS" = true ]; then
     echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
     # Delete all preference keys EXCEPT user data worth preserving
-    PRESERVE_KEYS="customVocabulary|meetingTypePrompts|toggleHotkeyShortcut"
+    # Note: vocabulary and toggleHotkey now live in Application Support files,
+    # but legacy UserDefaults keys (customVocabulary, toggleHotkeyShortcut) must
+    # also be preserved for users who haven't yet launched the app to trigger migration.
+    # hasCompletedOnboarding is preserved to avoid forcing full re-onboarding.
+    PRESERVE_KEYS="hasCompletedOnboarding|meetingTypePrompts|customVocabulary|toggleHotkeyShortcut"
     ALL_KEYS=$(defaults read com.lookmanohands.app 2>/dev/null | grep -oE '^\s{4}[a-zA-Z][a-zA-Z0-9]*' | sed 's/^ *//' || true)
     for key in $ALL_KEYS; do
         if ! echo "$key" | grep -qE "^($PRESERVE_KEYS)$"; then
@@ -135,7 +166,7 @@ if [ "$RESET_DEFAULTS" = true ]; then
     done
     defaults write com.lookmanohands.app triggerKey "Right Option"
     echo "   ✅ App preferences reset to factory settings"
-    echo "   ℹ️  Vocabulary and custom prompts preserved"
+    echo "   ℹ️  Vocabulary, custom prompts, and onboarding state preserved"
 else
     echo "ℹ️  Preserving existing app defaults"
     echo "   (use './deploy.sh --reset-defaults' to reset)"
