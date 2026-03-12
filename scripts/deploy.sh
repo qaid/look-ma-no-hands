@@ -153,10 +153,11 @@ fi
 if [ "$RESET_DEFAULTS" = true ]; then
     echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
     # Delete all preference keys EXCEPT user data worth preserving
-    # Note: vocabulary and toggleHotkey are stored in Application Support files
-    # (vocabulary.json, toggleHotkey.json), not UserDefaults — they survive automatically.
+    # Note: vocabulary and toggleHotkey now live in Application Support files,
+    # but legacy UserDefaults keys (customVocabulary, toggleHotkeyShortcut) must
+    # also be preserved for users who haven't yet launched the app to trigger migration.
     # hasCompletedOnboarding is preserved to avoid forcing full re-onboarding.
-    PRESERVE_KEYS="hasCompletedOnboarding|meetingTypePrompts"
+    PRESERVE_KEYS="hasCompletedOnboarding|meetingTypePrompts|customVocabulary|toggleHotkeyShortcut"
     ALL_KEYS=$(defaults read com.lookmanohands.app 2>/dev/null | grep -oE '^\s{4}[a-zA-Z][a-zA-Z0-9]*' | sed 's/^ *//' || true)
     for key in $ALL_KEYS; do
         if ! echo "$key" | grep -qE "^($PRESERVE_KEYS)$"; then
