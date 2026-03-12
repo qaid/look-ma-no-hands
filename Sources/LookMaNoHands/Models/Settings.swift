@@ -725,7 +725,9 @@ Now produce the complete meeting notes following the format above. Ensure every 
     private func saveVocabularyToFile() {
         guard !isSuppressingVocabSave else { return }
 
-        // Guard against accidentally overwriting a populated file with an empty array
+        // Guard against accidentally overwriting a populated file with an empty array.
+        // Two cases: (a) file has data we can read and restore, (b) file exists but we
+        // can't read it (permissions, race condition) — refuse to overwrite either way.
         if customVocabulary.isEmpty && FileManager.default.fileExists(atPath: Self.vocabularyFileURL.path) {
             if let existingData = try? Data(contentsOf: Self.vocabularyFileURL), !existingData.isEmpty,
                let existing = try? JSONDecoder().decode([VocabularyEntry].self, from: existingData),
@@ -734,6 +736,12 @@ Now produce the complete meeting notes following the format above. Ensure every 
                 isSuppressingVocabSave = true
                 customVocabulary = existing
                 isSuppressingVocabSave = false
+                return
+            }
+            // File exists but we couldn't read/decode it — don't overwrite with empty
+            let fileSize = (try? FileManager.default.attributesOfItem(atPath: Self.vocabularyFileURL.path)[.size] as? Int) ?? 0
+            if fileSize > 2 {
+                log("⚠️ Blocked saving empty vocabulary — file exists (\(fileSize) bytes) but couldn't be read")
                 return
             }
         }
