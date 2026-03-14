@@ -611,11 +611,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         self.meetingWindowWasOpen = UserDefaults.standard.bool(forKey: Keys.meetingWindowWasOpen)
 
         // Auto-save notes defaults to false (opt-in)
-        if UserDefaults.standard.object(forKey: Keys.autoSaveNotes) != nil {
-            self.autoSaveNotes = UserDefaults.standard.bool(forKey: Keys.autoSaveNotes)
-        } else {
-            self.autoSaveNotes = false
-        }
+        self.autoSaveNotes = UserDefaults.standard.bool(forKey: Keys.autoSaveNotes)
         self.autoSaveFolder = UserDefaults.standard.string(forKey: Keys.autoSaveFolder)
             ?? Self.defaultAutoSaveFolder
 

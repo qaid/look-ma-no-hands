@@ -299,10 +299,10 @@ class ContinuousTranscriber {
 
         var windowIndex = 0
         while windowIndex + windowSize <= samples.count {
-            let window = Array(samples[windowIndex..<(windowIndex + windowSize)])
-
             var rms: Float = 0
-            vDSP_rmsqv(window, 1, &rms, vDSP_Length(window.count))
+            samples.withUnsafeBufferPointer { buf in
+                vDSP_rmsqv(buf.baseAddress! + windowIndex, 1, &rms, vDSP_Length(windowSize))
+            }
 
             if rms < silenceThreshold {
                 if silenceStartIndex == nil {
@@ -345,17 +345,17 @@ class ContinuousTranscriber {
     func deduplicateAgainstPrevious(_ newText: String) -> String {
         guard let lastText = segments.last?.text else { return newText }
 
-        let lastWords = lastText.split(separator: " ")
+        let lastWords = lastText.split(separator: " ").map { $0.lowercased() }
         let newWords = newText.split(separator: " ")
         guard !lastWords.isEmpty, !newWords.isEmpty else { return newText }
+
+        let newWordsLower = newWords.map { $0.lowercased() }
 
         // Check up to 15 words of overlap
         let maxCheck = min(lastWords.count, newWords.count, 15)
         var bestOverlap = 0
         for len in 1...maxCheck {
-            let suffix = lastWords.suffix(len)
-            let prefix = newWords.prefix(len)
-            if Array(suffix).map({ $0.lowercased() }) == Array(prefix).map({ $0.lowercased() }) {
+            if lastWords.suffix(len).elementsEqual(newWordsLower.prefix(len)) {
                 bestOverlap = len
             }
         }

@@ -593,7 +593,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
 
         Settings.shared.meetingWindowWasOpen = true
-        UserDefaults.standard.synchronize()
         NSLog("✅ Meeting Transcription window created and displayed")
     }
 
@@ -1666,7 +1665,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let bundleID = Bundle.main.bundleIdentifier {
                 NSLog("🔄 Developer Reset: Clearing UserDefaults for bundle: %@", bundleID)
                 UserDefaults.standard.removePersistentDomain(forName: bundleID)
-                UserDefaults.standard.synchronize()
             } else {
                 NSLog("⚠️ Developer Reset: No bundle identifier found!")
             }

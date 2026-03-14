@@ -634,7 +634,6 @@ struct MeetingRecordTab: View {
 
     private func requestScreenRecordingPermission() {
         Settings.shared.pendingScreenRecordingGrant = true
-        UserDefaults.standard.synchronize()
         appDelegate?.minimizeMeetingWindowForPermission()
         // Delay permission request so the window hides first, ensuring the
         // macOS System Settings dialog appears visibly in the foreground.

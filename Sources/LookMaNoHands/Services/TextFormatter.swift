@@ -100,10 +100,11 @@ class TextFormatter {
         let pattern = "\\b((?:\\S+\\s+){2,8}\\S+)(\\s+\\1)+"
         var result = text
         var previous = ""
-        // Iterate since removing one repetition may reveal another
-        while result != previous {
+        // Iterate since removing one repetition may reveal another (capped to prevent runaway on pathological input)
+        for _ in 0..<10 {
             previous = result
             result = result.replacingOccurrences(of: pattern, with: "$1", options: .regularExpression)
+            if result == previous { break }
         }
         return result
     }
