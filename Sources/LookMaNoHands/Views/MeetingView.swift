@@ -69,9 +69,7 @@ struct MeetingView: View {
                 recordingIndicator: recordingIndicator,
                 appDelegate: appDelegate
             ) { record in
-                // After auto-save, select the new meeting and switch to Analyze
                 selectedMeeting = record
-                selectedTab = .analyze
             }
             .tabItem {
                 Label(MeetingTab.record.rawValue, systemImage: MeetingTab.record.icon)
