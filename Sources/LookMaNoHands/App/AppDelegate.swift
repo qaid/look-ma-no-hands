@@ -577,7 +577,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.title = "Meetings"
         window.center()
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 600, height: 450)
+        window.minSize = NSSize(width: 700, height: 450)
         window.maxSize = NSSize(width: 1400, height: 1200)
         window.setFrameAutosaveName("MeetingTranscriptionWindow")
         window.delegate = self
