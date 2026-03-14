@@ -59,9 +59,7 @@ class MeetingStore {
         type: MeetingType
     ) async throws -> MeetingRecord {
         let id = UUID()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy h:mm a"
-        let title = "\(type.displayName) - \(formatter.string(from: Date()))"
+        let title = "\(type.displayName) - \(Self.titleDateFormatter.string(from: Date()))"
 
         let hasNotes = !userNotes.isEmpty
 
@@ -71,7 +69,7 @@ class MeetingStore {
             duration: duration,
             meetingType: type,
             source: .recorded,
-            userNotesFilename: hasNotes ? "user-notes.json" : nil,
+            userNotesFilename: hasNotes ? Self.userNotesFilename : nil,
             segmentCount: segments.count
         )
 
@@ -82,7 +80,7 @@ class MeetingStore {
         if hasNotes {
             let dir = meetingDirectory(for: record)
             let notesData = try JSONEncoder().encode(userNotes)
-            try notesData.write(to: dir.appendingPathComponent("user-notes.json"), options: .atomic)
+            try notesData.write(to: dir.appendingPathComponent(Self.userNotesFilename), options: .atomic)
         }
 
         await MainActor.run {
@@ -99,9 +97,8 @@ class MeetingStore {
         userNotes: [UserNote],
         duration: TimeInterval
     ) async throws -> MeetingRecord {
-        guard let (existingIndex, existing) = await MainActor.run(body: {
-            guard let idx = meetings.firstIndex(where: { $0.id == id }) else { return nil as (Int, MeetingRecord)? }
-            return (idx, meetings[idx])
+        guard let existing = await MainActor.run(body: {
+            meetings.first(where: { $0.id == id })
         }) else {
             throw CocoaError(.fileNoSuchFile)
         }
@@ -109,13 +106,13 @@ class MeetingStore {
         var updated = existing
         updated.duration = duration
         updated.segmentCount = segments.count
-        updated.userNotesFilename = userNotes.isEmpty ? nil : "user-notes.json"
+        updated.userNotesFilename = userNotes.isEmpty ? nil : Self.userNotesFilename
 
         let transcript = Self.buildMergedTranscript(segments: segments, userNotes: userNotes)
         try await writeRecord(updated, transcript: transcript)
 
         let dir = meetingDirectory(for: updated)
-        let notesURL = dir.appendingPathComponent("user-notes.json")
+        let notesURL = dir.appendingPathComponent(Self.userNotesFilename)
         if !userNotes.isEmpty {
             let notesData = try JSONEncoder().encode(userNotes)
             try notesData.write(to: notesURL, options: .atomic)
@@ -125,7 +122,10 @@ class MeetingStore {
 
         let finalRecord = updated
         await MainActor.run {
-            meetings[existingIndex] = finalRecord
+            // Re-lookup by ID — the index may have shifted during async writeRecord
+            if let idx = meetings.firstIndex(where: { $0.id == finalRecord.id }) {
+                meetings[idx] = finalRecord
+            }
         }
         return finalRecord
     }
@@ -216,9 +216,7 @@ class MeetingStore {
             rawText = stripSRT(rawText)
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy h:mm a"
-        let title = "\(type.displayName) - \(formatter.string(from: Date()))"
+        let title = "\(type.displayName) - \(Self.titleDateFormatter.string(from: Date()))"
 
         let record = MeetingRecord(
             id: UUID(),
@@ -245,9 +243,7 @@ class MeetingStore {
             throw MeetingImportError.emptyTranscript
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy h:mm a"
-        let title = "\(type.displayName) - \(formatter.string(from: Date()))"
+        let title = "\(type.displayName) - \(Self.titleDateFormatter.string(from: Date()))"
 
         let record = MeetingRecord(
             id: UUID(),
@@ -289,9 +285,7 @@ class MeetingStore {
         let ext = url.pathExtension
         let audioFilename = "audio.\(ext)"
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy h:mm a"
-        let title = "\(type.displayName) - \(formatter.string(from: Date()))"
+        let title = "\(type.displayName) - \(Self.titleDateFormatter.string(from: Date()))"
 
         let record = MeetingRecord(
             id: id,
@@ -444,11 +438,20 @@ class MeetingStore {
 
     // MARK: - Private Helpers
 
+    private static let titleDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy h:mm a"
+        return formatter
+    }()
+
     private static let exportDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    /// Filename for user-captured inline notes stored alongside transcripts
+    static let userNotesFilename = "user-notes.json"
 
     /// Canonical auto-export filename for a meeting's notes.
     private func autoExportFilename(for record: MeetingRecord) -> String {

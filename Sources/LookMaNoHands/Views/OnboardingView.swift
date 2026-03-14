@@ -89,8 +89,6 @@ struct OnboardingView: View {
 
     private func completeOnboarding() {
         Settings.shared.hasCompletedOnboarding = true
-        // Force UserDefaults to save immediately before any potential restart
-        UserDefaults.standard.synchronize()
         print("OnboardingView: Onboarding completed, hasCompletedOnboarding saved")
         onComplete()
         dismiss()

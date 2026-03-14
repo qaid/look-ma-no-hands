@@ -23,9 +23,9 @@ class WhisperService: @unchecked Sendable {
     /// Name of the currently loaded model (e.g., "base", "large-v3-turbo")
     private(set) var loadedModelName: String?
 
-    /// Lock to serialize transcription calls (shared between dictation and meeting mode)
-    private let transcriptionLock = NSLock()
-    private var isTranscribing = false
+    /// Serializes transcription calls (shared between dictation and meeting mode)
+    /// Uses an actor-based semaphore to avoid spin-lock polling
+    private let transcriptionSemaphore = TranscriptionSemaphore()
     
     // MARK: - Initialization
 
@@ -100,20 +100,8 @@ class WhisperService: @unchecked Sendable {
 
         // Serialize transcription calls — prevents concurrent access from dictation and meeting mode
         // which can corrupt WhisperKit state and cause long blocking that disables the CGEvent tap
-        while true {
-            let acquired = transcriptionLock.withLock {
-                if !isTranscribing {
-                    isTranscribing = true
-                    return true
-                }
-                return false
-            }
-            if acquired { break }
-            try await Task.sleep(for: .milliseconds(100))
-        }
-        defer {
-            transcriptionLock.withLock { isTranscribing = false }
-        }
+        await transcriptionSemaphore.acquire()
+        defer { Task { await transcriptionSemaphore.release() } }
 
         let startTime = Date()
         let audioDuration = Double(samples.count) / 16000.0
@@ -328,6 +316,33 @@ class WhisperService: @unchecked Sendable {
         }
     }
 
+}
+
+// MARK: - Errors
+
+/// Actor-based async semaphore (permits=1) that suspends waiters instead of spin-polling
+private actor TranscriptionSemaphore {
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func acquire() async {
+        if !isLocked {
+            isLocked = true
+            return
+        }
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
+    }
+
+    func release() {
+        if let next = waiters.first {
+            waiters.removeFirst()
+            next.resume()
+        } else {
+            isLocked = false
+        }
+    }
 }
 
 // MARK: - Errors

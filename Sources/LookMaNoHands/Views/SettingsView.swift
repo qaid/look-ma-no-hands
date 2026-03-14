@@ -1776,10 +1776,6 @@ struct SettingsView: View {
             // Reset onboarding flag
             settings.hasCompletedOnboarding = false
 
-            // Force UserDefaults to synchronize immediately
-            UserDefaults.standard.synchronize()
-
-            // Small delay to ensure settings are written to disk
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 // Restart the app
                 self.restartApp()

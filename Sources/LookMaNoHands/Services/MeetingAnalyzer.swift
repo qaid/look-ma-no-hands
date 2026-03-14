@@ -12,6 +12,9 @@ class MeetingAnalyzer {
 
     // MARK: - Properties
 
+    /// Context window size for Ollama requests (16K tokens handles most meeting transcripts)
+    private static let defaultContextSize = 16384
+
     private let ollamaService: OllamaService
 
     // MARK: - Initialization
@@ -105,6 +108,32 @@ When attributing speech:
 
     // MARK: - Analysis
 
+    /// Validate transcript, configure model, build split prompt, and check Ollama availability.
+    /// Shared preamble for both streaming and non-streaming analysis paths.
+    private func prepareAnalysis(
+        transcript: String,
+        customPrompt: String?,
+        model: String?,
+        label: String
+    ) async throws -> SplitPrompt {
+        guard !transcript.isEmpty else {
+            throw AnalysisError.emptyTranscript
+        }
+
+        ollamaService.modelName = model ?? Settings.shared.ollamaModel
+
+        let prompt = customPrompt ?? Settings.shared.meetingPrompt
+        let splitPrompt = Self.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: ollamaService.modelName)
+
+        print("MeetingAnalyzer: Starting \(label) analysis with \(ollamaService.modelName) model...")
+
+        guard await ollamaService.isAvailable() else {
+            throw AnalysisError.ollamaUnavailable
+        }
+
+        return splitPrompt
+    }
+
     /// Analyze a meeting transcript and generate structured notes
     /// - Parameters:
     ///   - transcript: The raw transcript text
@@ -112,33 +141,12 @@ When attributing speech:
     ///   - model: Optional Ollama model name (defaults to Settings.shared.ollamaModel)
     /// - Returns: Structured meeting notes in markdown format
     func analyzeMeeting(transcript: String, customPrompt: String? = nil, model: String? = nil) async throws -> String {
-        guard !transcript.isEmpty else {
-            throw AnalysisError.emptyTranscript
-        }
+        let splitPrompt = try await prepareAnalysis(transcript: transcript, customPrompt: customPrompt, model: model, label: "")
 
-        // Set the model name first so buildSplitPrompt can use it for /no_think stripping
-        ollamaService.modelName = model ?? Settings.shared.ollamaModel
-
-        let prompt = customPrompt ?? Settings.shared.meetingPrompt
-        let splitPrompt = Self.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: ollamaService.modelName)
-
-        print("MeetingAnalyzer: Starting analysis with \(ollamaService.modelName) model...")
-
-        // Check if Ollama is available
-        let isAvailable = await ollamaService.isAvailable()
-        guard isAvailable else {
-            throw AnalysisError.ollamaUnavailable
-        }
-
-        // Process with Ollama
-        let structuredNotes = try await ollamaService.generate(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: 16384)
+        let structuredNotes = try await ollamaService.generate(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: Self.defaultContextSize)
 
         print("MeetingAnalyzer: Analysis complete, generated \(structuredNotes.count) characters")
-
-        // Free the model from memory — meeting analysis is a one-shot operation and the
-        // model (often 5 GB+) should not stay resident after completion.
         await ollamaService.unloadModel()
-
         return structuredNotes
     }
 
@@ -155,38 +163,16 @@ When attributing speech:
         model: String? = nil,
         onProgress: @escaping (Int, String) async -> Void
     ) async throws -> String {
-        guard !transcript.isEmpty else {
-            throw AnalysisError.emptyTranscript
-        }
-
-        // Set the model name first so buildSplitPrompt can use it for /no_think stripping
-        ollamaService.modelName = model ?? Settings.shared.ollamaModel
-
-        let prompt = customPrompt ?? Settings.shared.meetingPrompt
-        let splitPrompt = Self.buildSplitPrompt(prompt: prompt, transcript: transcript, modelName: ollamaService.modelName)
-
-        print("MeetingAnalyzer: Starting streaming analysis with \(ollamaService.modelName) model...")
-
-        // Check if Ollama is available
-        let isAvailable = await ollamaService.isAvailable()
-        guard isAvailable else {
-            throw AnalysisError.ollamaUnavailable
-        }
+        let splitPrompt = try await prepareAnalysis(transcript: transcript, customPrompt: customPrompt, model: model, label: "streaming")
 
         var totalChars = 0
-
-        // Process with Ollama streaming
-        let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: 16384) { chunk in
+        let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: Self.defaultContextSize) { chunk in
             totalChars += chunk.count
             await onProgress(totalChars, chunk)
         }
 
         print("MeetingAnalyzer: Streaming analysis complete, generated \(structuredNotes.count) characters")
-
-        // Free the model from memory — meeting analysis is a one-shot operation and the
-        // model (often 5 GB+) should not stay resident after completion.
         await ollamaService.unloadModel()
-
         return structuredNotes
     }
 

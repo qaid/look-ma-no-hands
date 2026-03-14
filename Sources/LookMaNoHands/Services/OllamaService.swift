@@ -98,22 +98,16 @@ class OllamaService {
         }
     }
 
-    /// Generate text from a prompt
-    /// - Parameters:
-    ///   - prompt: The prompt to send to the model
-    ///   - system: Optional system prompt for models that support role separation
-    ///   - numCtx: Optional context window size (tokens). When nil, uses the model's default.
-    /// - Returns: Generated text
-    func generate(prompt: String, system: String? = nil, numCtx: Int? = nil) async throws -> String {
+    /// Build a URLRequest for the /api/generate endpoint
+    private func buildGenerateRequest(prompt: String, system: String?, numCtx: Int?, stream: Bool) throws -> URLRequest {
         guard let url = URL(string: "\(baseURL)/api/generate") else {
             throw OllamaError.invalidURL
         }
 
-        // Build request body
         var requestBody: [String: Any] = [
             "model": modelName,
             "prompt": prompt,
-            "stream": false
+            "stream": stream
         ]
         if let system = system {
             requestBody["system"] = system
@@ -128,6 +122,17 @@ class OllamaService {
         request.httpMethod = "POST"
         request.httpBody = jsonData
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return request
+    }
+
+    /// Generate text from a prompt
+    /// - Parameters:
+    ///   - prompt: The prompt to send to the model
+    ///   - system: Optional system prompt for models that support role separation
+    ///   - numCtx: Optional context window size (tokens). When nil, uses the model's default.
+    /// - Returns: Generated text
+    func generate(prompt: String, system: String? = nil, numCtx: Int? = nil) async throws -> String {
+        let request = try buildGenerateRequest(prompt: prompt, system: system, numCtx: numCtx, stream: false)
 
         print("OllamaService: Sending request to \(modelName) (system: \(system != nil ? "yes" : "no"))...")
 
@@ -158,29 +163,7 @@ class OllamaService {
     ///   - onChunk: Callback invoked for each text chunk received
     /// - Returns: Complete generated text
     func generateStreaming(prompt: String, system: String? = nil, numCtx: Int? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
-        guard let url = URL(string: "\(baseURL)/api/generate") else {
-            throw OllamaError.invalidURL
-        }
-
-        // Build request body with streaming enabled
-        var requestBody: [String: Any] = [
-            "model": modelName,
-            "prompt": prompt,
-            "stream": true
-        ]
-        if let system = system {
-            requestBody["system"] = system
-        }
-        if let numCtx = numCtx {
-            requestBody["options"] = ["num_ctx": numCtx]
-        }
-
-        let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.httpBody = jsonData
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let request = try buildGenerateRequest(prompt: prompt, system: system, numCtx: numCtx, stream: true)
 
         print("OllamaService: Sending streaming request to \(modelName) (system: \(system != nil ? "yes" : "no"))...")
 
