@@ -85,6 +85,7 @@ class AudioRecorder {
             resampled = rawSamples
         }
 
+        // Normalize audio levels to match stopRecording() behavior
         return normalizeAudio(resampled)
     }
 

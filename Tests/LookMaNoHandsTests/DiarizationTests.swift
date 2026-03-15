@@ -122,16 +122,16 @@ final class MergedTranscriptDiarizationTests: XCTestCase {
         XCTAssertTrue(transcript.hasPrefix("[Me]"), "Local segment should be prefixed with [Me]")
     }
 
-    func testRemoteSourceRemotePrefix() {
+    func testRemoteSourceMacOSPrefix() {
         let seg = makeSegment("hi there", source: .remote)
         let transcript = MeetingStore.buildMergedTranscript(segments: [seg], userNotes: [])
-        XCTAssertTrue(transcript.hasPrefix("[Remote]"), "Remote segment should be prefixed with [Remote]")
+        XCTAssertTrue(transcript.hasPrefix("[Mac OS]"), "Remote segment should be prefixed with [Mac OS]")
     }
 
-    func testMixedSourceRemotePrefix() {
+    func testMixedSourceMacOSPrefix() {
         let seg = makeSegment("okay let's start", source: .mixed)
         let transcript = MeetingStore.buildMergedTranscript(segments: [seg], userNotes: [])
-        XCTAssertTrue(transcript.hasPrefix("[Remote]"), "Mixed segment should be prefixed with [Remote]")
+        XCTAssertTrue(transcript.hasPrefix("[Mac OS]"), "Mixed segment should be prefixed with [Mac OS]")
     }
 
     func testBackwardCompatMultipleUnknownSegments() {
@@ -142,7 +142,7 @@ final class MergedTranscriptDiarizationTests: XCTestCase {
         let transcript = MeetingStore.buildMergedTranscript(segments: segs, userNotes: [])
         XCTAssertEqual(transcript, "first paragraph\n\nsecond paragraph")
         XCTAssertFalse(transcript.contains("[Me]"))
-        XCTAssertFalse(transcript.contains("[Remote]"))
+        XCTAssertFalse(transcript.contains("[Mac OS]"))
     }
 
     func testMixedSourcesInSameTranscript() {
@@ -152,7 +152,7 @@ final class MergedTranscriptDiarizationTests: XCTestCase {
         ]
         let transcript = MeetingStore.buildMergedTranscript(segments: segs, userNotes: [])
         XCTAssertTrue(transcript.contains("[Me] my comment"))
-        XCTAssertTrue(transcript.contains("[Remote] your response"))
+        XCTAssertTrue(transcript.contains("[Mac OS] your response"))
     }
 }
 
@@ -198,7 +198,7 @@ final class SpeakerChangeMarkerTests: XCTestCase {
 final class MeetingAnalyzerDiarizationTests: XCTestCase {
 
     func testDiarizationSuffixAppendedWhenMePresent() {
-        let transcript = "[Me] hello there\n[Remote] hi how are you"
+        let transcript = "[Me] hello there\n[Mac OS] hi how are you"
         let split = MeetingAnalyzer.buildSplitPrompt(
             prompt: "Summarize this meeting.\n[TRANSCRIPTION_PLACEHOLDER]",
             transcript: transcript,
@@ -218,7 +218,7 @@ final class MeetingAnalyzerDiarizationTests: XCTestCase {
     }
 
     func testBothNoteAndDiarizationSuffixesCoexist() {
-        let transcript = "[Me] hello\n[USER NOTE @ 00:05] key point\n[Remote] bye"
+        let transcript = "[Me] hello\n[USER NOTE @ 00:05] key point\n[Mac OS] bye"
         let split = MeetingAnalyzer.buildSplitPrompt(
             prompt: "Summarize this meeting.\n[TRANSCRIPTION_PLACEHOLDER]",
             transcript: transcript,
@@ -228,13 +228,23 @@ final class MeetingAnalyzerDiarizationTests: XCTestCase {
         XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"), "Diarization suffix should also be appended")
     }
 
-    func testDiarizationSuffixAppendedWhenRemotePresent() {
-        let transcript = "[Remote] let me explain the issue"
+    func testDiarizationSuffixAppendedWhenMacOSPresent() {
+        let transcript = "[Mac OS] let me explain the issue"
         let split = MeetingAnalyzer.buildSplitPrompt(
             prompt: "Summarize.\n[TRANSCRIPTION_PLACEHOLDER]",
             transcript: transcript,
             modelName: "llama3"
         )
         XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"))
+    }
+
+    func testDiarizationSuffixAppendedForLegacyRemoteMarker() {
+        let transcript = "[Remote] let me explain the issue"
+        let split = MeetingAnalyzer.buildSplitPrompt(
+            prompt: "Summarize.\n[TRANSCRIPTION_PLACEHOLDER]",
+            transcript: transcript,
+            modelName: "llama3"
+        )
+        XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"), "Legacy [Remote] marker should trigger diarization instructions")
     }
 }

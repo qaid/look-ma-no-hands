@@ -70,7 +70,7 @@ Before generating output, apply these rules to the transcript:
 
 1. **Filter Noise**: Ignore filler words (um, uh, like, you know), false starts, and verbal pauses. Focus on substantive content.
 
-2. **Attribute Statements**: Identify who said what. If the transcript uses [Me] / [Remote] labels, treat [Me] as the local participant and [Remote] as the other person. Use names if identifiable from context, otherwise "Speaker 1" / "Speaker 2" or roles (e.g., "Manager", "Report") if inferable.
+2. **Attribute Statements**: Identify who said what. If the transcript uses [Me] / [Mac OS] labels, treat [Me] as the local participant and [Mac OS] as the other person. Use names if identifiable from context, otherwise "Speaker 1" / "Speaker 2" or roles (e.g., "Manager", "Report") if inferable.
 
 3. **Capture Specifics Exactly**: When participants mention names, projects, dates, metrics, deadlines, or commitments, preserve them precisely. These details are what make 1:1 notes useful.
 
@@ -227,7 +227,7 @@ You are summarizing an all-hands meeting. Focus on:
             return """
 /no_think
 
-You are summarizing a customer call. If the transcript uses [Me] / [Remote] labels, [Me] represents your team and [Remote] represents the customer. Focus on:
+You are summarizing a customer call. If the transcript uses [Me] / [Mac OS] labels, [Me] represents your team and [Mac OS] represents the customer. Focus on:
 
 ## Customer Pain Points
 - Problems or frustrations the customer expressed

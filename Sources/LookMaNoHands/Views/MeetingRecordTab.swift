@@ -337,7 +337,7 @@ struct MeetingRecordTab: View {
                             Text("Jot Notes")
                                 .font(.system(size: 14))
                         }
-                        .foregroundColor(liveState.isNotesSidebarVisible ? .orange : .secondary)
+                        .foregroundColor(liveState.isNotesSidebarVisible ? Color(red: 0.55, green: 0.38, blue: 0.12) : .secondary)
                     }
                     .buttonStyle(.plain)
                     .keyboardShortcut("j", modifiers: .command)
@@ -363,92 +363,42 @@ struct MeetingRecordTab: View {
         }
     }
 
+    // MARK: - Pastel Colors
+
+    private static let pastelBlue = Color(red: 0.68, green: 0.78, blue: 0.95)     // Me
+    private static let pastelGreen = Color(red: 0.68, green: 0.90, blue: 0.75)     // Remote/Mac OS
+    static let pastelAmber = Color(red: 0.96, green: 0.84, blue: 0.62)     // Notes
+
+    private static let pastelBlueTint = Color(red: 0.68, green: 0.78, blue: 0.95).opacity(0.12)
+    private static let pastelGreenTint = Color(red: 0.68, green: 0.90, blue: 0.75).opacity(0.12)
+    private static let pastelAmberTint = Color(red: 0.96, green: 0.84, blue: 0.62).opacity(0.15)
+
+    private static let pastelBlueText = Color(red: 0.20, green: 0.36, blue: 0.60)
+    private static let pastelGreenText = Color(red: 0.18, green: 0.45, blue: 0.30)
+    private static let pastelAmberText = Color(red: 0.55, green: 0.38, blue: 0.12)
+
     // MARK: - Transcript Left Pane (timeline)
 
     private var transcriptLeftPane: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    let entries = liveState.timelineEntries
-                    if entries.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    let groups = TimelineEntry.grouped(liveState.timelineEntries)
+                    if groups.isEmpty {
                         Text("No transcript yet")
                             .font(.system(size: 14))
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 40)
                     } else {
-                        ForEach(entries) { entry in
-                            switch entry {
-                            case .segment(let segment, _):
-                                HStack(alignment: .top, spacing: 12) {
-                                    Text(formatTimestamp(segment.startTime))
-                                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                        .frame(width: 60, alignment: .leading)
-
-                                    if segment.source != .unknown {
-                                        Text(segment.source == .local ? "Me" : "Remote")
-                                            .font(.system(size: 10, weight: .semibold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(
-                                                Capsule()
-                                                    .fill(segment.source == .local ? Color.blue : Color.green)
-                                            )
-                                    }
-
-                                    Text(segment.text)
-                                        .font(.system(size: 16))
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                        ForEach(groups) { group in
+                            Group {
+                                switch group.key {
+                                case .speaker(let source):
+                                    speakerGroupView(group: group, source: source)
+                                case .note:
+                                    noteGroupView(group: group)
                                 }
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 8)
-
-                            case .note(let note):
-                                HStack(alignment: .top, spacing: 12) {
-                                    Text(formatTimestamp(note.timestamp))
-                                        .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                        .foregroundColor(.orange)
-                                        .frame(width: 60, alignment: .leading)
-
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "pencil.line")
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.orange)
-                                        Text(note.text)
-                                            .font(.system(size: 16))
-                                            .textSelection(.enabled)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 8)
-                                .background(Color.orange.opacity(0.08))
-                                .cornerRadius(6)
-                                .id("note-\(note.id.uuidString)")
-                                .background(
-                                    Group {
-                                        if note.id == lastSubmittedNoteID {
-                                            GeometryReader { noteGeo in
-                                                Color.clear
-                                                    .onChange(of: noteGeo.frame(in: .named("transcriptScroll")).minY) { _, minY in
-                                                        if showNoteAboveIndicator && minY >= -20 && minY < scrollViewHeight {
-                                                            withAnimation(.easeOut(duration: 0.2)) {
-                                                                showNoteAboveIndicator = false
-                                                                noteAboveCount = 0
-                                                            }
-                                                        }
-                                                    }
-                                            }
-                                        }
-                                    }
-                                )
-                                .transition(.asymmetric(
-                                    insertion: .scale(scale: 0.97, anchor: .leading).combined(with: .opacity),
-                                    removal: .opacity
-                                ))
                             }
                         }
                         Color.clear.frame(height: 1).id("timeline-bottom")
@@ -506,6 +456,134 @@ struct MeetingRecordTab: View {
         }
     }
 
+    // MARK: - Speaker Group View
+
+    private func speakerGroupView(group: TimelineGroup, source: DiarizationSource) -> some View {
+        let isLocal = source == .local
+        let badgeColor = isLocal ? Self.pastelBlue : Self.pastelGreen
+        let tintColor = isLocal ? Self.pastelBlueTint : Self.pastelGreenTint
+        let label: String = {
+            if source == .unknown { return "" }
+            return isLocal ? "Me" : "Mac OS"
+        }()
+        let timeRange: String = {
+            if group.entries.count > 1 && group.startTimestamp != group.endTimestamp {
+                return "\(formatTimestamp(group.startTimestamp)) – \(formatTimestamp(group.endTimestamp))"
+            }
+            return formatTimestamp(group.startTimestamp)
+        }()
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Group header
+            HStack(spacing: 8) {
+                if source != .unknown {
+                    Text(label)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 2)
+                        .background(Capsule().fill(badgeColor))
+                }
+
+                Spacer()
+
+                Text(timeRange)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.bottom, 6)
+
+            // Segment text joined into flowing prose
+            Text(group.entries.compactMap { entry -> String? in
+                if case .segment(let segment, _) = entry { return segment.text }
+                return nil
+            }.joined(separator: " "))
+                .font(.system(size: 14))
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(source == .unknown ? Color.clear : tintColor)
+        )
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: - Note Group View
+
+    private func noteGroupView(group: TimelineGroup) -> some View {
+        ForEach(group.entries) { entry in
+            if case .note(let note) = entry {
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(spacing: 8) {
+                        Text("Note")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Self.pastelAmber))
+
+                        Text("You")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(Self.pastelAmberText)
+
+                        Spacer()
+
+                        Text(formatTimestamp(note.timestamp))
+                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                            .foregroundColor(Self.pastelAmberText.opacity(0.7))
+                    }
+                    .padding(.bottom, 6)
+
+                    HStack(alignment: .top, spacing: 5) {
+                        Image(systemName: "pencil.line")
+                            .font(.system(size: 12))
+                            .foregroundColor(Self.pastelAmberText)
+                        Text(note.text)
+                            .font(.system(size: 14))
+                            .foregroundColor(Self.pastelAmberText)
+                            .italic()
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Self.pastelAmberTint)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Self.pastelAmber.opacity(0.3), lineWidth: 0.5)
+                        )
+                )
+                .padding(.horizontal, 4)
+                .id("note-\(note.id.uuidString)")
+                .background(
+                    Group {
+                        if note.id == lastSubmittedNoteID {
+                            GeometryReader { noteGeo in
+                                Color.clear
+                                    .onChange(of: noteGeo.frame(in: .named("transcriptScroll")).minY) { _, minY in
+                                        if showNoteAboveIndicator && minY >= -20 && minY < scrollViewHeight {
+                                            withAnimation(.easeOut(duration: 0.2)) {
+                                                showNoteAboveIndicator = false
+                                                noteAboveCount = 0
+                                            }
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.97, anchor: .leading).combined(with: .opacity),
+                    removal: .opacity
+                ))
+            }
+        }
+    }
+
     // MARK: - Notes Sidebar
 
     private var notesSidebarPane: some View {
@@ -517,7 +595,7 @@ struct MeetingRecordTab: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("@ \(formatTimestamp(note.timestamp))")
                                 .font(.system(size: 11, weight: .medium, design: .monospaced))
-                                .foregroundColor(.orange)
+                                .foregroundColor(Self.pastelAmberText)
                             Text(note.text)
                                 .font(.system(size: 13))
                                 .textSelection(.enabled)
@@ -546,19 +624,19 @@ struct MeetingRecordTab: View {
                 HStack(spacing: 4) {
                     Image(systemName: "pencil.line")
                         .font(.system(size: 10))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Self.pastelAmberText)
                     Text("@ \(formatTimestamp(stamp))")
                         .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(Self.pastelAmberText)
                 }
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .background(
                     Capsule()
-                        .fill(Color.orange.opacity(0.12))
+                        .fill(Self.pastelAmber.opacity(0.2))
                         .overlay(
                             Capsule()
-                                .stroke(Color.orange.opacity(0.35), lineWidth: 0.75)
+                                .stroke(Self.pastelAmber.opacity(0.5), lineWidth: 0.75)
                         )
                 )
                 .transition(.asymmetric(
@@ -575,7 +653,7 @@ struct MeetingRecordTab: View {
                 .background(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(
-                            isNoteInputFocused ? Color.orange.opacity(0.8) : Color.orange.opacity(0.4),
+                            isNoteInputFocused ? Self.pastelAmber.opacity(0.9) : Self.pastelAmber.opacity(0.5),
                             lineWidth: isNoteInputFocused ? 1.5 : 1
                         )
                         .animation(.easeOut(duration: 0.12), value: isNoteInputFocused)
@@ -589,7 +667,7 @@ struct MeetingRecordTab: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.orange)
+            .tint(Self.pastelAmber)
             .disabled(liveState.noteInputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .keyboardShortcut(.return, modifiers: .command)
         }
@@ -879,8 +957,8 @@ private struct NoteAboveIndicator: View {
             .padding(.vertical, 5)
             .background(
                 Capsule()
-                    .fill(Color.orange)
-                    .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                    .fill(MeetingRecordTab.pastelAmber)
+                    .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
             )
         }
         .buttonStyle(.plain)
