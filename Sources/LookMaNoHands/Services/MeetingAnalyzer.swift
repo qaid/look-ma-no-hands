@@ -36,12 +36,12 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
 
 SPEAKER DIARIZATION RULES: The transcript uses the following markers for speaker attribution:
 - [Me] — spoken by the local user (the person who recorded this meeting)
-- [Remote] — spoken by one or more remote participants
+- [Mac OS] — spoken by one or more remote participants
 - [SPEAKER_CHANGE] — a likely turn change among remote participants (a pause was detected)
 
 When attributing speech:
 1. [Me] always refers to the local user recording the meeting.
-2. [SPEAKER_CHANGE] inside a [Remote] block suggests a new speaker may have started — but not every change means a new person; use context to decide.
+2. [SPEAKER_CHANGE] inside a [Mac OS] block suggests a new speaker may have started — but not every change means a new person; use context to decide.
 3. Infer speaker names from greetings, introductions, or context clues in the transcript when possible.
 4. Assign consistent labels throughout (e.g., if "Sarah" is introduced, use "Sarah" not "Remote Speaker 1" afterwards).
 5. Fall back to "Remote Speaker 1", "Remote Speaker 2", etc. when names are not identifiable.
@@ -82,7 +82,7 @@ When attributing speech:
         }
 
         // Append diarization instructions when speaker markers are present
-        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Remote]")
+        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Mac OS]")
         if hasDiarization {
             system += diarizationInstructionSuffix
         }

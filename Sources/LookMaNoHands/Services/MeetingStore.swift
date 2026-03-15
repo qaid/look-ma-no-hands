@@ -155,7 +155,7 @@ class MeetingStore {
                         changes: seg.speakerChangeOffsets,
                         segmentDuration: duration > 0 ? duration : 1
                     )
-                    labeledText = "[Remote] \(withChanges)"
+                    labeledText = "[Mac OS] \(withChanges)"
                 case .unknown:
                     labeledText = seg.text
                 }
