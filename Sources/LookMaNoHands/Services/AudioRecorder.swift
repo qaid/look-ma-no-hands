@@ -53,13 +53,19 @@ class AudioRecorder {
         // This removes system audio bleed from the mic signal so that
         // source classification can correctly distinguish local vs remote audio.
         if useVoiceProcessing {
-            if #available(macOS 13.0, *) {
-                do {
-                    try inputNode.setVoiceProcessingEnabled(true)
-                    print("AudioRecorder: Voice processing (AEC) enabled")
-                } catch {
-                    print("AudioRecorder: Failed to enable voice processing: \(error)")
-                }
+            do {
+                try inputNode.setVoiceProcessingEnabled(true)
+                // Disable automatic ducking: macOS lowers system audio when voice
+                // processing is active (it assumes a VoIP call). We're only using
+                // AEC for source classification, not communication, so keep system
+                // volume unchanged.
+                var duckingConfig = inputNode.voiceProcessingOtherAudioDuckingConfiguration
+                duckingConfig.enableAdvancedDucking = false
+                duckingConfig.duckingLevel = .min
+                inputNode.voiceProcessingOtherAudioDuckingConfiguration = duckingConfig
+                print("AudioRecorder: Voice processing (AEC) enabled, ducking minimized")
+            } catch {
+                print("AudioRecorder: Failed to enable voice processing: \(error)")
             }
         }
 
