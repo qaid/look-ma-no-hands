@@ -42,7 +42,7 @@ class MixedAudioRecorder {
         micRMS: Float,
         systemRMS: Float,
         dominanceRatio: Float = 1.5,
-        silenceThreshold: Float = 0.005
+        silenceThreshold: Float = 0.002
     ) -> DiarizationSource {
         let micSilent = micRMS < silenceThreshold
         let systemSilent = systemRMS < silenceThreshold
@@ -62,8 +62,9 @@ class MixedAudioRecorder {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
         // Enable echo cancellation so the mic doesn't pick up system audio.
         // Note: AEC suppresses mic amplitude during system audio playback, but
-        // classifySource uses raw (unnormalized) RMS from both sources, so
-        // thresholds remain valid post-AEC.
+        // classifySource uses raw (unnormalized) RMS from both sources for fair
+        // comparison. The silence threshold (0.002) is calibrated for raw 16kHz
+        // audio where typical speech RMS is 0.01–0.1 and ambient noise is <0.001.
         self.microphoneRecorder = AudioRecorder(useVoiceProcessing: true)
 
         setupSystemAudioCallback()
