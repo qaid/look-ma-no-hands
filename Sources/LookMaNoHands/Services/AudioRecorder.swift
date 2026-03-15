@@ -49,21 +49,14 @@ class AudioRecorder {
 
         let inputNode = audioEngine.inputNode
 
-        // Enable voice processing (echo cancellation) for meeting mode.
-        // This removes system audio bleed from the mic signal so that
-        // source classification can correctly distinguish local vs remote audio.
+        // Optional voice processing (echo cancellation). Currently unused in
+        // meeting mode because it causes macOS to duck system audio even with
+        // duckingLevel=.min. Meeting mode instead compensates for speaker bleed
+        // in MixedAudioRecorder.classifySource.
         if useVoiceProcessing {
             do {
                 try inputNode.setVoiceProcessingEnabled(true)
-                // Disable automatic ducking: macOS lowers system audio when voice
-                // processing is active (it assumes a VoIP call). We're only using
-                // AEC for source classification, not communication, so keep system
-                // volume unchanged.
-                var duckingConfig = inputNode.voiceProcessingOtherAudioDuckingConfiguration
-                duckingConfig.enableAdvancedDucking = false
-                duckingConfig.duckingLevel = .min
-                inputNode.voiceProcessingOtherAudioDuckingConfiguration = duckingConfig
-                print("AudioRecorder: Voice processing (AEC) enabled, ducking minimized")
+                print("AudioRecorder: Voice processing (AEC) enabled")
             } catch {
                 print("AudioRecorder: Failed to enable voice processing: \(error)")
             }
