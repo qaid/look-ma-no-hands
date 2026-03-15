@@ -340,6 +340,7 @@ struct WhisperModelStepView: View {
 
     @State private var modelExists: Bool = false
     @State private var isCheckingModel: Bool = true
+    @State private var isLoadingModel: Bool = false
     @State private var downloadError: String?
 
     var body: some View {
@@ -364,11 +365,23 @@ struct WhisperModelStepView: View {
                 ProgressView("Checking for existing model...")
                     .padding()
             } else if modelExists || onboardingState.modelDownloaded {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                    Text("Current model: \(onboardingState.selectedModel.displayName)")
-                        .font(.headline)
+                VStack(spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Current model: \(onboardingState.selectedModel.displayName)")
+                            .font(.headline)
+                    }
+
+                    if isLoadingModel {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Preparing model for first use…")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 .padding()
             } else {
@@ -457,6 +470,7 @@ struct WhisperModelStepView: View {
         // If model exists, load it and warm up the Neural Engine
         // (warmup is essential to prevent 10-second latency on first dictation)
         if exists {
+            isLoadingModel = true
             Task {
                 do {
                     // Load the existing model
@@ -466,12 +480,14 @@ struct WhisperModelStepView: View {
                     await whisperService.warmUpNeuralEngine()
 
                     await MainActor.run {
+                        isLoadingModel = false
                         onboardingState.modelDownloaded = true
                         Settings.shared.whisperModel = onboardingState.selectedModel
                     }
                 } catch {
                     // If loading fails, user needs to re-download
                     await MainActor.run {
+                        isLoadingModel = false
                         modelExists = false
                         onboardingState.modelDownloaded = false
                     }
