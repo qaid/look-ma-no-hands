@@ -1361,6 +1361,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // When macOS terminates the app after granting screen recording permission
+        // ("Quit & Reopen" dialog), it may fail to relaunch accessory/menu-bar apps.
+        // Schedule our own relaunch so the user isn't left without the app.
+        if Settings.shared.pendingScreenRecordingGrant {
+            let bundlePath = Bundle.main.bundlePath
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/bin/sh")
+            task.arguments = ["-c", "sleep 1 && open \"\(bundlePath)\""]
+            try? task.run()
+        }
+
         Logger.shared.info("App terminating normally", category: .app)
         MemoryMonitor.shared.stopMonitoring()
         Logger.shared.shutdown()
