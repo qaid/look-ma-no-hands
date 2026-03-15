@@ -50,6 +50,8 @@ struct MeetingRecordTab: View {
         self.recordingIndicator = recordingIndicator
         self.appDelegate = appDelegate
         self.onRecordingFinished = onRecordingFinished
+        // 5s chunks for fast display. Previously 10s to reduce Whisper hallucinations,
+        // but AEC now removes system audio bleed which was the main cause of repetition artifacts.
         let meetingChunkDuration: TimeInterval = 5
         _mixedAudioRecorder = State(initialValue: MixedAudioRecorder(chunkDuration: meetingChunkDuration))
         _continuousTranscriber = State(initialValue: ContinuousTranscriber(whisperService: whisperService, chunkDuration: meetingChunkDuration))

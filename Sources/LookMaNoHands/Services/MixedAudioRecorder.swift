@@ -60,9 +60,11 @@ class MixedAudioRecorder {
 
     init(chunkDuration: TimeInterval = 5) {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
-        self.microphoneRecorder = AudioRecorder()
-        // Enable echo cancellation so the mic doesn't pick up system audio
-        self.microphoneRecorder.useVoiceProcessing = true
+        // Enable echo cancellation so the mic doesn't pick up system audio.
+        // Note: AEC suppresses mic amplitude during system audio playback, but
+        // drainAvailableSamples() normalizes to 0.9 peak before RMS comparison,
+        // so classifySource thresholds remain valid post-AEC.
+        self.microphoneRecorder = AudioRecorder(useVoiceProcessing: true)
 
         setupSystemAudioCallback()
     }

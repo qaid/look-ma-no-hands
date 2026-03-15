@@ -17,8 +17,13 @@ class AudioRecorder {
     /// Whether recording is currently in progress
     private(set) var isRecording = false
 
-    /// Whether to enable voice processing (echo cancellation) for meeting mode
-    var useVoiceProcessing: Bool = false
+    /// Whether to enable voice processing (echo cancellation) for meeting mode.
+    /// Set at init time; read during startRecording() to configure the audio engine.
+    let useVoiceProcessing: Bool
+
+    init(useVoiceProcessing: Bool = false) {
+        self.useVoiceProcessing = useVoiceProcessing
+    }
 
     /// The sample rate required by Whisper
     private let targetSampleRate: Double = 16000
@@ -46,7 +51,7 @@ class AudioRecorder {
 
         // Enable voice processing (echo cancellation) for meeting mode.
         // This removes system audio bleed from the mic signal so that
-        // speaker diarization can correctly distinguish local vs remote audio.
+        // source classification can correctly distinguish local vs remote audio.
         if useVoiceProcessing {
             if #available(macOS 13.0, *) {
                 do {
