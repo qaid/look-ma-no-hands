@@ -61,6 +61,8 @@ class MixedAudioRecorder {
     init(chunkDuration: TimeInterval = 5) {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
         self.microphoneRecorder = AudioRecorder()
+        // Enable echo cancellation so the mic doesn't pick up system audio
+        self.microphoneRecorder.useVoiceProcessing = true
 
         setupSystemAudioCallback()
     }
