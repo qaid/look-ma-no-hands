@@ -85,7 +85,9 @@ class AudioRecorder {
     
     /// Drain buffered microphone samples for mixing, keeping only recent samples for visualization.
     /// Returns resampled audio at 16kHz. Drained samples are removed from the buffer.
-    func drainAvailableSamples() -> [Float] {
+    /// - Parameter normalize: If true (default), normalizes audio to 0.9 peak. Pass false when
+    ///   raw samples are needed for RMS comparison (e.g., source classification).
+    func drainAvailableSamples(normalize: Bool = true) -> [Float] {
         guard isRecording else { return [] }
 
         let rawSamples: [Float] = bufferLock.withLock {
@@ -109,7 +111,7 @@ class AudioRecorder {
         }
 
         // Normalize audio levels to match stopRecording() behavior
-        return normalizeAudio(resampled)
+        return normalize ? normalizeAudio(resampled) : resampled
     }
 
     /// Get frequency band levels for waveform visualization

@@ -62,8 +62,8 @@ class MixedAudioRecorder {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
         // Enable echo cancellation so the mic doesn't pick up system audio.
         // Note: AEC suppresses mic amplitude during system audio playback, but
-        // drainAvailableSamples() normalizes to 0.9 peak before RMS comparison,
-        // so classifySource thresholds remain valid post-AEC.
+        // classifySource uses raw (unnormalized) RMS from both sources, so
+        // thresholds remain valid post-AEC.
         self.microphoneRecorder = AudioRecorder(useVoiceProcessing: true)
 
         setupSystemAudioCallback()
@@ -133,18 +133,24 @@ class MixedAudioRecorder {
         systemAudioRecorder.onAudioChunk = { [weak self] systemChunk in
             guard let self = self else { return }
 
-            // Drain only new mic samples (already resampled to 16kHz, old samples removed)
-            let micChunk = self.microphoneRecorder.drainAvailableSamples()
+            // Drain raw (unnormalized) mic samples for fair RMS comparison
+            let micChunkRaw = self.microphoneRecorder.drainAvailableSamples(normalize: false)
 
-            print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
+            print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunkRaw.count) samples")
 
-            // Classify source using pre-mix RMS values
-            let micRMS = Self.computeRMS(micChunk)
+            // Classify source using raw RMS values (both unnormalized for fair comparison)
+            let micRMS = Self.computeRMS(micChunkRaw)
             let systemRMS = Self.computeRMS(systemChunk)
             let source = Self.classifySource(micRMS: micRMS, systemRMS: systemRMS)
 
-            // Mix the chunks
-            let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
+            // Normalize both sources independently before mixing so system audio
+            // (which arrives at lower amplitude from ScreenCaptureKit) is brought
+            // to the same level as mic audio
+            let micChunk = self.normalizeAudio(micChunkRaw)
+            let systemChunkNormalized = self.normalizeAudio(systemChunk)
+
+            // Mix the normalized chunks
+            let mixedChunk = self.mixAudio(systemSamples: systemChunkNormalized, micSamples: micChunk)
 
             // Send the mixed chunk via the source-aware callback if set, otherwise fall back
             if self.onAudioChunkWithSource != nil {
@@ -165,18 +171,16 @@ class MixedAudioRecorder {
 
         var mixed = [Float](repeating: 0, count: outputLength)
 
-        // Mix samples with balance (0.7 system, 0.8 microphone to favor user voice)
+        // Mix samples with equal balance (both sources are pre-normalized)
         for i in 0..<outputLength {
             var sample: Float = 0
 
-            // Add system audio (slightly reduced to avoid drowning out mic)
             if i < systemSamples.count {
                 sample += systemSamples[i] * 0.7
             }
 
-            // Add microphone audio (keep at higher level)
             if i < micSamples.count {
-                sample += micSamples[i] * 0.8
+                sample += micSamples[i] * 0.7
             }
 
             // Soft clipping to prevent distortion
@@ -225,8 +229,8 @@ class MixedAudioRecorder {
         for i in 0..<bandCount {
             let systemLevel = i < systemSamples.count ? systemSamples[i] : 0.0
             let micLevel = i < micSamples.count ? micSamples[i] : 0.0
-            // Use max to ensure both sources are visible, or sum with normalization
-            let mixed = min(systemLevel + micLevel, 1.0)
+            // Use max so whichever source is active drives the visualizer
+            let mixed = max(systemLevel, micLevel)
             mixedBands.append(mixed)
         }
 

@@ -326,8 +326,6 @@ struct MeetingAnalyzeTab: View {
                 statusMessage = "Notes copied to clipboard"
             } label: {
                 Label("Copy Notes", systemImage: "doc.on.doc")
-                    .lineLimit(1)
-                    .fixedSize()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -338,8 +336,6 @@ struct MeetingAnalyzeTab: View {
                 if let meeting = selectedMeeting { saveNotes(for: meeting) }
             } label: {
                 Label("Export", systemImage: "square.and.arrow.down")
-                    .lineLimit(1)
-                    .fixedSize()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
@@ -352,14 +348,13 @@ struct MeetingAnalyzeTab: View {
                 statusMessage = "Transcript copied to clipboard"
             } label: {
                 Label("Copy Transcript", systemImage: "doc.text")
-                    .lineLimit(1)
-                    .fixedSize()
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(transcript.isEmpty)
             .help("Copy transcript to clipboard")
         }
+        .labelStyle(.iconOnly)
     }
 
     // MARK: - Transcript Section
