@@ -37,22 +37,30 @@ class MixedAudioRecorder {
         return rms
     }
 
-    /// Classify the dominant audio source based on pre-mix RMS values
+    /// Classify the dominant audio source based on pre-mix RMS values.
+    /// Without AEC, the mic picks up system audio from speakers. We compensate
+    /// by subtracting an estimated bleed fraction of the system RMS from the mic
+    /// RMS before comparing. Typical laptop speaker-to-mic bleed is 10-30%.
     static func classifySource(
         micRMS: Float,
         systemRMS: Float,
         dominanceRatio: Float = 1.5,
-        silenceThreshold: Float = 0.002
+        silenceThreshold: Float = 0.002,
+        bleedFraction: Float = 0.25
     ) -> DiarizationSource {
-        let micSilent = micRMS < silenceThreshold
+        // Estimate mic RMS with system bleed removed
+        let estimatedBleed = systemRMS * bleedFraction
+        let adjustedMicRMS = max(micRMS - estimatedBleed, 0)
+
+        let micSilent = adjustedMicRMS < silenceThreshold
         let systemSilent = systemRMS < silenceThreshold
 
         if micSilent && systemSilent { return .mixed }
         if micSilent { return .remote }
         if systemSilent { return .local }
 
-        if micRMS >= systemRMS * dominanceRatio { return .local }
-        if systemRMS >= micRMS * dominanceRatio { return .remote }
+        if adjustedMicRMS >= systemRMS * dominanceRatio { return .local }
+        if systemRMS >= adjustedMicRMS * dominanceRatio { return .remote }
         return .mixed
     }
 
@@ -60,12 +68,10 @@ class MixedAudioRecorder {
 
     init(chunkDuration: TimeInterval = 5) {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
-        // Enable echo cancellation so the mic doesn't pick up system audio.
-        // Note: AEC suppresses mic amplitude during system audio playback, but
-        // classifySource uses raw (unnormalized) RMS from both sources for fair
-        // comparison. The silence threshold (0.002) is calibrated for raw 16kHz
-        // audio where typical speech RMS is 0.01–0.1 and ambient noise is <0.001.
-        self.microphoneRecorder = AudioRecorder(useVoiceProcessing: true)
+        // Voice processing is disabled to prevent macOS from ducking system audio.
+        // Without AEC the mic will pick up speaker bleed, but classifySource
+        // compensates by subtracting an estimated bleed fraction from mic RMS.
+        self.microphoneRecorder = AudioRecorder(useVoiceProcessing: false)
 
         setupSystemAudioCallback()
     }
