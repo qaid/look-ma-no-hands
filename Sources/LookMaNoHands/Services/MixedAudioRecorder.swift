@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Accelerate
+import CoreAudio
 
 /// Service that captures and mixes both system audio and microphone audio
 /// Used for meeting transcription to capture both remote participants and local speaker
@@ -37,22 +38,76 @@ class MixedAudioRecorder {
         return rms
     }
 
-    /// Classify the dominant audio source based on pre-mix RMS values
+    /// Detect whether the current output device is headphones (Bluetooth or wired).
+    /// When headphones are in use, speaker-to-mic bleed is negligible.
+    static func isHeadphonesConnected() -> Bool {
+        var deviceID: AudioDeviceID = 0
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
+        ) == noErr, deviceID != 0 else { return false }
+
+        // Check Bluetooth transport type
+        var transportType: UInt32 = 0
+        size = UInt32(MemoryLayout<UInt32>.size)
+        address.mSelector = kAudioDevicePropertyTransportType
+        if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transportType) == noErr {
+            if transportType == kAudioDeviceTransportTypeBluetooth ||
+               transportType == kAudioDeviceTransportTypeBluetoothLE {
+                return true
+            }
+        }
+
+        // Check wired headphones via data source ('hdpn' = headphones)
+        var dataSource: UInt32 = 0
+        size = UInt32(MemoryLayout<UInt32>.size)
+        address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDataSource,
+            mScope: kAudioObjectPropertyScopeOutput,
+            mElement: 0
+        )
+        if AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &dataSource) == noErr {
+            // 'hdpn' as UInt32 big-endian
+            let hdpn: UInt32 = 0x6864706E
+            return dataSource == hdpn
+        }
+
+        return false
+    }
+
+    /// Classify the dominant audio source based on pre-mix RMS values.
+    /// Without AEC, the mic picks up system audio from speakers. We compensate
+    /// by subtracting an estimated bleed fraction of the system RMS from the mic
+    /// RMS before comparing. Bleed fraction is 0 when headphones are detected
+    /// (no speaker-to-mic bleed) and ~25% for built-in speakers.
     static func classifySource(
         micRMS: Float,
         systemRMS: Float,
         dominanceRatio: Float = 1.5,
-        silenceThreshold: Float = 0.005
+        silenceThreshold: Float = 0.002,
+        bleedFraction: Float? = nil
     ) -> DiarizationSource {
-        let micSilent = micRMS < silenceThreshold
+        // Use provided bleed fraction, or auto-detect based on output device
+        let effectiveBleed = bleedFraction ?? (isHeadphonesConnected() ? 0.0 : 0.25)
+
+        // Estimate mic RMS with system bleed removed
+        let estimatedBleed = systemRMS * effectiveBleed
+        let adjustedMicRMS = max(micRMS - estimatedBleed, 0)
+
+        let micSilent = adjustedMicRMS < silenceThreshold
         let systemSilent = systemRMS < silenceThreshold
 
         if micSilent && systemSilent { return .mixed }
         if micSilent { return .remote }
         if systemSilent { return .local }
 
-        if micRMS >= systemRMS * dominanceRatio { return .local }
-        if systemRMS >= micRMS * dominanceRatio { return .remote }
+        if adjustedMicRMS >= systemRMS * dominanceRatio { return .local }
+        if systemRMS >= adjustedMicRMS * dominanceRatio { return .remote }
         return .mixed
     }
 
@@ -60,11 +115,10 @@ class MixedAudioRecorder {
 
     init(chunkDuration: TimeInterval = 5) {
         self.systemAudioRecorder = SystemAudioRecorder(chunkDuration: chunkDuration)
-        // Enable echo cancellation so the mic doesn't pick up system audio.
-        // Note: AEC suppresses mic amplitude during system audio playback, but
-        // drainAvailableSamples() normalizes to 0.9 peak before RMS comparison,
-        // so classifySource thresholds remain valid post-AEC.
-        self.microphoneRecorder = AudioRecorder(useVoiceProcessing: true)
+        // Voice processing is disabled to prevent macOS from ducking system audio.
+        // Without AEC the mic will pick up speaker bleed, but classifySource
+        // compensates by subtracting an estimated bleed fraction from mic RMS.
+        self.microphoneRecorder = AudioRecorder(useVoiceProcessing: false)
 
         setupSystemAudioCallback()
     }
@@ -133,18 +187,24 @@ class MixedAudioRecorder {
         systemAudioRecorder.onAudioChunk = { [weak self] systemChunk in
             guard let self = self else { return }
 
-            // Drain only new mic samples (already resampled to 16kHz, old samples removed)
-            let micChunk = self.microphoneRecorder.drainAvailableSamples()
+            // Drain raw (unnormalized) mic samples for fair RMS comparison
+            let micChunkRaw = self.microphoneRecorder.drainAvailableSamples(normalize: false)
 
-            print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunk.count) samples")
+            print("MixedAudioRecorder: System chunk: \(systemChunk.count), mic chunk: \(micChunkRaw.count) samples")
 
-            // Classify source using pre-mix RMS values
-            let micRMS = Self.computeRMS(micChunk)
+            // Classify source using raw RMS values (both unnormalized for fair comparison)
+            let micRMS = Self.computeRMS(micChunkRaw)
             let systemRMS = Self.computeRMS(systemChunk)
             let source = Self.classifySource(micRMS: micRMS, systemRMS: systemRMS)
 
-            // Mix the chunks
-            let mixedChunk = self.mixAudio(systemSamples: systemChunk, micSamples: micChunk)
+            // Normalize both sources independently before mixing so system audio
+            // (which arrives at lower amplitude from ScreenCaptureKit) is brought
+            // to the same level as mic audio
+            let micChunk = self.normalizeAudio(micChunkRaw)
+            let systemChunkNormalized = self.normalizeAudio(systemChunk)
+
+            // Mix the normalized chunks
+            let mixedChunk = self.mixAudio(systemSamples: systemChunkNormalized, micSamples: micChunk)
 
             // Send the mixed chunk via the source-aware callback if set, otherwise fall back
             if self.onAudioChunkWithSource != nil {
@@ -165,18 +225,16 @@ class MixedAudioRecorder {
 
         var mixed = [Float](repeating: 0, count: outputLength)
 
-        // Mix samples with balance (0.7 system, 0.8 microphone to favor user voice)
+        // Mix samples with equal balance (both sources are pre-normalized)
         for i in 0..<outputLength {
             var sample: Float = 0
 
-            // Add system audio (slightly reduced to avoid drowning out mic)
             if i < systemSamples.count {
                 sample += systemSamples[i] * 0.7
             }
 
-            // Add microphone audio (keep at higher level)
             if i < micSamples.count {
-                sample += micSamples[i] * 0.8
+                sample += micSamples[i] * 0.7
             }
 
             // Soft clipping to prevent distortion
@@ -209,8 +267,8 @@ class MixedAudioRecorder {
     // MARK: - Frequency Visualization
 
     /// Get frequency bands for waveform visualization
-    /// Analyzes the mixed audio (system + microphone) to show all captured sound
-    /// This visualizes both remote participants and your own voice
+    /// Uses the louder of system or microphone for each band so whichever
+    /// source is active drives the visualizer
     func getFrequencyBands(bandCount: Int) -> [Float] {
         guard isRecording else {
             return Array(repeating: 0.0, count: bandCount)
@@ -225,8 +283,8 @@ class MixedAudioRecorder {
         for i in 0..<bandCount {
             let systemLevel = i < systemSamples.count ? systemSamples[i] : 0.0
             let micLevel = i < micSamples.count ? micSamples[i] : 0.0
-            // Use max to ensure both sources are visible, or sum with normalization
-            let mixed = min(systemLevel + micLevel, 1.0)
+            // Use max so whichever source is active drives the visualizer
+            let mixed = max(systemLevel, micLevel)
             mixedBands.append(mixed)
         }
 

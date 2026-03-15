@@ -49,17 +49,16 @@ class AudioRecorder {
 
         let inputNode = audioEngine.inputNode
 
-        // Enable voice processing (echo cancellation) for meeting mode.
-        // This removes system audio bleed from the mic signal so that
-        // source classification can correctly distinguish local vs remote audio.
+        // Optional voice processing (echo cancellation). Currently unused in
+        // meeting mode because it causes macOS to duck system audio even with
+        // duckingLevel=.min. Meeting mode instead compensates for speaker bleed
+        // in MixedAudioRecorder.classifySource.
         if useVoiceProcessing {
-            if #available(macOS 13.0, *) {
-                do {
-                    try inputNode.setVoiceProcessingEnabled(true)
-                    print("AudioRecorder: Voice processing (AEC) enabled")
-                } catch {
-                    print("AudioRecorder: Failed to enable voice processing: \(error)")
-                }
+            do {
+                try inputNode.setVoiceProcessingEnabled(true)
+                print("AudioRecorder: Voice processing (AEC) enabled")
+            } catch {
+                print("AudioRecorder: Failed to enable voice processing: \(error)")
             }
         }
 
@@ -85,7 +84,9 @@ class AudioRecorder {
     
     /// Drain buffered microphone samples for mixing, keeping only recent samples for visualization.
     /// Returns resampled audio at 16kHz. Drained samples are removed from the buffer.
-    func drainAvailableSamples() -> [Float] {
+    /// - Parameter normalize: If true (default), normalizes audio to 0.9 peak. Pass false when
+    ///   raw samples are needed for RMS comparison (e.g., source classification).
+    func drainAvailableSamples(normalize: Bool = true) -> [Float] {
         guard isRecording else { return [] }
 
         let rawSamples: [Float] = bufferLock.withLock {
@@ -109,7 +110,7 @@ class AudioRecorder {
         }
 
         // Normalize audio levels to match stopRecording() behavior
-        return normalizeAudio(resampled)
+        return normalize ? normalizeAudio(resampled) : resampled
     }
 
     /// Get frequency band levels for waveform visualization
