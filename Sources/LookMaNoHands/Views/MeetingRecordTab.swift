@@ -367,7 +367,7 @@ struct MeetingRecordTab: View {
 
     private static let pastelBlue = Color(red: 0.68, green: 0.78, blue: 0.95)     // Me
     private static let pastelGreen = Color(red: 0.68, green: 0.90, blue: 0.75)     // Remote/Mac OS
-    private static let pastelAmber = Color(red: 0.96, green: 0.84, blue: 0.62)     // Notes
+    static let pastelAmber = Color(red: 0.96, green: 0.84, blue: 0.62)     // Notes
 
     private static let pastelBlueTint = Color(red: 0.68, green: 0.78, blue: 0.95).opacity(0.12)
     private static let pastelGreenTint = Color(red: 0.68, green: 0.90, blue: 0.75).opacity(0.12)
@@ -462,8 +462,10 @@ struct MeetingRecordTab: View {
         let isLocal = source == .local
         let badgeColor = isLocal ? Self.pastelBlue : Self.pastelGreen
         let tintColor = isLocal ? Self.pastelBlueTint : Self.pastelGreenTint
-        let labelColor = isLocal ? Self.pastelBlueText : Self.pastelGreenText
-        let label = isLocal ? "Me" : "Mac OS"
+        let label: String = {
+            if source == .unknown { return "" }
+            return isLocal ? "Me" : "Mac OS"
+        }()
         let timeRange: String = {
             if group.entries.count > 1 && group.startTimestamp != group.endTimestamp {
                 return "\(formatTimestamp(group.startTimestamp)) – \(formatTimestamp(group.endTimestamp))"
@@ -481,10 +483,6 @@ struct MeetingRecordTab: View {
                         .padding(.horizontal, 7)
                         .padding(.vertical, 2)
                         .background(Capsule().fill(badgeColor))
-
-                    Text(label)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(labelColor)
                 }
 
                 Spacer()
@@ -959,7 +957,7 @@ private struct NoteAboveIndicator: View {
             .padding(.vertical, 5)
             .background(
                 Capsule()
-                    .fill(Color(red: 0.96, green: 0.84, blue: 0.62))
+                    .fill(MeetingRecordTab.pastelAmber)
                     .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
             )
         }

@@ -122,13 +122,13 @@ final class MergedTranscriptDiarizationTests: XCTestCase {
         XCTAssertTrue(transcript.hasPrefix("[Me]"), "Local segment should be prefixed with [Me]")
     }
 
-    func testRemoteSourceRemotePrefix() {
+    func testRemoteSourceMacOSPrefix() {
         let seg = makeSegment("hi there", source: .remote)
         let transcript = MeetingStore.buildMergedTranscript(segments: [seg], userNotes: [])
         XCTAssertTrue(transcript.hasPrefix("[Mac OS]"), "Remote segment should be prefixed with [Mac OS]")
     }
 
-    func testMixedSourceRemotePrefix() {
+    func testMixedSourceMacOSPrefix() {
         let seg = makeSegment("okay let's start", source: .mixed)
         let transcript = MeetingStore.buildMergedTranscript(segments: [seg], userNotes: [])
         XCTAssertTrue(transcript.hasPrefix("[Mac OS]"), "Mixed segment should be prefixed with [Mac OS]")
@@ -228,7 +228,7 @@ final class MeetingAnalyzerDiarizationTests: XCTestCase {
         XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"), "Diarization suffix should also be appended")
     }
 
-    func testDiarizationSuffixAppendedWhenRemotePresent() {
+    func testDiarizationSuffixAppendedWhenMacOSPresent() {
         let transcript = "[Mac OS] let me explain the issue"
         let split = MeetingAnalyzer.buildSplitPrompt(
             prompt: "Summarize.\n[TRANSCRIPTION_PLACEHOLDER]",
@@ -236,5 +236,15 @@ final class MeetingAnalyzerDiarizationTests: XCTestCase {
             modelName: "llama3"
         )
         XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"))
+    }
+
+    func testDiarizationSuffixAppendedForLegacyRemoteMarker() {
+        let transcript = "[Remote] let me explain the issue"
+        let split = MeetingAnalyzer.buildSplitPrompt(
+            prompt: "Summarize.\n[TRANSCRIPTION_PLACEHOLDER]",
+            transcript: transcript,
+            modelName: "llama3"
+        )
+        XCTAssertTrue(split.system.contains("SPEAKER DIARIZATION RULES"), "Legacy [Remote] marker should trigger diarization instructions")
     }
 }

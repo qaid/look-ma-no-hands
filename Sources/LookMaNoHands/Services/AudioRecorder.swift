@@ -77,13 +77,16 @@ class AudioRecorder {
 
         guard !rawSamples.isEmpty else { return [] }
 
-        // Resample to 16kHz if needed (no normalization — caller needs raw levels
-        // for accurate RMS-based source classification in MixedAudioRecorder)
+        // Resample to 16kHz if needed
+        let resampled: [Float]
         if abs(inputSampleRate - targetSampleRate) > 0.1 {
-            return resampleToTarget(rawSamples)
+            resampled = resampleToTarget(rawSamples)
         } else {
-            return rawSamples
+            resampled = rawSamples
         }
+
+        // Normalize audio levels to match stopRecording() behavior
+        return normalizeAudio(resampled)
     }
 
     /// Get frequency band levels for waveform visualization

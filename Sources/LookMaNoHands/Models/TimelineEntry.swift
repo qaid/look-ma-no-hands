@@ -64,7 +64,9 @@ enum TimelineEntry: Identifiable {
 
         for entry in entries.dropFirst() {
             let key = entry.groupKey
-            if key == currentKey {
+            // Never merge .unknown segments — keep each as its own block for readability
+            let isUnknown = key == .speaker(.unknown)
+            if key == currentKey && !isUnknown {
                 currentEntries.append(entry)
             } else {
                 groups.append(TimelineGroup(key: currentKey, entries: currentEntries))

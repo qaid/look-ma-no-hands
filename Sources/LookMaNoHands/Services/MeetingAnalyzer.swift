@@ -36,7 +36,7 @@ IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These 
 
 SPEAKER DIARIZATION RULES: The transcript uses the following markers for speaker attribution:
 - [Me] — spoken by the local user (the person who recorded this meeting)
-- [Mac OS] — spoken by one or more remote participants
+- [Mac OS] (or [Remote] in older recordings) — spoken by one or more remote participants
 - [SPEAKER_CHANGE] — a likely turn change among remote participants (a pause was detected)
 
 When attributing speech:
@@ -82,7 +82,7 @@ When attributing speech:
         }
 
         // Append diarization instructions when speaker markers are present
-        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Mac OS]")
+        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Mac OS]") || transcript.contains("[Remote]")
         if hasDiarization {
             system += diarizationInstructionSuffix
         }
