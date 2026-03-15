@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Look Ma No Hands — Local Voice Dictation for macOS</title>
+<meta name="description" content="Fast, private voice dictation and meeting transcription for macOS. 100% local processing with Whisper. No cloud, no accounts, no data leaves your Mac.">
+<meta property="og:title" content="Look Ma No Hands — Local Voice Dictation for macOS">
+<meta property="og:description" content="Fast, private voice dictation and meeting transcription for macOS. 100% local processing. No cloud, no accounts.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://qaid.github.io/look-ma-no-hands/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='70' r='22' fill='%234e7fff' opacity='0.3'/><rect x='44' y='20' width='12' height='50' rx='6' fill='%234e7fff'/><path d='M30 52 C30 68 40 80 50 80 C60 80 70 68 70 52' fill='none' stroke='%234e7fff' stroke-width='3.5' stroke-linecap='round'/><line x1='50' y1='80' x2='50' y2='92' stroke='%234e7fff' stroke-width='3.5' stroke-linecap='round'/><line x1='38' y1='92' x2='62' y2='92' stroke='%234e7fff' stroke-width='3.5' stroke-linecap='round'/></svg>">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ---- THEME TOKENS ---- */
+  :root {
+    --bg: #0d0d0d;
+    --text: #f0f0f0;
+    --text-secondary: #aaa;
+    --text-muted: #888;
+    --text-faint: #666;
+    --text-ghost: #4a4a4a;
+    --border: #1a1a1a;
+    --border-subtle: #151515;
+    --nav-bg: rgba(13, 13, 13, 0.85);
+    --indicator-bg: rgba(20, 20, 20, 0.8);
+    --indicator-border: rgba(255, 255, 255, 0.07);
+    --code-bg: #111;
+    --code-text: #888;
+    --code-dim: #383838;
+    --kbd-bg: rgba(255, 255, 255, 0.06);
+    --kbd-border: rgba(255, 255, 255, 0.1);
+    --kbd-text: #ccc;
+    --kbd-shadow: rgba(0, 0, 0, 0.4);
+    --scanline: rgba(255, 255, 255, 0.007);
+    --hero-italic: #999;
+    --note-num: #222;
+    --cta-color: #aaa;
+    --cta-hover: #f0f0f0;
+    --cta-border: #444;
+    --cta-border-hover: #777;
+    --link-color: #888;
+    --link-hover: #ccc;
+    --link-border: #444;
+    --link-border-hover: #777;
+    --screenshot-border: #1a1a1a;
+    --img-shadow: none;
+
+    /* Waveform gradients — set via JS */
+    --wf-stroke-r: rgba(255,64,51,0.6);
+    --wf-stroke-b: rgba(77,128,255,0.8);
+    --wf-stroke-p: rgba(102,64,217,0.7);
+    --wf-fill-top: rgba(77,128,255,0.15);
+    --wf-fill-bot: rgba(77,128,255,0);
+
+    color-scheme: dark;
+  }
+
+  [data-theme="light"] {
+    --bg: #f5f4f0;
+    --text: #1a1a18;
+    --text-secondary: #555;
+    --text-muted: #777;
+    --text-faint: #999;
+    --text-ghost: #bbb;
+    --border: #ddd;
+    --border-subtle: #e4e4e0;
+    --nav-bg: rgba(245, 244, 240, 0.88);
+    --indicator-bg: rgba(245, 244, 240, 0.9);
+    --indicator-border: rgba(0, 0, 0, 0.08);
+    --code-bg: #eae8e3;
+    --code-text: #555;
+    --code-dim: #bbb;
+    --kbd-bg: rgba(0, 0, 0, 0.05);
+    --kbd-border: rgba(0, 0, 0, 0.12);
+    --kbd-text: #333;
+    --kbd-shadow: rgba(0, 0, 0, 0.08);
+    --scanline: rgba(0, 0, 0, 0.006);
+    --hero-italic: #888;
+    --note-num: #e8e6e0;
+    --cta-color: #555;
+    --cta-hover: #111;
+    --cta-border: #bbb;
+    --cta-border-hover: #666;
+    --link-color: #666;
+    --link-hover: #222;
+    --link-border: #bbb;
+    --link-border-hover: #666;
+    --screenshot-border: #ddd;
+    --img-shadow: 0 2px 16px rgba(0,0,0,0.08);
+
+    --wf-stroke-r: rgba(230,40,30,0.75);
+    --wf-stroke-b: rgba(40,90,220,0.85);
+    --wf-stroke-p: rgba(80,40,180,0.75);
+    --wf-fill-top: rgba(40,90,220,0.12);
+    --wf-fill-bot: rgba(40,90,220,0);
+
+    color-scheme: light;
+  }
+
+  /* System preference (only applies when no explicit data-theme) */
+  @media (prefers-color-scheme: light) {
+    html:not([data-theme]) {
+      --bg: #f5f4f0;
+      --text: #1a1a18;
+      --text-secondary: #555;
+      --text-muted: #777;
+      --text-faint: #999;
+      --text-ghost: #bbb;
+      --border: #ddd;
+      --border-subtle: #e4e4e0;
+      --nav-bg: rgba(245, 244, 240, 0.88);
+      --indicator-bg: rgba(245, 244, 240, 0.9);
+      --indicator-border: rgba(0, 0, 0, 0.08);
+      --code-bg: #eae8e3;
+      --code-text: #555;
+      --code-dim: #bbb;
+      --kbd-bg: rgba(0, 0, 0, 0.05);
+      --kbd-border: rgba(0, 0, 0, 0.12);
+      --kbd-text: #333;
+      --kbd-shadow: rgba(0, 0, 0, 0.08);
+      --scanline: rgba(0, 0, 0, 0.006);
+      --hero-italic: #888;
+      --note-num: #e8e6e0;
+      --cta-color: #555;
+      --cta-hover: #111;
+      --cta-border: #bbb;
+      --cta-border-hover: #666;
+      --link-color: #666;
+      --link-hover: #222;
+      --link-border: #bbb;
+      --link-border-hover: #666;
+      --screenshot-border: #ddd;
+      --img-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      --wf-stroke-r: rgba(230,40,30,0.75);
+      --wf-stroke-b: rgba(40,90,220,0.85);
+      --wf-stroke-p: rgba(80,40,180,0.75);
+      --wf-fill-top: rgba(40,90,220,0.12);
+      --wf-fill-bot: rgba(40,90,220,0);
+      color-scheme: light;
+    }
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    transition: background 0.3s, color 0.3s;
+  }
+
+  /* Scan-line texture */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      var(--scanline) 2px,
+      var(--scanline) 3px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  a { color: inherit; }
+
+  /* ---- NAV ---- */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(24px, 5vw, 60px);
+    height: 56px;
+    background: var(--nav-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .nav-name {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    text-decoration: none;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .nav-link {
+    font-size: 14px;
+    color: var(--text-muted);
+    text-decoration: none;
+    letter-spacing: 0.04em;
+    transition: color 0.2s;
+  }
+  .nav-link:hover { color: var(--text-secondary); }
+
+  /* Theme switcher */
+  .theme-switcher {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--kbd-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px;
+  }
+
+  .theme-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    padding: 0;
+  }
+  .theme-btn:hover { color: var(--text-secondary); }
+  .theme-btn.active {
+    background: var(--border);
+    color: var(--text);
+  }
+  .theme-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  /* ---- LAYOUT ---- */
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 clamp(24px, 5vw, 60px);
+  }
+
+  /* ---- HERO ---- */
+  .hero {
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding-top: 100px;
+    padding-bottom: 80px;
+    position: relative;
+  }
+
+  .hero-overline {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 20px;
+  }
+
+  .hero h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(52px, 9vw, 112px);
+    font-weight: 700;
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    margin-bottom: 36px;
+  }
+  .hero h1 .app-icon {
+    display: inline-block;
+    font-style: normal;
+    vertical-align: baseline;
+    margin-right: 4px;
+  }
+
+  .hero h1 em {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--hero-italic);
+  }
+
+  .hero-desc {
+    font-size: 20px;
+    color: var(--text-muted);
+    max-width: 520px;
+    line-height: 1.6;
+    margin-bottom: 44px;
+  }
+
+  /* Waveform indicator — matches app exactly */
+  .indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px 8px 14px;
+    background: var(--indicator-bg);
+    border: 1px solid var(--indicator-border);
+    border-radius: 12px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    margin-bottom: 48px;
+    width: fit-content;
+    transition: background 0.3s, border-color 0.3s;
+  }
+
+  .indicator .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff3b30;
+    box-shadow: 0 0 8px rgba(255, 59, 48, 0.4);
+    flex-shrink: 0;
+  }
+
+  .indicator svg { display: block; flex-shrink: 0; }
+
+  .hero-cta {
+    display: inline-block;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--cta-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--cta-border);
+    padding-bottom: 2px;
+    transition: all 0.2s;
+  }
+  .hero-cta:hover { color: var(--cta-hover); border-color: var(--cta-border-hover); }
+
+  .hero-meta {
+    margin-top: 12px;
+    font-size: 14px;
+    color: var(--text-ghost);
+    letter-spacing: 0.06em;
+  }
+
+  /* ---- DIVIDER ---- */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+    transition: border-color 0.3s;
+  }
+
+  /* ---- TRACKLIST (FEATURES) ---- */
+  .tracklist {
+    padding: 72px 0;
+  }
+
+  .tracklist-header {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 36px;
+  }
+
+  .track {
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .track:first-of-type { border-top: 1px solid var(--border-subtle); }
+
+  .track-num {
+    font-size: 16px;
+    color: var(--text-ghost);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    width: 28px;
+  }
+
+  .track-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+    min-width: 200px;
+  }
+
+  .track-desc {
+    font-size: 17px;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .track-duration {
+    margin-left: auto;
+    font-size: 16px;
+    color: var(--text-ghost);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    padding-left: 16px;
+  }
+
+  /* ---- LINER NOTES (HOW IT WORKS) ---- */
+  .liner-notes {
+    padding: 72px 0;
+  }
+
+  .liner-notes-header {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 36px;
+  }
+
+  .notes-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+  }
+
+  .note {
+    position: relative;
+  }
+
+  .note-num {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 56px;
+    font-weight: 700;
+    color: var(--note-num);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .note h3 {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+
+  .note p {
+    font-size: 17px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  kbd {
+    display: inline-block;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 2px 6px;
+    color: var(--kbd-text);
+    background: var(--kbd-bg);
+    border: 1px solid var(--kbd-border);
+    border-radius: 4px;
+    box-shadow: 0 1px 1px var(--kbd-shadow);
+    line-height: 1;
+    vertical-align: middle;
+  }
+
+  /* ---- INSTALL (CREDITS) ---- */
+  .credits {
+    padding: 72px 0;
+  }
+
+  .credits-header {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 36px;
+  }
+
+  .credits-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+  }
+
+  .credits-install h3 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .code-block {
+    font-family: 'SF Mono', Menlo, Monaco, monospace;
+    font-size: 15px;
+    line-height: 1.8;
+    color: var(--code-text);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    transition: background 0.3s, border-color 0.3s;
+  }
+  .code-block .dim { color: var(--code-dim); user-select: none; }
+
+  .credits-alt {
+    font-size: 17px;
+    color: var(--text-faint);
+  }
+  .credits-alt a {
+    color: var(--link-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--link-border);
+    padding-bottom: 1px;
+    transition: all 0.2s;
+  }
+  .credits-alt a:hover { color: var(--link-hover); border-color: var(--link-border-hover); }
+
+  /* Requirements column */
+  .credits-reqs h3 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .req-list {
+    list-style: none;
+  }
+
+  .req-list li {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 17px;
+  }
+  .req-list li:first-child { border-top: 1px solid var(--border-subtle); }
+
+  .req-label { color: var(--text-secondary); }
+  .req-value { color: var(--text-faint); font-size: 16px; }
+
+  /* ---- SCREENSHOTS ---- */
+  .screenshots {
+    padding: 72px 0;
+  }
+
+  .screenshots-header {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 36px;
+  }
+
+  .screenshots-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .screenshot {
+    position: relative;
+  }
+
+  .screenshot img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    object-position: top;
+    border-radius: 8px;
+    border: none;
+    display: block;
+  }
+
+  .screenshot {
+    cursor: pointer;
+  }
+
+  .screenshot-caption {
+    display: block;
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--text-faint);
+  }
+
+  /* ---- LIGHTBOX ---- */
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    background: rgba(0, 0, 0, 0.85);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s, visibility 0.25s;
+    cursor: pointer;
+  }
+  .lightbox.open {
+    opacity: 1;
+    visibility: visible;
+  }
+  .lightbox img {
+    max-width: 80vw;
+    max-height: 80vh;
+    border-radius: 10px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+    transform: scale(0.95);
+    transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .lightbox.open img {
+    transform: scale(1);
+  }
+  .lightbox-caption {
+    font-size: 16px;
+    color: #aaa;
+    text-align: center;
+  }
+
+  /* ---- FOOTER ---- */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px clamp(24px, 5vw, 60px);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 960px;
+    margin: 0 auto;
+    transition: border-color 0.3s;
+  }
+
+  .footer-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-faint);
+  }
+
+  .footer-right {
+    font-size: 14px;
+    color: var(--text-ghost);
+    display: flex;
+    gap: 16px;
+  }
+  .footer-right a {
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-right a:hover { color: var(--text-secondary); }
+
+  /* ---- SCROLL REVEAL ---- */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-d1 { transition-delay: 0.06s; }
+  .reveal-d2 { transition-delay: 0.12s; }
+  .reveal-d3 { transition-delay: 0.18s; }
+  .reveal-d4 { transition-delay: 0.24s; }
+
+  /* ---- RESPONSIVE ---- */
+  @media (max-width: 768px) {
+    .notes-grid {
+      grid-template-columns: 1fr;
+      gap: 32px;
+    }
+
+    .credits-cols {
+      grid-template-columns: 1fr;
+      gap: 40px;
+    }
+
+    .track {
+      flex-wrap: wrap;
+      gap: 4px 16px;
+    }
+    .track-title { min-width: unset; }
+    .track-duration { margin-left: 48px; }
+
+    .hero { padding-top: 100px; }
+
+    .screenshots-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .hero h1 { font-size: 44px; }
+    .track-title { font-size: 19px; }
+    footer { flex-direction: column; gap: 8px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-name">&#x1F64C;&#x1F3FE; Look Ma No Hands</a>
+  <div class="nav-right">
+    <div class="theme-switcher" aria-label="Theme">
+      <button class="theme-btn" data-theme="light" title="Light">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+      <button class="theme-btn" data-theme="system" title="System">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </button>
+      <button class="theme-btn" data-theme="dark" title="Dark">
+        <svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      </button>
+    </div>
+    <a href="https://github.com/qaid/look-ma-no-hands" class="nav-link">GitHub</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero container">
+  <div class="hero-overline reveal">macOS Voice Dictation &mdash; Open Source</div>
+
+  <h1 class="reveal reveal-d1"><span class="app-icon">&#x1F64C;&#x1F3FE;</span> Look Ma,<br><em>No Hands</em></h1>
+
+  <p class="hero-desc reveal reveal-d2">Speak anywhere on your Mac. Whisper transcribes locally in under a second. No cloud. No accounts. Your voice stays yours.</p>
+
+  <div class="indicator reveal reveal-d3" aria-label="Recording indicator preview">
+    <div class="dot"></div>
+    <svg id="waveform" width="260" height="34" viewBox="0 0 260 34"></svg>
+  </div>
+
+
+</section>
+
+<hr class="divider container">
+
+<!-- FEATURES — TRACKLIST -->
+<section class="tracklist container">
+  <div class="tracklist-header reveal">Features</div>
+
+  <div class="track reveal">
+    <span class="track-num">A1</span>
+    <span class="track-title">Voice Dictation</span>
+    <span class="track-desc">Press your hotkey, speak, and formatted text appears at your cursor in any app. ~1 second with WhisperKit on Apple Silicon.</span>
+    <span class="track-duration">~1s</span>
+  </div>
+
+  <div class="track reveal reveal-d1">
+    <span class="track-num">A2</span>
+    <span class="track-title">Meeting Capture</span>
+    <span class="track-desc">Record system audio from Zoom, Meet, or Teams. Continuous real-time transcription with live display.</span>
+    <span class="track-duration">Live</span>
+  </div>
+
+  <div class="track reveal reveal-d2">
+    <span class="track-num">B1</span>
+    <span class="track-title">AI Meeting Notes</span>
+    <span class="track-desc">Transform raw transcripts into structured notes with decisions, action items, and summaries. Ollama runs locally.</span>
+    <span class="track-duration">Local</span>
+  </div>
+
+  <div class="track reveal reveal-d3">
+    <span class="track-num">B2</span>
+    <span class="track-title">Private by Design</span>
+    <span class="track-desc">Zero cloud processing. Zero telemetry. Zero accounts. Works fully offline after initial model download.</span>
+    <span class="track-duration">0 req</span>
+  </div>
+</section>
+
+<hr class="divider container">
+
+<!-- APP SCREENSHOTS -->
+<section class="screenshots container">
+  <div class="screenshots-header reveal">The App</div>
+
+  <div class="screenshots-grid">
+    <div class="screenshot reveal">
+      <img src="images/menubar-ready.png" alt="Look Ma No Hands menu bar — ready to record" loading="lazy">
+      <span class="screenshot-caption">Menu bar status — ready to record</span>
+    </div>
+    <div class="screenshot reveal reveal-d1">
+      <img src="images/onboarding-welcome.png" alt="Look Ma No Hands onboarding welcome screen" loading="lazy">
+      <span class="screenshot-caption">Guided onboarding</span>
+    </div>
+    <div class="screenshot reveal reveal-d2">
+      <img src="images/onboarding-permissions.png" alt="Look Ma No Hands permissions setup" loading="lazy">
+      <span class="screenshot-caption">Permission setup</span>
+    </div>
+    <div class="screenshot reveal reveal-d3">
+      <img src="images/meeting-recording.png" alt="Look Ma No Hands meeting recording with live transcription" loading="lazy">
+      <span class="screenshot-caption">Meeting recording &amp; transcription</span>
+    </div>
+  </div>
+</section>
+
+<hr class="divider container">
+
+<!-- HOW IT WORKS — LINER NOTES -->
+<section class="liner-notes container">
+  <div class="liner-notes-header reveal">How It Works</div>
+
+  <div class="notes-grid">
+    <div class="note reveal">
+      <div class="note-num">1</div>
+      <h3>Install</h3>
+      <p>One Homebrew command, or download the signed and notarized app from GitHub Releases.</p>
+    </div>
+
+    <div class="note reveal reveal-d1">
+      <div class="note-num">2</div>
+      <h3>Press <kbd>Caps Lock</kbd></h3>
+      <p>Or set any custom hotkey. A floating indicator appears to confirm you're recording.</p>
+    </div>
+
+    <div class="note reveal reveal-d2">
+      <div class="note-num">3</div>
+      <h3>Speak</h3>
+      <p>Talk naturally. Press the key again. Formatted text is inserted where your cursor sits.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider container">
+
+<!-- INSTALL + REQUIREMENTS — CREDITS -->
+<section class="credits container">
+  <div class="credits-cols">
+    <div class="credits-install reveal">
+      <h3>Install</h3>
+      <div class="code-block"><span class="dim">$</span> brew tap qaid/lmnh
+<span class="dim">$</span> brew install --cask look-ma-no-hands</div>
+      <p class="credits-alt">Or download the latest <a href="https://github.com/qaid/look-ma-no-hands/releases/latest">.dmg from GitHub Releases</a></p>
+    </div>
+
+    <div class="credits-reqs reveal reveal-d1">
+      <h3>Requirements</h3>
+      <ul class="req-list">
+        <li><span class="req-label">Platform</span><span class="req-value">macOS 14+ (Sonoma)</span></li>
+        <li><span class="req-label">Architecture</span><span class="req-value">Apple Silicon recommended</span></li>
+        <li><span class="req-label">Disk Space</span><span class="req-value">~200 MB for Whisper model</span></li>
+        <li><span class="req-label">AI Notes</span><span class="req-value">Ollama (optional)</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<hr class="divider container">
+
+<!-- FOOTER -->
+<footer>
+  <span class="footer-name">Look Ma No Hands</span>
+  <div class="footer-right">
+    <a href="https://github.com/qaid/look-ma-no-hands">GitHub</a>
+    <span>MIT License</span>
+  </div>
+</footer>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+  <img id="lightbox-img" src="" alt="">
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+</div>
+
+<script>
+// ---- Lightbox ----
+(function() {
+  var lb = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lightbox-img');
+  var lbCap = document.getElementById('lightbox-caption');
+
+  document.querySelectorAll('.screenshot').forEach(function(el) {
+    el.addEventListener('click', function() {
+      var img = this.querySelector('img');
+      var cap = this.querySelector('.screenshot-caption');
+      lbImg.src = img.src;
+      lbImg.alt = img.alt;
+      lbCap.textContent = cap ? cap.textContent : '';
+      lb.classList.add('open');
+    });
+  });
+
+  lb.addEventListener('click', function() {
+    lb.classList.remove('open');
+  });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') lb.classList.remove('open');
+  });
+})();
+
+// ---- Theme switcher ----
+(function() {
+  var btns = document.querySelectorAll('.theme-btn');
+  var html = document.documentElement;
+
+  function setTheme(mode) {
+    if (mode === 'system') {
+      html.removeAttribute('data-theme');
+      localStorage.removeItem('theme');
+    } else {
+      html.setAttribute('data-theme', mode);
+      localStorage.setItem('theme', mode);
+    }
+    btns.forEach(function(b) {
+      b.classList.toggle('active', b.dataset.theme === mode);
+    });
+    // Update waveform gradients after theme change
+    updateWaveformGradients();
+  }
+
+  // Restore saved preference
+  var saved = localStorage.getItem('theme');
+  if (saved) {
+    setTheme(saved);
+  } else {
+    setTheme('system');
+  }
+
+  btns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      setTheme(this.dataset.theme);
+    });
+  });
+
+  // Listen for system theme changes when in system mode
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+    if (!localStorage.getItem('theme')) updateWaveformGradients();
+  });
+})();
+
+// ---- Waveform ----
+var wfStrokeStops, wfFillStops;
+
+function updateWaveformGradients() {
+  if (!wfStrokeStops || !wfFillStops) return;
+  var style = getComputedStyle(document.documentElement);
+  wfStrokeStops[0].setAttribute('stop-color', style.getPropertyValue('--wf-stroke-r').trim());
+  wfStrokeStops[1].setAttribute('stop-color', style.getPropertyValue('--wf-stroke-b').trim());
+  wfStrokeStops[2].setAttribute('stop-color', style.getPropertyValue('--wf-stroke-p').trim());
+  wfFillStops[0].setAttribute('stop-color', style.getPropertyValue('--wf-fill-top').trim());
+  wfFillStops[1].setAttribute('stop-color', style.getPropertyValue('--wf-fill-bot').trim());
+}
+
+(function() {
+  var svg = document.getElementById('waveform');
+  var ns = 'http://www.w3.org/2000/svg';
+  var W = 260, H = 34, mid = H / 2, bands = 40;
+
+  var style = getComputedStyle(document.documentElement);
+
+  var defs = document.createElementNS(ns, 'defs');
+
+  // Stroke gradient
+  var sg = document.createElementNS(ns, 'linearGradient');
+  sg.id = 'sg';
+  sg.setAttribute('x1', '0%'); sg.setAttribute('x2', '100%');
+  var sColors = [
+    [0, style.getPropertyValue('--wf-stroke-r').trim()],
+    [0.35, style.getPropertyValue('--wf-stroke-b').trim()],
+    [1, style.getPropertyValue('--wf-stroke-p').trim()]
+  ];
+  wfStrokeStops = [];
+  sColors.forEach(function(s) {
+    var stop = document.createElementNS(ns, 'stop');
+    stop.setAttribute('offset', (s[0] * 100) + '%');
+    stop.setAttribute('stop-color', s[1]);
+    sg.appendChild(stop);
+    wfStrokeStops.push(stop);
+  });
+  defs.appendChild(sg);
+
+  // Fill gradient
+  var fg = document.createElementNS(ns, 'linearGradient');
+  fg.id = 'fg';
+  fg.setAttribute('x1', '0'); fg.setAttribute('y1', '0');
+  fg.setAttribute('x2', '0'); fg.setAttribute('y2', '1');
+  var fColors = [
+    [0, style.getPropertyValue('--wf-fill-top').trim()],
+    [1, style.getPropertyValue('--wf-fill-bot').trim()]
+  ];
+  wfFillStops = [];
+  fColors.forEach(function(s) {
+    var stop = document.createElementNS(ns, 'stop');
+    stop.setAttribute('offset', (s[0] * 100) + '%');
+    stop.setAttribute('stop-color', s[1]);
+    fg.appendChild(stop);
+    wfFillStops.push(stop);
+  });
+  defs.appendChild(fg);
+  svg.appendChild(defs);
+
+  var fillPath = document.createElementNS(ns, 'path');
+  fillPath.setAttribute('fill', 'url(#fg)');
+  svg.appendChild(fillPath);
+
+  var strokePath = document.createElementNS(ns, 'path');
+  strokePath.setAttribute('fill', 'none');
+  strokePath.setAttribute('stroke', 'url(#sg)');
+  strokePath.setAttribute('stroke-width', '2.5');
+  strokePath.setAttribute('stroke-linecap', 'round');
+  strokePath.setAttribute('stroke-linejoin', 'round');
+  svg.appendChild(strokePath);
+
+  var phase = 0;
+
+  function simulate() {
+    var b = [];
+    for (var i = 0; i < bands; i++) {
+      var v = 0;
+      v += Math.sin(phase * 1.0 + i * 0.25) * 0.3;
+      v += Math.sin(phase * 1.7 + i * 0.4) * 0.2;
+      v += Math.sin(phase * 0.6 + i * 0.15) * 0.15;
+      v += Math.sin(phase * 2.3 + i * 0.6) * 0.1;
+      v = Math.abs(v) * 1.2 + 0.08;
+      b.push(Math.min(v, 1.0));
+    }
+    return b;
+  }
+
+  function buildPath(data) {
+    var pts = [];
+    for (var i = 0; i < data.length; i++) {
+      var x = (i / (data.length - 1)) * W;
+      var norm = data[i] * data[i];
+      var amp = norm * (H * 0.45);
+      var sign = (i % 2 === 0) ? -1 : 1;
+      pts.push({ x: x, y: mid + sign * amp });
+    }
+
+    var d = 'M ' + pts[0].x.toFixed(1) + ',' + pts[0].y.toFixed(1);
+    for (var i = 1; i < pts.length; i++) {
+      var p = pts[i - 1], c = pts[i];
+      var cpx = ((p.x + c.x) / 2).toFixed(1);
+      d += ' C ' + cpx + ',' + p.y.toFixed(1) + ' ' + cpx + ',' + c.y.toFixed(1) + ' ' + c.x.toFixed(1) + ',' + c.y.toFixed(1);
+    }
+    return d;
+  }
+
+  function frame() {
+    phase += 0.04;
+    var data = simulate();
+    var d = buildPath(data);
+    strokePath.setAttribute('d', d);
+    fillPath.setAttribute('d', d + ' L ' + W + ',' + H + ' L 0,' + H + ' Z');
+    requestAnimationFrame(frame);
+  }
+  frame();
+})();
+
+// ---- Scroll reveal ----
+(function() {
+  var els = document.querySelectorAll('.reveal');
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) entry.target.classList.add('visible');
+    });
+  }, { threshold: 0.12 });
+  els.forEach(function(el) { observer.observe(el); });
+})();
+</script>
+
+</body>
+</html>
