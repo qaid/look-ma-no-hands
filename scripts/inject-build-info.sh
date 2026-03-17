@@ -24,8 +24,10 @@ COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "dev")
 BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
 
-# Backup the placeholder BuildInfo.swift
-if ! cp "$BUILD_INFO_FILE" "$BUILD_INFO_FILE.backup"; then
+# Backup the placeholder BuildInfo.swift outside Sources/ so SPM doesn't warn
+BUILD_INFO_BACKUP="$REPO_ROOT/.build/BuildInfo.swift.backup"
+mkdir -p "$(dirname "$BUILD_INFO_BACKUP")"
+if ! cp "$BUILD_INFO_FILE" "$BUILD_INFO_BACKUP"; then
     echo "ERROR: Failed to backup BuildInfo.swift" >&2
     return 1
 fi
@@ -33,9 +35,9 @@ fi
 # Set up trap to restore BuildInfo.swift on any exit (success or failure)
 # Chain with any existing EXIT trap to avoid clobbering callers' cleanup logic
 cleanup_build_info() {
-    if [ -f "$BUILD_INFO_FILE.backup" ]; then
+    if [ -f "$BUILD_INFO_BACKUP" ]; then
         echo "🔄 Restoring BuildInfo.swift placeholder..."
-        mv "$BUILD_INFO_FILE.backup" "$BUILD_INFO_FILE"
+        mv "$BUILD_INFO_BACKUP" "$BUILD_INFO_FILE"
     fi
 }
 _existing_exit_trap=$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")
