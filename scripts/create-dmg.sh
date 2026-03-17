@@ -22,6 +22,15 @@ mkdir -p "${APP_PATH}/Contents/Resources"
 cp ".build/release/LookMaNoHands" "${APP_PATH}/Contents/MacOS/LookMaNoHands"
 chmod +x "${APP_PATH}/Contents/MacOS/LookMaNoHands"
 
+# Copy SPM resource bundles so Bundle.module resolves correctly in the deployed app.
+for bundle in .build/release/*.bundle; do
+    if [ -d "$bundle" ]; then
+        bundle_name=$(basename "$bundle")
+        echo "📦 Copying resource bundle: $bundle_name"
+        cp -R "$bundle" "${APP_PATH}/Contents/Resources/$bundle_name"
+    fi
+done
+
 # Copy Info.plist and inject version from build argument
 cp "Resources/Info.plist" "${APP_PATH}/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "${VERSION}" "${APP_PATH}/Contents/Info.plist"
