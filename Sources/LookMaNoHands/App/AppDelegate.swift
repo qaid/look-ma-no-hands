@@ -102,6 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
             NSLog("🆕 First launch detected - showing onboarding")
             showOnboarding()
+            closeAutoOpenedSettingsWindow()
             return  // Skip rest of initialization until onboarding completes
         }
 
@@ -137,6 +138,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                       hasMicrophone ? "granted" : "missing",
                       hasAccessibility ? "granted" : "missing")
                 showPermissionsOnboarding()
+                closeAutoOpenedSettingsWindow()
                 return  // Skip rest of initialization until permissions are re-granted
             }
         }
@@ -147,6 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // Normal initialization for returning users
+        closeAutoOpenedSettingsWindow()
         completeInitialization()
 
         // Request notification permission
@@ -168,6 +171,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Small delay to ensure app is fully initialized
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.launchSplash.show()
+            }
+        }
+    }
+
+    /// Close any Settings window that SwiftUI auto-opens on launch.
+    /// The `Settings` scene creates an `NSWindow` with this identifier automatically.
+    private func closeAutoOpenedSettingsWindow() {
+        DispatchQueue.main.async {
+            for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
+                window.close()
             }
         }
     }
