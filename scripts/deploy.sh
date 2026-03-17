@@ -131,6 +131,17 @@ fi
 cp ".build/release/LookMaNoHands" "$APP_PATH/Contents/MacOS/LookMaNoHands"
 chmod +x "$APP_PATH/Contents/MacOS/LookMaNoHands"
 
+# Copy SPM resource bundles so Bundle.module resolves correctly in the deployed app.
+# Without these, resources (models, tokenizer configs) are unavailable at runtime
+# and Bundle.main context differs from the development build.
+for bundle in .build/release/*.bundle; do
+    if [ -d "$bundle" ]; then
+        bundle_name=$(basename "$bundle")
+        echo "📦 Copying resource bundle: $bundle_name"
+        cp -R "$bundle" "$APP_PATH/Contents/Resources/$bundle_name"
+    fi
+done
+
 # Code sign the app to bind Info.plist (without --deep to avoid invalidating the signature)
 codesign --force --sign - --entitlements Resources/LookMaNoHands.entitlements "$APP_PATH"
 

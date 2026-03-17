@@ -544,6 +544,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.delegate = self
 
+        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle
+        window.titlebarSeparatorStyle = .automatic
+        window.backgroundColor = .windowBackgroundColor
+        window.appearance = NSApp.effectiveAppearance
+
         // Create SwiftUI settings view and wrap it in NSHostingView
         let settingsView = SettingsView(whisperService: whisperService)
         let hostingView = NSHostingView(rootView: settingsView)
@@ -553,6 +558,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        window.invalidateShadow()
+        window.displayIfNeeded()
 
         NSLog("✅ Settings window created and displayed")
     }
@@ -595,6 +602,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.setFrameAutosaveName("MeetingTranscriptionWindow")
         window.delegate = self
 
+        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
+        // Without these, the agent→regular activation policy switch can produce muted/default styling.
+        window.titlebarSeparatorStyle = .automatic
+        window.backgroundColor = .windowBackgroundColor
+        // Inherit the effective system appearance so the window doesn't render with
+        // a stale appearance from the accessory activation policy.
+        window.appearance = NSApp.effectiveAppearance
+
         // Create SwiftUI meeting view and wrap it in NSHostingView
         let meetingView = MeetingView(whisperService: whisperService, recordingIndicator: recordingIndicator, appDelegate: self)
         let hostingView = NSHostingView(rootView: meetingView)
@@ -604,6 +619,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Force window display refresh after activation policy change to ensure
+        // all system colors and materials resolve with the correct appearance.
+        window.invalidateShadow()
+        window.displayIfNeeded()
 
         Settings.shared.meetingWindowWasOpen = true
         NSLog("✅ Meeting Transcription window created and displayed")
