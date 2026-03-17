@@ -78,9 +78,10 @@ hdiutil create -volname "${APP_NAME}" \
 [ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 
 # Phase B — Mount, copy background, style via AppleScript
-MOUNT_DIR=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}" | sed -n 's|.*\(/Volumes/.*\)|\1|p' | head -1)
-if [ -z "${MOUNT_DIR}" ]; then
-    echo "ERROR: Failed to mount DMG — could not determine mount point"
+MOUNT_DIR="/Volumes/${APP_NAME}"
+hdiutil attach -readwrite -noverify -mountpoint "${MOUNT_DIR}" "${TEMP_DMG}"
+if [ ! -d "${MOUNT_DIR}" ]; then
+    echo "ERROR: Failed to mount DMG at ${MOUNT_DIR}"
     rm -f "${TEMP_DMG}"
     exit 1
 fi
@@ -111,8 +112,8 @@ if [ -f "Resources/dmg-background.png" ]; then
     cp Resources/dmg-background.png "${MOUNT_DIR}/.background/background.png"
 fi
 
-# Style the DMG window with AppleScript
-osascript <<APPLESCRIPT
+# Style the DMG window with AppleScript (non-fatal — may fail in headless CI)
+if ! osascript <<APPLESCRIPT
 tell application "Finder"
     tell disk "${APP_NAME}"
         open
@@ -134,6 +135,9 @@ tell application "Finder"
     end tell
 end tell
 APPLESCRIPT
+then
+    echo "⚠️  DMG styling via AppleScript failed (expected in headless CI) — continuing without styling"
+fi
 
 # Phase C — Detach and convert to compressed read-only
 sync
