@@ -78,7 +78,7 @@ hdiutil create -volname "${APP_NAME}" \
 [ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 
 # Phase B — Mount, copy background, style via AppleScript
-MOUNT_DIR=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}" | awk '/\/Volumes\// {print $NF}')
+MOUNT_DIR=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}" | sed -n 's|.*\(/Volumes/.*\)|\1|p' | head -1)
 if [ -z "${MOUNT_DIR}" ]; then
     echo "ERROR: Failed to mount DMG — could not determine mount point"
     rm -f "${TEMP_DMG}"
@@ -93,7 +93,15 @@ cleanup_mount() {
         hdiutil detach "${MOUNT_DIR}" -force 2>/dev/null || true
     fi
 }
-trap cleanup_mount EXIT
+# Chain with existing EXIT trap (from inject-build-info.sh) to avoid clobbering cleanup
+_prev_trap=$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT$//")
+if [ -n "$_prev_trap" ]; then
+    eval "_chained_cleanup() { cleanup_mount; $_prev_trap; }"
+    trap _chained_cleanup EXIT
+else
+    trap cleanup_mount EXIT
+fi
+unset _prev_trap
 
 mkdir -p "${MOUNT_DIR}/.background"
 if [ -f "Resources/dmg-background@2x.png" ]; then
