@@ -112,6 +112,9 @@ class LiveMeetingState {
         }
         var smoothed: [Float] = []
         for i in 0..<newBands.count {
+            // Smooth 70% old / 30% new for a stable waveform.
+            // Empty frames are prevented by the dedicated visualizationBuffer
+            // in SystemAudioRecorder (not drained by chunk callbacks).
             smoothed.append(frequencyBands[i] * 0.7 + newBands[i] * 0.3)
         }
         frequencyBands = smoothed
