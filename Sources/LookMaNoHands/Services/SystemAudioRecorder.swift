@@ -22,7 +22,9 @@ class SystemAudioRecorder: NSObject {
 
     /// Buffer to store captured audio samples
     private var audioBuffer: [Float] = []
-    private let bufferLock = NSLock()  // Thread-safe access to audioBuffer
+    /// Separate buffer for visualization — not drained by chunk callbacks
+    private var visualizationBuffer: [Float] = []
+    private let bufferLock = NSLock()  // Thread-safe access to audioBuffer + visualizationBuffer
 
     /// Sample rate for recording (Whisper expects 16kHz)
     private let targetSampleRate: Double = 16000
@@ -133,6 +135,7 @@ class SystemAudioRecorder: NSObject {
         isRecording = true
         bufferLock.withLock {
             audioBuffer.removeAll()
+            visualizationBuffer.removeAll()
         }
 
         print("SystemAudioRecorder: Started recording system audio")
@@ -157,6 +160,7 @@ class SystemAudioRecorder: NSObject {
         let samples = bufferLock.withLock {
             let copy = audioBuffer
             audioBuffer.removeAll()
+            visualizationBuffer.removeAll()
             return copy
         }
 
@@ -194,6 +198,12 @@ extension SystemAudioRecorder: SCStreamOutput {
         bufferLock.withLock {
             // Add to buffer
             audioBuffer.append(contentsOf: audioSamples)
+
+            // Keep recent samples for visualization (independent of chunk draining)
+            visualizationBuffer.append(contentsOf: audioSamples)
+            if visualizationBuffer.count > 2048 {
+                visualizationBuffer.removeFirst(visualizationBuffer.count - 2048)
+            }
 
             // Optionally call chunk callback for streaming transcription
             let chunkSamples = Int(targetSampleRate * chunkDuration)
@@ -258,16 +268,13 @@ extension SystemAudioRecorder: SCStreamOutput {
             return Array(repeating: 0.0, count: bandCount)
         }
 
-        // Thread-safe copy of recent samples
+        // Thread-safe copy from visualization buffer (not drained by chunk callbacks)
         let recentSamples: [Float] = bufferLock.withLock {
-            // Use smaller threshold - 512 samples ≈ 32ms at 16kHz
-            guard audioBuffer.count > 512 else {
+            guard visualizationBuffer.count > 512 else {
                 return []
             }
-
-            // Get recent samples (copy while holding lock)
-            let sampleCount = min(1024, audioBuffer.count)
-            return Array(audioBuffer.suffix(sampleCount))
+            let sampleCount = min(1024, visualizationBuffer.count)
+            return Array(visualizationBuffer.suffix(sampleCount))
         }
 
         guard !recentSamples.isEmpty else {
