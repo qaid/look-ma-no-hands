@@ -78,10 +78,13 @@ hdiutil create -volname "${APP_NAME}" \
 [ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 
 # Phase B — Mount, copy background, style via AppleScript
-MOUNT_DIR="/Volumes/${APP_NAME}"
-hdiutil attach -readwrite -noverify -mountpoint "${MOUNT_DIR}" "${TEMP_DMG}"
-if [ ! -d "${MOUNT_DIR}" ]; then
-    echo "ERROR: Failed to mount DMG at ${MOUNT_DIR}"
+# Let hdiutil choose the mount point, then parse it from output (avoids
+# quoting pitfalls with space-containing -mountpoint paths on CI runners).
+HDIUTIL_OUT=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}")
+MOUNT_DIR=$(echo "$HDIUTIL_OUT" | tail -1 | sed 's/.*\t//;s/[[:space:]]*$//')
+if [ -z "${MOUNT_DIR}" ] || [ ! -d "${MOUNT_DIR}" ]; then
+    echo "ERROR: Failed to mount DMG (parsed mount point: '${MOUNT_DIR}')"
+    echo "hdiutil output: ${HDIUTIL_OUT}"
     rm -f "${TEMP_DMG}"
     exit 1
 fi
@@ -112,8 +115,11 @@ if [ -f "Resources/dmg-background.png" ]; then
     cp Resources/dmg-background.png "${MOUNT_DIR}/.background/background.png"
 fi
 
-# Style the DMG window with AppleScript (non-fatal — may fail in headless CI)
-if ! osascript <<APPLESCRIPT
+# Style the DMG window with AppleScript (non-fatal — may fail in headless CI).
+# Note: we use `|| true` instead of `if ! osascript <<HEREDOC` because bash 3.x
+# (macOS default) has a known interaction between set -e and heredocs inside `if`
+# conditions that can cause the script to exit despite the guard.
+APPLESCRIPT_CONTENT=$(cat <<APPLESCRIPT_EOF
 tell application "Finder"
     tell disk "${APP_NAME}"
         open
@@ -134,8 +140,9 @@ tell application "Finder"
         close
     end tell
 end tell
-APPLESCRIPT
-then
+APPLESCRIPT_EOF
+)
+if ! echo "$APPLESCRIPT_CONTENT" | osascript 2>&1; then
     echo "⚠️  DMG styling via AppleScript failed (expected in headless CI) — continuing without styling"
 fi
 
