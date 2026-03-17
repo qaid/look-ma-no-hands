@@ -10,6 +10,7 @@ APP_PATH="${BUILD_DIR}/${APP_NAME}.app"
 ENTITLEMENTS="Resources/LookMaNoHands.entitlements"
 
 echo "Building ${APP_NAME} v${VERSION}..."
+source "$(dirname "$0")/inject-build-info.sh"
 swift build -c release
 
 echo "Creating app bundle..."
