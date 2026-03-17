@@ -26,6 +26,9 @@ let package = Package(
                 .product(name: "MarkdownUI", package: "swift-markdown-ui")
             ],
             path: "Sources/LookMaNoHands",
+            exclude: [
+                "Services/BuildInfo.swift.backup"
+            ],
             resources: [
                 .copy("Resources")
             ],
