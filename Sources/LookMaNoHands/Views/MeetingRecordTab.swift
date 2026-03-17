@@ -834,14 +834,12 @@ struct MeetingRecordTab: View {
 
     private func startAudioLevelUpdates() {
         stopAudioLevelUpdates()
-        // Capture strong references — safe because stopAudioLevelUpdates() invalidates
-        // the timer in onDisappear and stopRecording(), breaking any retain cycle.
-        // Weak captures caused the timer to self-invalidate in release builds when
-        // the weak references became nil on the first tick.
+        // Capture weak references to avoid retaining @State-backed objects past
+        // view teardown. The local lets keep them alive for timer creation.
         let recorder = mixedAudioRecorder
         let state = liveState
-        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { t in
-            guard t.isValid, state.isActive else {
+        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [weak recorder, weak state] t in
+            guard let recorder = recorder, let state = state, t.isValid, state.isActive else {
                 t.invalidate()
                 return
             }
