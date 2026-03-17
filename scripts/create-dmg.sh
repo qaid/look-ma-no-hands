@@ -68,12 +68,30 @@ hdiutil create -volname "${APP_NAME}" \
 [ -d "${DMG_TEMP}" ] && rm -rf "${DMG_TEMP}"
 
 # Phase B — Mount, copy background, style via AppleScript
-MOUNT_DIR=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}" | grep "/Volumes/" | sed 's/.*\/Volumes/\/Volumes/')
+MOUNT_DIR=$(hdiutil attach -readwrite -noverify "${TEMP_DMG}" | awk '/\/Volumes\// {print $NF}')
+if [ -z "${MOUNT_DIR}" ]; then
+    echo "ERROR: Failed to mount DMG — could not determine mount point"
+    rm -f "${TEMP_DMG}"
+    exit 1
+fi
 echo "Mounted at: ${MOUNT_DIR}"
 
+# Ensure DMG is detached on any failure
+cleanup_mount() {
+    if [ -n "${MOUNT_DIR}" ] && [ -d "${MOUNT_DIR}" ]; then
+        echo "Cleaning up: detaching ${MOUNT_DIR}"
+        hdiutil detach "${MOUNT_DIR}" -force 2>/dev/null || true
+    fi
+}
+trap cleanup_mount EXIT
+
 mkdir -p "${MOUNT_DIR}/.background"
-cp Resources/dmg-background@2x.png "${MOUNT_DIR}/.background/background@2x.png"
-cp Resources/dmg-background.png "${MOUNT_DIR}/.background/background.png"
+if [ -f "Resources/dmg-background@2x.png" ]; then
+    cp Resources/dmg-background@2x.png "${MOUNT_DIR}/.background/background@2x.png"
+fi
+if [ -f "Resources/dmg-background.png" ]; then
+    cp Resources/dmg-background.png "${MOUNT_DIR}/.background/background.png"
+fi
 
 # Style the DMG window with AppleScript
 osascript <<APPLESCRIPT
@@ -102,6 +120,7 @@ APPLESCRIPT
 # Phase C — Detach and convert to compressed read-only
 sync
 hdiutil detach "${MOUNT_DIR}"
+trap - EXIT
 hdiutil convert "${TEMP_DMG}" -format UDZO -o "${BUILD_DIR}/${DMG_NAME}"
 rm -f "${TEMP_DMG}"
 

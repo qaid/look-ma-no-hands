@@ -11,7 +11,7 @@ guiding users to drag the app icon to the Applications folder.
 
 import math
 import os
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont
 
 # --- Dimensions (2x Retina) ---
 W, H = 1320, 800
@@ -49,7 +49,6 @@ def draw_curved_arrow(overlay):
     draw = ImageDraw.Draw(overlay)
 
     # Arc parameters — arrow curves upward between icon zones
-    cx = (APP_CENTER_X + APPS_CENTER_X) / 2  # midpoint
     num_points = 200
     points = []
 
@@ -129,7 +128,8 @@ def add_subtle_glow(overlay):
             [cx - r, cy - r, cx + r, cy + r],
             fill=(100, 200, 255, alpha),
         )
-    overlay.paste(Image.alpha_composite(overlay, glow))
+    composited = Image.alpha_composite(overlay, glow)
+    overlay.paste(composited, mask=composited)
 
 
 def main():
