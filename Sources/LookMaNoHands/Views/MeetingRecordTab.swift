@@ -834,8 +834,12 @@ struct MeetingRecordTab: View {
 
     private func startAudioLevelUpdates() {
         stopAudioLevelUpdates()
-        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [weak mixedAudioRecorder, weak liveState] t in
-            guard let recorder = mixedAudioRecorder, let state = liveState, t.isValid, state.isActive else {
+        // Capture weak references to avoid retaining @State-backed objects past
+        // view teardown. The local lets keep them alive for timer creation.
+        let recorder = mixedAudioRecorder
+        let state = liveState
+        audioUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [weak recorder, weak state] t in
+            guard let recorder = recorder, let state = state, t.isValid, state.isActive else {
                 t.invalidate()
                 return
             }
