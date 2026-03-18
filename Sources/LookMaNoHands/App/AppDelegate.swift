@@ -178,9 +178,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Close any Settings window that SwiftUI auto-opens on launch.
     /// The `Settings` scene creates an `NSWindow` with this identifier automatically.
     private func closeAutoOpenedSettingsWindow() {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
             for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
                 window.close()
+            }
+            // If no tracked windows are visible, reset to accessory mode.
+            // The auto-opened Settings window bypasses windowWillClose identity checks
+            // (it's not meetingWindow/settingsWindow/onboardingWindow), so we handle
+            // activation policy here to avoid getting stuck at .regular.
+            let hasVisibleTrackedWindow = self?.meetingWindow?.isVisible == true
+                || self?.settingsWindow?.isVisible == true
+                || self?.onboardingWindow?.isVisible == true
+            if !hasVisibleTrackedWindow {
+                NSApp.setActivationPolicy(.accessory)
             }
         }
     }
@@ -627,6 +637,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Settings.shared.meetingWindowWasOpen = true
         NSLog("✅ Meeting Transcription window created and displayed")
+    }
+
+    /// Check if a window is the meeting window (identity comparison, not title-based).
+    func isMeetingWindow(_ window: NSWindow) -> Bool {
+        window === meetingWindow
     }
 
     /// Hide the meeting window so macOS System Settings permission prompt is visible.
@@ -1394,17 +1409,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // When macOS terminates the app after granting screen recording permission
-        // ("Quit & Reopen" dialog), it may fail to relaunch accessory/menu-bar apps.
-        // Schedule our own relaunch so the user isn't left without the app.
-        if Settings.shared.pendingScreenRecordingGrant {
-            let bundlePath = Bundle.main.bundlePath
-            let task = Process()
-            task.executableURL = URL(fileURLWithPath: "/bin/sh")
-            task.arguments = ["-c", "sleep 1 && open \"\(bundlePath)\""]
-            try? task.run()
-        }
-
         Logger.shared.info("App terminating normally", category: .app)
         MemoryMonitor.shared.stopMonitoring()
         Logger.shared.shutdown()
