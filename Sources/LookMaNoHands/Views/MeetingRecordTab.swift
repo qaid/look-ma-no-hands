@@ -34,7 +34,6 @@ struct MeetingRecordTab: View {
     @State private var lastSubmittedNoteID: UUID?
     @State private var noteAboveCount = 0
     @State private var scrollViewHeight: CGFloat = 0
-    @State private var permissionWorkItem: DispatchWorkItem?
 
     // MARK: - Init
 
@@ -88,23 +87,27 @@ struct MeetingRecordTab: View {
             setupTranscriberCallbacks()
             setupAudioRecorderCallback()
             checkStatus()
-            if liveState.status == .missingPermissions {
-                requestScreenRecordingPermission()
+            // Resume audio level updates if recording is in progress
+            // (e.g., returning from another tab)
+            if liveState.isRecording {
+                startAudioLevelUpdates()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             guard Settings.shared.pendingScreenRecordingGrant else { return }
             checkStatus()
-            appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onDisappear {
-            liveState.isActive = false
-            permissionWorkItem?.cancel()
-            permissionWorkItem = nil
+            // Only pause visualization — don't stop recording or tear down state.
+            // Tab switches trigger onDisappear/onAppear; recording must survive them.
             stopAudioLevelUpdates()
-            if liveState.isRecording {
-                Task { await stopRecording() }
-            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
+            // Stop recording when the meeting window actually closes (not on tab switch).
+            guard let window = notification.object as? NSWindow,
+                  window.title == "Meetings",
+                  liveState.isRecording else { return }
+            Task { await stopRecording() }
         }
     }
 
@@ -149,6 +152,7 @@ struct MeetingRecordTab: View {
             }
             .pickerStyle(.menu)
             .labelsHidden()
+            .fixedSize()
             .disabled(liveState.isRecording)
 
             Spacer()
@@ -246,7 +250,7 @@ struct MeetingRecordTab: View {
 
     private var emptyVisualizationState: some View {
         RoundedRectangle(cornerRadius: 8)
-            .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .fill(Color.primary.opacity(0.04))
             .frame(maxWidth: .infinity)
             .overlay(
                 Text(store.isImportingAudio ? "Import in progress..." : "Ready to record")
@@ -714,21 +718,23 @@ struct MeetingRecordTab: View {
 
     private func requestScreenRecordingPermission() {
         Settings.shared.pendingScreenRecordingGrant = true
-        appDelegate?.minimizeMeetingWindowForPermission()
-        // Delay permission request so the window hides first, ensuring the
-        // macOS System Settings dialog appears visibly in the foreground.
-        // Use a cancellable work item so disappearing the view cancels the request.
-        permissionWorkItem?.cancel()
-        let workItem = DispatchWorkItem { CGRequestScreenCaptureAccess() }
-        permissionWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+        // Request permission directly — CGRequestScreenCaptureAccess() shows its own
+        // system dialog. Keep the meeting window visible so the user can return to it.
+        CGRequestScreenCaptureAccess()
     }
 
     private func handleRecordingToggle() {
         if liveState.isRecording {
             Task { await stopRecording() }
         } else if liveState.status == .missingPermissions {
-            requestScreenRecordingPermission()
+            // Re-check actual permission state — it may have been granted since last check
+            // (e.g., after app relaunch following permission grant in System Settings).
+            checkStatus()
+            if liveState.canRecord {
+                Task { await startRecording() }
+            } else {
+                requestScreenRecordingPermission()
+            }
         } else if liveState.canRecord {
             Task { await startRecording() }
         }

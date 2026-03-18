@@ -648,34 +648,30 @@ struct PermissionsStepView: View {
     }
 
     private func checkPermissions() {
-        Task {
-            // Check microphone
-            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-            let micGranted = (micStatus == .authorized)
+        // Check microphone
+        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let micGranted = (micStatus == .authorized)
 
-            // Check accessibility
-            let accessibilityGranted = AXIsProcessTrusted()
+        // Check accessibility — must run on main thread for accurate TCC results
+        let accessibilityGranted = AXIsProcessTrusted()
 
-            await MainActor.run {
-                // Detect if permissions just changed from false to true
-                let micJustGranted = !previousMicPermission && micGranted
-                let accessibilityJustGranted = !previousAccessibilityPermission && accessibilityGranted
+        // Detect if permissions just changed from false to true
+        let micJustGranted = !previousMicPermission && micGranted
+        let accessibilityJustGranted = !previousAccessibilityPermission && accessibilityGranted
 
-                // Update state
-                onboardingState.hasMicrophonePermission = micGranted
-                onboardingState.hasAccessibilityPermission = accessibilityGranted
+        // Update state
+        onboardingState.hasMicrophonePermission = micGranted
+        onboardingState.hasAccessibilityPermission = accessibilityGranted
 
-                // If any permission was just granted, bring window to front
-                // (user just dismissed the system permission dialog)
-                if micJustGranted || accessibilityJustGranted {
-                    bringToFront?()
-                }
-
-                // Update previous values for next check
-                previousMicPermission = micGranted
-                previousAccessibilityPermission = accessibilityGranted
-            }
+        // If any permission was just granted, bring window to front
+        // (user just dismissed the system permission dialog)
+        if micJustGranted || accessibilityJustGranted {
+            bringToFront?()
         }
+
+        // Update previous values for next check
+        previousMicPermission = micGranted
+        previousAccessibilityPermission = accessibilityGranted
     }
 }
 
