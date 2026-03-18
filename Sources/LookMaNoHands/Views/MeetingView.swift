@@ -98,5 +98,7 @@ struct MeetingView: View {
             .tag(MeetingTab.library)
         }
         .frame(minWidth: 700, minHeight: 500)
+        .preferredColorScheme(Settings.shared.appearanceTheme == .light ? .light :
+                              Settings.shared.appearanceTheme == .dark ? .dark : nil)
     }
 }

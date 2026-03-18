@@ -90,6 +90,8 @@ struct SettingsView: View {
         .toolbar(.hidden)
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 750, minHeight: 450)
+        .preferredColorScheme(settings.appearanceTheme == .light ? .light :
+                              settings.appearanceTheme == .dark ? .dark : nil)
         .onAppear {
             checkPermissions()
             checkWhisperModelStatus()

@@ -53,7 +53,7 @@ if [ -n "${DEVELOPER_ID_APPLICATION}" ]; then
     echo "✅ Developer ID signature verified"
 else
     echo "No DEVELOPER_ID_APPLICATION set — using ad-hoc signing"
-    codesign --force --sign - "${APP_PATH}"
+    codesign --force --sign - --entitlements "${ENTITLEMENTS}" "${APP_PATH}"
 fi
 
 echo "Creating DMG..."
