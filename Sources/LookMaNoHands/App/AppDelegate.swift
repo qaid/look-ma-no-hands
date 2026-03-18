@@ -203,21 +203,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// The `Settings` scene creates an `NSWindow` with this identifier automatically.
     private func closeAutoOpenedSettingsWindow() {
         // Synchronous pass: hide immediately to prevent any visible flash
-        var closedSettingsWindowSynchronously = false
         for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
             window.orderOut(nil)
             window.close()
-            closedSettingsWindowSynchronously = true
         }
         // Safety net: async check in case the window is created after this call.
-        // Also removes the observer only after confirming the window was handled,
-        // so the observer stays active if the window hasn't appeared yet.
         DispatchQueue.main.async { [weak self] in
-            var closedWindow = false
             for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
                 window.orderOut(nil)
                 window.close()
-                closedWindow = true
             }
             // If no tracked windows are visible, reset to accessory mode.
             // The auto-opened Settings window bypasses windowWillClose identity checks
@@ -229,14 +223,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if !hasVisibleTrackedWindow {
                 NSApp.setActivationPolicy(.accessory)
             }
-            // Only remove the observer if we found and closed the window here
-            // or it was already handled by the synchronous pass. The observer
-            // self-removes when it fires, so leaving it active is safe.
-            if closedWindow || closedSettingsWindowSynchronously {
-                if let observer = self?.settingsWindowObserver {
-                    NotificationCenter.default.removeObserver(observer)
-                    self?.settingsWindowObserver = nil
-                }
+            // Always remove the observer after the async pass completes.
+            // By this point the launch window has passed — any auto-opened
+            // Settings window would have been caught by the sync pass, async
+            // pass, or the observer itself. Leaving it active would cause it
+            // to close user-initiated Settings windows later in the session.
+            if let observer = self?.settingsWindowObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self?.settingsWindowObserver = nil
             }
         }
     }
