@@ -71,10 +71,12 @@ struct OnboardingView: View {
             if !onboardingState.isPermissionsOnlyFlow {
                 ProgressIndicatorView(currentStep: onboardingState.currentStep)
                     .frame(maxWidth: .infinity)
-                    .background(Color(NSColor.windowBackgroundColor))
+                    .background(.background)
             }
         }
         .frame(width: 600, height: 520)
+        .preferredColorScheme(Settings.shared.appearanceTheme == .light ? .light :
+                              Settings.shared.appearanceTheme == .dark ? .dark : nil)
         .onAppear {
             // If starting at permissions, configure the state accordingly
             if startAtPermissions {

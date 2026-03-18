@@ -6,6 +6,8 @@ import AVFoundation
 /// This is where we configure the app to run as a menu bar app without a dock icon
 class AppDelegate: NSObject, NSApplicationDelegate {
 
+    // MARK: - Properties
+
     // Menu bar status item
     private var statusItem: NSStatusItem?
     private var recordingMenuItem: NSMenuItem?
@@ -235,6 +237,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Window Appearance
+
+    /// Returns a concrete NSAppearance when the user has picked Light or Dark,
+    /// or nil to let the window inherit dynamically from the screen/system context.
+    /// Using nil avoids the stale-snapshot race that occurs when reading
+    /// NSApp.effectiveAppearance immediately after setActivationPolicy(.regular).
+    private func resolvedWindowAppearance() -> NSAppearance? {
+        switch Settings.shared.appearanceTheme {
+        case .light:  return NSAppearance(named: .aqua)
+        case .dark:   return NSAppearance(named: .darkAqua)
+        case .system: return nil
+        }
+    }
+
     // MARK: - Onboarding
 
     private func showOnboarding() {
@@ -290,11 +306,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.level = .normal  // Use normal level so system permission dialogs appear above
 
-        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
-        // Without these, the agent→regular activation policy switch can produce muted/default styling.
         window.titlebarSeparatorStyle = .automatic
         window.backgroundColor = .windowBackgroundColor
-        window.appearance = NSApp.effectiveAppearance
+        // Use nil (system) or user-chosen theme — avoids stale effectiveAppearance
+        // snapshot during the accessory→regular activation policy transition.
+        window.appearance = resolvedWindowAppearance()
         NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
@@ -302,12 +318,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Bring window to front and activate app
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-
-        // Force window display refresh after activation policy change to ensure
-        // all system colors and materials resolve with the correct appearance.
-        window.invalidateShadow()
-        window.displayIfNeeded()
-        NSLog("   ✓ Made window key and front")
 
         // Ensure window stays on top
         window.orderFrontRegardless()
@@ -366,11 +376,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.level = .normal  // Use normal level so system permission dialogs appear above
 
-        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
-        // Without these, the agent→regular activation policy switch can produce muted/default styling.
         window.titlebarSeparatorStyle = .automatic
         window.backgroundColor = .windowBackgroundColor
-        window.appearance = NSApp.effectiveAppearance
+        window.appearance = resolvedWindowAppearance()
         NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
@@ -378,12 +386,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Bring window to front and activate app
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-
-        // Force window display refresh after activation policy change to ensure
-        // all system colors and materials resolve with the correct appearance.
-        window.invalidateShadow()
-        window.displayIfNeeded()
-        NSLog("   ✓ Made window key and front")
 
         // Ensure window stays on top
         window.orderFrontRegardless()
@@ -616,10 +618,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.isReleasedWhenClosed = false
         window.delegate = self
 
-        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle
         window.titlebarSeparatorStyle = .automatic
         window.backgroundColor = .windowBackgroundColor
-        window.appearance = NSApp.effectiveAppearance
+        window.appearance = resolvedWindowAppearance()
 
         // Create SwiftUI settings view and wrap it in NSHostingView
         let settingsView = SettingsView(whisperService: whisperService)
@@ -630,8 +631,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        window.invalidateShadow()
-        window.displayIfNeeded()
 
         NSLog("✅ Settings window created and displayed")
     }
@@ -674,13 +673,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.setFrameAutosaveName("MeetingTranscriptionWindow")
         window.delegate = self
 
-        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
-        // Without these, the agent→regular activation policy switch can produce muted/default styling.
         window.titlebarSeparatorStyle = .automatic
         window.backgroundColor = .windowBackgroundColor
-        // Inherit the effective system appearance so the window doesn't render with
-        // a stale appearance from the accessory activation policy.
-        window.appearance = NSApp.effectiveAppearance
+        window.appearance = resolvedWindowAppearance()
 
         // Create SwiftUI meeting view and wrap it in NSHostingView
         let meetingView = MeetingView(whisperService: whisperService, recordingIndicator: recordingIndicator, appDelegate: self)
@@ -691,11 +686,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-
-        // Force window display refresh after activation policy change to ensure
-        // all system colors and materials resolve with the correct appearance.
-        window.invalidateShadow()
-        window.displayIfNeeded()
 
         Settings.shared.meetingWindowWasOpen = true
         NSLog("✅ Meeting Transcription window created and displayed")
