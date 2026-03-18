@@ -96,6 +96,7 @@ struct MeetingRecordTab: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             guard Settings.shared.pendingScreenRecordingGrant else { return }
             checkStatus()
+            appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onDisappear {
             // Only pause visualization — don't stop recording or tear down state.
@@ -104,8 +105,9 @@ struct MeetingRecordTab: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { notification in
             // Stop recording when the meeting window actually closes (not on tab switch).
+            // Use identity comparison via appDelegate instead of fragile title string match.
             guard let window = notification.object as? NSWindow,
-                  window.title == "Meetings",
+                  appDelegate?.isMeetingWindow(window) == true,
                   liveState.isRecording else { return }
             Task { await stopRecording() }
         }
@@ -718,8 +720,10 @@ struct MeetingRecordTab: View {
 
     private func requestScreenRecordingPermission() {
         Settings.shared.pendingScreenRecordingGrant = true
-        // Request permission directly — CGRequestScreenCaptureAccess() shows its own
-        // system dialog. Keep the meeting window visible so the user can return to it.
+        // Hide the meeting window so the macOS System Settings permission prompt is visible.
+        // Without this, the permission dialog appears behind the meeting window on menu bar
+        // apps with .accessory activation policy (Issue #245, fixed in PR #247 and #265).
+        appDelegate?.minimizeMeetingWindowForPermission()
         CGRequestScreenCaptureAccess()
     }
 

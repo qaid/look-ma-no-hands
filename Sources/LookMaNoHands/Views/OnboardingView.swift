@@ -648,30 +648,40 @@ struct PermissionsStepView: View {
     }
 
     private func checkPermissions() {
-        // Check microphone
-        let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
-        let micGranted = (micStatus == .authorized)
+        // Ensure we're on the main thread — AXIsProcessTrusted() returns cached/stale
+        // values when called off-thread, and state mutations require MainActor.
+        let work = {
+            // Check microphone
+            let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+            let micGranted = (micStatus == .authorized)
 
-        // Check accessibility — must run on main thread for accurate TCC results
-        let accessibilityGranted = AXIsProcessTrusted()
+            // Check accessibility — must run on main thread for accurate TCC results
+            let accessibilityGranted = AXIsProcessTrusted()
 
-        // Detect if permissions just changed from false to true
-        let micJustGranted = !previousMicPermission && micGranted
-        let accessibilityJustGranted = !previousAccessibilityPermission && accessibilityGranted
+            // Detect if permissions just changed from false to true
+            let micJustGranted = !self.previousMicPermission && micGranted
+            let accessibilityJustGranted = !self.previousAccessibilityPermission && accessibilityGranted
 
-        // Update state
-        onboardingState.hasMicrophonePermission = micGranted
-        onboardingState.hasAccessibilityPermission = accessibilityGranted
+            // Update state
+            self.onboardingState.hasMicrophonePermission = micGranted
+            self.onboardingState.hasAccessibilityPermission = accessibilityGranted
 
-        // If any permission was just granted, bring window to front
-        // (user just dismissed the system permission dialog)
-        if micJustGranted || accessibilityJustGranted {
-            bringToFront?()
+            // If any permission was just granted, bring window to front
+            // (user just dismissed the system permission dialog)
+            if micJustGranted || accessibilityJustGranted {
+                self.bringToFront?()
+            }
+
+            // Update previous values for next check
+            self.previousMicPermission = micGranted
+            self.previousAccessibilityPermission = accessibilityGranted
         }
 
-        // Update previous values for next check
-        previousMicPermission = micGranted
-        previousAccessibilityPermission = accessibilityGranted
+        if Thread.isMainThread {
+            work()
+        } else {
+            DispatchQueue.main.async { work() }
+        }
     }
 }
 
