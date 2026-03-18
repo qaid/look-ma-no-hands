@@ -295,6 +295,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         window.level = .normal  // Use normal level so system permission dialogs appear above
+
+        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
+        // Without these, the agent→regular activation policy switch can produce muted/default styling.
+        window.titlebarSeparatorStyle = .automatic
+        window.backgroundColor = .windowBackgroundColor
+        window.appearance = NSApp.effectiveAppearance
         NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
@@ -302,6 +308,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Bring window to front and activate app
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Force window display refresh after activation policy change to ensure
+        // all system colors and materials resolve with the correct appearance.
+        window.invalidateShadow()
+        window.displayIfNeeded()
         NSLog("   ✓ Made window key and front")
 
         // Ensure window stays on top
@@ -360,6 +371,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         window.level = .normal  // Use normal level so system permission dialogs appear above
+
+        // Explicit appearance to ensure consistency between swift-run and deployed .app bundle.
+        // Without these, the agent→regular activation policy switch can produce muted/default styling.
+        window.titlebarSeparatorStyle = .automatic
+        window.backgroundColor = .windowBackgroundColor
+        window.appearance = NSApp.effectiveAppearance
         NSLog("   ✓ Configured NSWindow")
 
         self.onboardingWindow = window
@@ -367,6 +384,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Bring window to front and activate app
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Force window display refresh after activation policy change to ensure
+        // all system colors and materials resolve with the correct appearance.
+        window.invalidateShadow()
+        window.displayIfNeeded()
         NSLog("   ✓ Made window key and front")
 
         // Ensure window stays on top
