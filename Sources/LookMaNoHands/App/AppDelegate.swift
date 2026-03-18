@@ -51,7 +51,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let launchSplash = LaunchSplashWindowController()
     private let hotkeyToggleSplash = HotkeyToggleSplashWindowController()
 
+    // Observer for intercepting auto-opened Settings window
+    private var settingsWindowObserver: Any?
+
     // MARK: - Application Lifecycle
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // Install an observer to intercept the SwiftUI Settings window before it becomes visible.
+        // The SwiftUI `Settings` scene auto-creates an NSWindow on first launch; this observer
+        // catches it via didBecomeKey and orderOut immediately to prevent a visible flash.
+        settingsWindowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let window = notification.object as? NSWindow,
+                  window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" else { return }
+            window.orderOut(nil)
+            window.close()
+            // Remove observer once we've handled it
+            if let observer = self?.settingsWindowObserver {
+                NotificationCenter.default.removeObserver(observer)
+                self?.settingsWindowObserver = nil
+            }
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // FIRST: Install crash handlers before anything else
@@ -178,8 +202,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Close any Settings window that SwiftUI auto-opens on launch.
     /// The `Settings` scene creates an `NSWindow` with this identifier automatically.
     private func closeAutoOpenedSettingsWindow() {
+        // Synchronous pass: hide immediately to prevent any visible flash
+        for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
+            window.orderOut(nil)
+            window.close()
+        }
+        // Safety net: async check in case the window is created after this call
         DispatchQueue.main.async { [weak self] in
             for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
+                window.orderOut(nil)
                 window.close()
             }
             // If no tracked windows are visible, reset to accessory mode.
@@ -192,6 +223,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if !hasVisibleTrackedWindow {
                 NSApp.setActivationPolicy(.accessory)
             }
+        }
+        // Remove the observer if still active (no longer needed after explicit close)
+        if let observer = settingsWindowObserver {
+            NotificationCenter.default.removeObserver(observer)
+            settingsWindowObserver = nil
         }
     }
 
