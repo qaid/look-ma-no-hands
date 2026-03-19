@@ -68,6 +68,9 @@ See `docs/test-inventory.md` for the full list of test classes.
 - Wait for user confirmation before `git push`
 - Write clear commit messages matching existing style
 
+### Pull Requests
+- When a PR resolves an existing GitHub issue, the PR description **must** include a GitHub closing keyword linking to the issue (e.g. `Closes #123`, `Fixes #456`). This ensures the issue is automatically closed when the PR is merged.
+
 ## Content Search Tool Policy
 
 **This project prefers ripgrep (rg) for content search** - faster, respects .gitignore, and matches all examples in this file.
