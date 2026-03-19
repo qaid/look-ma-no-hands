@@ -443,6 +443,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             object: nil
         )
 
+        // Listen for whisper model changes from Settings
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(whisperModelDidChange(_:)),
+            name: .whisperModelChanged,
+            object: nil
+        )
+
         // Check for updates if enabled (silent, non-blocking)
         if Settings.shared.checkForUpdatesOnLaunch {
             Task {
@@ -1004,6 +1012,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         hotkeyToggleSplash.show(isEnabled: enabled)
     }
 
+    /// Handle whisper model changes from Settings
+    @objc private func whisperModelDidChange(_ notification: Notification) {
+        guard let modelName = notification.userInfo?["model"] as? String else { return }
+
+        // Skip if this model is already loaded
+        guard whisperService.loadedModelName != modelName else {
+            NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+            return
+        }
+
+        updateMenuBarStatus("Loading model...")
+
+        Task {
+            do {
+                try await whisperService.loadModel(named: modelName)
+                NSLog("✅ Whisper model '\(modelName)' loaded after settings change")
+
+                await MainActor.run {
+                    updateMenuBarStatus("Warming up...")
+                }
+
+                await whisperService.warmUpNeuralEngine()
+
+                await MainActor.run {
+                    updateMenuBarStatus("Ready")
+                }
+                NSLog("✅ Neural Engine warm-up complete for '\(modelName)'")
+            } catch {
+                NSLog("❌ Failed to load model '\(modelName)' after settings change: \(error.localizedDescription)")
+                await MainActor.run {
+                    updateMenuBarStatus("Model load failed")
+                    showAlert(
+                        title: "Model Load Failed",
+                        message: "Failed to load the \(modelName) model: \(error.localizedDescription)"
+                    )
+                }
+            }
+
+            NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+        }
+    }
+
     // MARK: - Contextual Prompt Building
 
     /// Build an initial_prompt for Whisper based on the active app and field context
@@ -1187,11 +1237,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         }
 
         // Check if Whisper model is ready
-        if !whisperService.isModelLoaded {
+        if !whisperService.isModelLoaded || whisperService.isModelLoading || whisperService.isWarmingUp {
             if whisperService.isModelLoading {
                 showAlert(
                     title: "Model Loading",
                     message: "The Whisper model is still loading. Please wait a moment and try again."
+                )
+            } else if whisperService.isWarmingUp {
+                showAlert(
+                    title: "Warming Up",
+                    message: "The Neural Engine is warming up for the new model. Please wait a moment and try again."
                 )
             } else {
                 showAlert(
@@ -1417,6 +1472,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
                 await MainActor.run {
                     autoreleasepool {
+                        // Restore focus to the window/field that was active when recording started
+                        if let targetElement = self.focusedElementBeforeRecording {
+                            self.restoreFocus(to: targetElement)
+                            Thread.sleep(forTimeInterval: 0.05)
+                        }
+
                         self.textInsertionService.insertText(formattedText)
                         self.transcriptionState.setFormattedText(formattedText)
                         self.transcriptionState.completeProcessing()

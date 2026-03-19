@@ -41,6 +41,7 @@ struct SettingsView: View {
     @State private var ollamaStatus: ConnectionState = .unknown
     @State private var availableOllamaModels: [String] = []
     @State private var isDownloadingModel = false
+    @State private var isModelReloading = false
     @State private var modelDownloadError: String?
     @State private var modelAvailability: [WhisperModel: Bool] = [:]
 
@@ -103,6 +104,10 @@ struct SettingsView: View {
         }
         .onDisappear {
             stopPermissionPolling()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
+            isModelReloading = false
+            checkWhisperModelStatus()
         }
     }
 
@@ -1699,11 +1704,21 @@ struct SettingsView: View {
         // Clear any previous error
         modelDownloadError = nil
 
-        // If the model is already loaded or exists on disk, no download needed
         let isLoaded = whisperService.loadedModelName == newModel.rawValue
+        if isLoaded { return }
+
         let existsOnDisk = WhisperService.modelExists(named: newModel.rawValue)
 
-        if !isLoaded && !existsOnDisk {
+        if existsOnDisk {
+            // Model exists on disk but isn't loaded — notify AppDelegate to load + warm up
+            isModelReloading = true
+            NotificationCenter.default.post(
+                name: .whisperModelChanged,
+                object: nil,
+                userInfo: ["model": newModel.rawValue]
+            )
+        } else {
+            // Download first, then notify
             Task {
                 await downloadModel(newModel)
             }
@@ -1720,13 +1735,18 @@ struct SettingsView: View {
         do {
             try await WhisperService.downloadModel(named: model.rawValue)
 
-            // Download successful
+            // Download successful — notify AppDelegate to load + warm up
             DispatchQueue.main.async {
                 self.isDownloadingModel = false
+                self.isModelReloading = true
                 self.modelAvailability[model] = true
                 print("SettingsView: Model \(model.rawValue) downloaded successfully")
 
-                // TODO: Notify AppDelegate to reload the model
+                NotificationCenter.default.post(
+                    name: .whisperModelChanged,
+                    object: nil,
+                    userInfo: ["model": model.rawValue]
+                )
             }
 
         } catch {
@@ -1743,6 +1763,8 @@ struct SettingsView: View {
     private var modelStatusColor: Color {
         if isDownloadingModel {
             return .yellow
+        } else if isModelReloading {
+            return .blue
         } else if let isAvailable = modelAvailability[settings.whisperModel] {
             return isAvailable ? .green : .orange
         } else {
@@ -1754,6 +1776,8 @@ struct SettingsView: View {
     private var modelStatusText: String {
         if isDownloadingModel {
             return "Downloading..."
+        } else if isModelReloading {
+            return whisperService.isWarmingUp ? "Warming up..." : "Loading..."
         } else if let isAvailable = modelAvailability[settings.whisperModel] {
             return isAvailable ? "Downloaded" : "Not downloaded"
         } else {

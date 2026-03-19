@@ -20,6 +20,9 @@ class WhisperService: @unchecked Sendable {
     /// Whether model is currently loading
     private(set) var isModelLoading = false
 
+    /// Whether the Neural Engine is currently warming up
+    private(set) var isWarmingUp = false
+
     /// Name of the currently loaded model (e.g., "base", "large-v3-turbo")
     private(set) var loadedModelName: String?
 
@@ -204,6 +207,9 @@ class WhisperService: @unchecked Sendable {
     ///
     /// Failures are logged but don't block onboarding (warm-up is an optimization).
     func warmUpNeuralEngine() async {
+        isWarmingUp = true
+        defer { isWarmingUp = false }
+
         Logger.shared.info("🔥 Warming up Neural Engine...", category: .whisper)
         let startTime = Date()
 
