@@ -57,8 +57,10 @@ class SpeakerDiarizationService: @unchecked Sendable {
             transcriptSegments: remoteSegments
         )
 
-        // Free model memory
+        // Free model memory and clear the reference so a subsequent diarize()
+        // call creates a fresh SpeakerKit instance instead of reusing the unloaded one.
         await kit.unloadModels()
+        speakerKit = nil
 
         onProgress?("Speaker identification complete")
         return labeled
@@ -128,6 +130,7 @@ class SpeakerDiarizationService: @unchecked Sendable {
 
     /// Convert a numeric speaker ID to a letter-based label: 0 → "Speaker A", 1 → "Speaker B", etc.
     static func labelForSpeakerId(_ id: Int) -> String {
+        guard id >= 0 else { return "Speaker \(abs(id))" }
         let letter = id < 26
             ? String(UnicodeScalar(UInt8(65 + id)))  // A-Z
             : "\(id + 1)"

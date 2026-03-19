@@ -94,8 +94,11 @@ struct MeetingRecordTab: View {
             }
             // Prompt for screen recording permission immediately when the tab appears,
             // so the user doesn't have to discover the requirement by clicking Record.
-            if liveState.status == .missingPermissions && !SystemAudioRecorder.hasPermission() {
-                promptScreenRecordingPermission()
+            // Guard against pendingScreenRecordingGrant to prevent a relaunch loop:
+            // after macOS relaunches the app for a TCC grant, hasPermission() can return
+            // false transiently, which would re-trigger CGRequestScreenCaptureAccess().
+            if liveState.status == .missingPermissions && !SystemAudioRecorder.hasPermission() && !Settings.shared.pendingScreenRecordingGrant {
+                requestScreenRecordingPermission()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
@@ -757,16 +760,9 @@ struct MeetingRecordTab: View {
 
     // MARK: - Recording Control
 
-    /// Prompt for screen recording permission on tab appear — keeps the meeting window visible
-    /// so the user can see the app while navigating System Settings.
-    private func promptScreenRecordingPermission() {
-        Settings.shared.pendingScreenRecordingGrant = true
-        CGRequestScreenCaptureAccess()
-    }
-
-    /// Request screen recording permission from the Record button — hides the meeting window
-    /// so the macOS System Settings permission prompt is visible above menu bar apps
-    /// with .accessory activation policy (Issue #245, fixed in PR #247 and #265).
+    /// Request screen recording permission — hides the meeting window so the macOS
+    /// System Settings permission prompt is visible above menu bar apps with .accessory
+    /// activation policy (Issue #245, fixed in PR #247 and #265).
     private func requestScreenRecordingPermission() {
         Settings.shared.pendingScreenRecordingGrant = true
         appDelegate?.minimizeMeetingWindowForPermission()
@@ -828,9 +824,10 @@ struct MeetingRecordTab: View {
         stopTimer()
         stopAudioLevelUpdates()
 
-        // Drain system audio before stopping (needed for SpeakerKit post-processing)
-        let systemAudio = mixedAudioRecorder.drainAccumulatedSystemAudio()
+        // Stop recording first so all in-flight audio callbacks complete,
+        // then drain the accumulated system audio for SpeakerKit post-processing.
         _ = await mixedAudioRecorder.stopRecording()
+        let systemAudio = mixedAudioRecorder.drainAccumulatedSystemAudio()
         let finalSegments = await continuousTranscriber.endSession()
 
         let sessionStartIndex = liveState.segments.count - finalSegments.count

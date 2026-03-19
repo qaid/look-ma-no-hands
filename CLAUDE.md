@@ -27,7 +27,7 @@
 - Meeting mode (active): System audio capture + structured notes via Ollama
 - 100% local processing (whisper.cpp + optional Ollama)
 
-**Tech Stack**: Swift + SwiftUI + SPM | whisper.cpp (via SwiftWhisper 1.0.0+) | Ollama (optional) | AVFoundation + ScreenCaptureKit
+**Tech Stack**: Swift + SwiftUI + SPM | WhisperKit (0.17.0) + SpeakerKit | Ollama (optional) | AVFoundation + ScreenCaptureKit
 
 **System Permissions**: Microphone + Accessibility (dictation) | Screen Recording (meeting mode)
 
@@ -269,12 +269,12 @@ Unsure if tool is available?
 
 ## Current Dependencies
 
-- **SwiftWhisper** (1.0.0+) - whisper.cpp with Core ML support
+- **WhisperKit** (0.17.0) - On-device speech recognition (whisper.cpp + Core ML)
+- **SpeakerKit** (via WhisperKit) - On-device speaker diarization (Pyannote)
 - **Ollama** (optional) - Local LLM for meeting note structuring (http://localhost:11434/api/generate)
 
 ## Useful Resources
 
-- whisper.cpp: https://github.com/ggerganov/whisper.cpp
-- SwiftWhisper: https://github.com/exPHAT/SwiftWhisper
+- WhisperKit: https://github.com/argmaxinc/WhisperKit
 - Ollama: https://ollama.ai
 - ScreenCaptureKit: https://developer.apple.com/documentation/screencapturekit
