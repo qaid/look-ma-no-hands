@@ -1,7 +1,7 @@
 import Foundation
 
 /// How a meeting record was created
-enum MeetingSource: String, Codable {
+enum MeetingSource: String, Codable, Sendable {
     case recorded = "recorded"
     case importedTranscript = "importedTranscript"
     case importedAudio = "importedAudio"
@@ -9,7 +9,7 @@ enum MeetingSource: String, Codable {
 
 /// Persisted meeting metadata
 /// All filename fields are relative to the meeting's folder in Application Support
-struct MeetingRecord: Identifiable, Codable {
+struct MeetingRecord: Identifiable, Codable, Sendable {
     let id: UUID
     var title: String
     var createdAt: Date

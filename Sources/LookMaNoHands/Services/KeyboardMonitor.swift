@@ -4,7 +4,7 @@ import AppKit
 
 /// Monitors keyboard events system-wide to detect the configured trigger hotkey
 /// Requires Accessibility permissions to function
-class KeyboardMonitor {
+class KeyboardMonitor: @unchecked Sendable {
 
     // MARK: - Types
 
@@ -72,7 +72,7 @@ class KeyboardMonitor {
         // Check accessibility permission (optionally prompting)
         let trusted: Bool
         if showPrompt {
-            let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+            let options: NSDictionary = ["AXTrustedCheckOptionPrompt": true]
             trusted = AXIsProcessTrustedWithOptions(options)
         } else {
             trusted = AXIsProcessTrusted()

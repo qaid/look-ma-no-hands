@@ -2,7 +2,7 @@ import Foundation
 
 /// Service for communicating with the local Ollama API
 /// Used for AI-powered text formatting
-class OllamaService {
+class OllamaService: @unchecked Sendable {
     
     // MARK: - Configuration
     
@@ -162,7 +162,7 @@ class OllamaService {
     ///   - numCtx: Optional context window size (tokens). When nil, uses the model's default.
     ///   - onChunk: Callback invoked for each text chunk received
     /// - Returns: Complete generated text
-    func generateStreaming(prompt: String, system: String? = nil, numCtx: Int? = nil, onChunk: @escaping (String) async -> Void) async throws -> String {
+    func generateStreaming(prompt: String, system: String? = nil, numCtx: Int? = nil, onChunk: @Sendable @escaping (String) async -> Void) async throws -> String {
         let request = try buildGenerateRequest(prompt: prompt, system: system, numCtx: numCtx, stream: true)
 
         print("OllamaService: Sending streaming request to \(modelName) (system: \(system != nil ? "yes" : "no"))...")

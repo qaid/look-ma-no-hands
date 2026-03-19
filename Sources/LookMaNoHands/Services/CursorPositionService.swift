@@ -4,7 +4,7 @@ import ApplicationServices
 
 /// Service for tracking cursor position in focused text fields
 /// Uses Accessibility APIs to get screen coordinates of the text cursor
-class CursorPositionService {
+class CursorPositionService: @unchecked Sendable {
 
     static let shared = CursorPositionService()
 

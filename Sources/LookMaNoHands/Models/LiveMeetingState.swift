@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 
 /// Status of an in-flight meeting recording
-enum MeetingStatus: Equatable {
+enum MeetingStatus: Equatable, Sendable {
     case ready
     case missingModel
     case missingPermissions
@@ -33,7 +33,7 @@ enum MeetingStatus: Equatable {
 }
 
 /// Represents a single recording session within a meeting
-struct RecordingSession: Identifiable {
+struct RecordingSession: Identifiable, Sendable {
     let id = UUID()
     let startTime: Date
     var endTime: Date?
@@ -47,7 +47,7 @@ struct RecordingSession: Identifiable {
 /// In-flight recording state for the Record tab
 /// Does NOT own persistence — that lives in MeetingStore
 @Observable
-class LiveMeetingState {
+class LiveMeetingState: @unchecked Sendable {
     var status: MeetingStatus = .ready
     var isRecording = false
     var isPaused = false

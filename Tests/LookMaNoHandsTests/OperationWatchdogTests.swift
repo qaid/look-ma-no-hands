@@ -1,7 +1,7 @@
 import XCTest
 @testable import LookMaNoHands
 
-final class OperationWatchdogTests: XCTestCase {
+final class OperationWatchdogTests: XCTestCase, @unchecked Sendable {
     override func tearDown() {
         OperationWatchdog.shared.cancelAllWatchdogs()
         super.tearDown()

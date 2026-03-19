@@ -4,7 +4,7 @@ import AVFoundation
 import Accelerate
 
 /// Errors that can occur during system audio recording
-enum RecorderError: Error {
+enum RecorderError: Error, Sendable {
     case noDisplayAvailable
     case permissionDenied
     case captureFailure(String)
@@ -13,7 +13,7 @@ enum RecorderError: Error {
 /// Service for capturing system audio using ScreenCaptureKit
 /// Used for meeting transcription to record audio from video conferencing apps
 @available(macOS 13.0, *)
-class SystemAudioRecorder: NSObject {
+class SystemAudioRecorder: NSObject, @unchecked Sendable {
 
     // MARK: - Properties
 

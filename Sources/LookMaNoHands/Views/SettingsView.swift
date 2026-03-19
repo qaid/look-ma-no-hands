@@ -1613,8 +1613,8 @@ struct SettingsView: View {
     
     private func openAccessibilityPreferences() {
         // First, trigger the system prompt to add this app to Accessibility
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        let _ = AXIsProcessTrustedWithOptions(options)
 
         // Also open System Settings to the Accessibility pane
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!

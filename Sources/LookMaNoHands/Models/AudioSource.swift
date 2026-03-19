@@ -2,7 +2,7 @@ import Foundation
 
 /// Identifies which audio source a chunk or transcript segment originated from,
 /// used for channel-separation diarization
-enum DiarizationSource: String, Codable, Equatable {
+enum DiarizationSource: String, Codable, Equatable, Sendable {
     case local    // Microphone — the user ("Me")
     case remote   // System audio — other participants
     case mixed    // Neither clearly dominant
@@ -10,7 +10,7 @@ enum DiarizationSource: String, Codable, Equatable {
 }
 
 /// Audio samples paired with their classified diarization source
-struct AudioChunkWithSource {
+struct AudioChunkWithSource: Sendable {
     let samples: [Float]
     let source: DiarizationSource
 }

@@ -3,7 +3,7 @@ import AVFoundation
 import CoreAudio
 
 /// Represents an audio input device
-struct AudioInputDevice: Identifiable, Hashable {
+struct AudioInputDevice: Identifiable, Hashable, Sendable {
     let id: AudioDeviceID
     let name: String
     let isDefault: Bool
@@ -13,7 +13,7 @@ struct AudioInputDevice: Identifiable, Hashable {
 
 /// Manager for audio input devices
 /// Handles enumeration and selection of microphone inputs
-class AudioDeviceManager: ObservableObject {
+class AudioDeviceManager: ObservableObject, @unchecked Sendable {
 
     // MARK: - Published Properties
 

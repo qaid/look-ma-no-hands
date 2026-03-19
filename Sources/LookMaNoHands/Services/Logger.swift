@@ -3,7 +3,7 @@ import os.log
 
 /// Centralized logging service using Apple's unified logging system (OSLog)
 /// Logs persist to ~/Library/Logs/LookMaNoHands/ and are viewable in Console.app
-final class Logger {
+final class Logger: @unchecked Sendable {
 
     /// Shared instance for app-wide logging
     static let shared = Logger()
@@ -12,15 +12,15 @@ final class Logger {
     private let subsystem = Bundle.main.bundleIdentifier ?? "com.lookmanohands"
 
     /// Category-specific loggers for organized filtering in Console.app
-    private lazy var appLogger = OSLog(subsystem: subsystem, category: "App")
-    private lazy var audioLogger = OSLog(subsystem: subsystem, category: "Audio")
-    private lazy var whisperLogger = OSLog(subsystem: subsystem, category: "Whisper")
-    private lazy var transcriptionLogger = OSLog(subsystem: subsystem, category: "Transcription")
-    private lazy var accessibilityLogger = OSLog(subsystem: subsystem, category: "Accessibility")
-    private lazy var keyboardLogger = OSLog(subsystem: subsystem, category: "Keyboard")
-    private lazy var memoryLogger = OSLog(subsystem: subsystem, category: "Memory")
-    private lazy var crashLogger = OSLog(subsystem: subsystem, category: "Crash")
-    private lazy var updateLogger = OSLog(subsystem: subsystem, category: "Update")
+    private let appLogger: OSLog
+    private let audioLogger: OSLog
+    private let whisperLogger: OSLog
+    private let transcriptionLogger: OSLog
+    private let accessibilityLogger: OSLog
+    private let keyboardLogger: OSLog
+    private let memoryLogger: OSLog
+    private let crashLogger: OSLog
+    private let updateLogger: OSLog
 
     /// Log file URL
     private let logDirectory: URL
@@ -53,6 +53,17 @@ final class Logger {
         // Setup log directory
         let libraryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first!
         logDirectory = libraryURL.appendingPathComponent("Logs/LookMaNoHands")
+
+        // Initialize category loggers eagerly
+        appLogger = OSLog(subsystem: subsystem, category: "App")
+        audioLogger = OSLog(subsystem: subsystem, category: "Audio")
+        whisperLogger = OSLog(subsystem: subsystem, category: "Whisper")
+        transcriptionLogger = OSLog(subsystem: subsystem, category: "Transcription")
+        accessibilityLogger = OSLog(subsystem: subsystem, category: "Accessibility")
+        keyboardLogger = OSLog(subsystem: subsystem, category: "Keyboard")
+        memoryLogger = OSLog(subsystem: subsystem, category: "Memory")
+        crashLogger = OSLog(subsystem: subsystem, category: "Crash")
+        updateLogger = OSLog(subsystem: subsystem, category: "Update")
 
         setupPersistentLogging()
     }

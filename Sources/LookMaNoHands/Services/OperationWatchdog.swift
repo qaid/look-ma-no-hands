@@ -1,7 +1,7 @@
 import Foundation
 
 /// Watchdog for detecting hung operations and enforcing timeouts
-final class OperationWatchdog {
+final class OperationWatchdog: @unchecked Sendable {
 
     static let shared = OperationWatchdog()
 
@@ -183,10 +183,10 @@ extension OperationWatchdog {
     ///   - work: The async work to perform
     /// - Returns: The result of the work
     /// - Throws: `TimeoutError` if timeout occurs, or any error from work
-    func withTimeout<T>(
+    func withTimeout<T: Sendable>(
         _ timeout: TimeInterval,
         operation: String,
-        work: @escaping () async throws -> T
+        work: @escaping @Sendable () async throws -> T
     ) async throws -> T {
         return try await withThrowingTaskGroup(of: T.self) { group in
             // Add the actual work

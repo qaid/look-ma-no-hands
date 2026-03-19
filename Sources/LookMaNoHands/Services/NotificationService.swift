@@ -1,7 +1,7 @@
 import Foundation
 import UserNotifications
 
-class NotificationService: NSObject, UNUserNotificationCenterDelegate {
+class NotificationService: NSObject, @unchecked Sendable, UNUserNotificationCenterDelegate {
     static let shared = NotificationService()
 
     private override init() {

@@ -1,7 +1,7 @@
 import Foundation
 
 /// Checks GitHub for new commits on main branch
-class UpdateService {
+class UpdateService: @unchecked Sendable {
 
     // MARK: - Configuration
 

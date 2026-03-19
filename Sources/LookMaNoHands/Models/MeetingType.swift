@@ -1,7 +1,7 @@
 import Foundation
 
 /// Meeting type that shapes LLM analysis prompts
-enum MeetingType: String, CaseIterable, Codable, Identifiable {
+enum MeetingType: String, CaseIterable, Codable, Identifiable, Sendable {
     case standup = "standup"
     case oneOnOne = "oneOnOne"
     case allHands = "allHands"

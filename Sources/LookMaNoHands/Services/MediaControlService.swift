@@ -7,7 +7,7 @@ import Cocoa
 /// Without this guard, sending commands when no app owns the "Now Playing"
 /// session (e.g. on a clean install) causes macOS to launch Apple Music
 /// as the default media handler. (#128)
-class MediaControlService {
+class MediaControlService: @unchecked Sendable {
 
     /// Whether we paused media (so we only resume what we paused)
     private var didPauseMedia = false

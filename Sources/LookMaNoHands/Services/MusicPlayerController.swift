@@ -3,7 +3,7 @@ import AppKit
 
 /// Manages pause/resume of music players using AppleScript
 /// This is the macOS-specific approach to prevent media from resuming when recording starts
-final class MusicPlayerController {
+final class MusicPlayerController: @unchecked Sendable {
 
     // MARK: - Singleton
 

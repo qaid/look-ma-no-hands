@@ -228,7 +228,7 @@ struct RecordingIndicatorPreview: View {
 // MARK: - Window Controller
 
 /// Observable state for the recording indicator
-class RecordingIndicatorState: ObservableObject {
+class RecordingIndicatorState: ObservableObject, @unchecked Sendable {
     @Published var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
 
     // Exponential smoothing for fluid animation
@@ -259,7 +259,7 @@ class RecordingIndicatorState: ObservableObject {
 }
 
 /// Controls the floating indicator window - persistent window approach
-class RecordingIndicatorWindowController {
+class RecordingIndicatorWindowController: @unchecked Sendable {
 
     private var window: NSWindow?
     private var hostingView: NSHostingView<RecordingIndicator>?

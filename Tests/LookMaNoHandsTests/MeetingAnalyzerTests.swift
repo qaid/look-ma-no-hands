@@ -53,18 +53,18 @@ final class MeetingAnalyzerTests: XCTestCase {
         settings.ollamaModel = "fallback:2"
         defer { settings.ollamaModel = originalModel }
 
-        var progressCalls = 0
+        let counter = CharCounter()
         _ = try await analyzer.analyzeMeetingStreaming(
             transcript: "Hello team",
             customPrompt: "Custom prompt",
             model: nil
         ) { _, _ in
-            progressCalls += 1
+            counter.add(1)
         }
 
         XCTAssertEqual(mockService.modelName, "fallback:2")
         XCTAssertTrue(mockService.unloadCalled)
-        XCTAssertGreaterThanOrEqual(progressCalls, 1)
+        XCTAssertGreaterThanOrEqual(counter.total, 1)
     }
 
     // MARK: - buildSplitPrompt
