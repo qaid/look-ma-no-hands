@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "name": "lmnh-site-tests",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@axe-core/playwright": "^4.10.0",
+    "serve": "^14.0.0"
+  }
+}

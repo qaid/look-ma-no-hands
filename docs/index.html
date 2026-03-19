@@ -181,7 +181,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 clamp(24px, 5vw, 60px);
+    padding: 0 clamp(28px, 6vw, 60px);
     height: 56px;
     background: var(--nav-bg);
     backdrop-filter: blur(12px);
@@ -258,7 +258,7 @@
   .container {
     max-width: 960px;
     margin: 0 auto;
-    padding: 0 clamp(24px, 5vw, 60px);
+    padding: 0 clamp(28px, 6vw, 60px);
   }
 
   /* ---- HERO ---- */
@@ -322,6 +322,7 @@
     -webkit-backdrop-filter: blur(20px);
     margin-bottom: 48px;
     width: fit-content;
+    max-width: 100%;
     transition: background 0.3s, border-color 0.3s;
   }
 
@@ -334,7 +335,7 @@
     flex-shrink: 0;
   }
 
-  .indicator svg { display: block; flex-shrink: 0; }
+  .indicator svg { display: block; flex-shrink: 1; width: 100%; height: auto; }
 
   .hero-cta {
     display: inline-block;
@@ -399,7 +400,7 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     flex-shrink: 0;
-    min-width: 200px;
+    width: 200px;
   }
 
   .track-desc {
@@ -640,7 +641,7 @@
   /* ---- FOOTER ---- */
   footer {
     border-top: 1px solid var(--border);
-    padding: 32px clamp(24px, 5vw, 60px);
+    padding: 32px clamp(28px, 6vw, 60px);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -654,6 +655,12 @@
     font-weight: 600;
     color: var(--text-faint);
   }
+  .footer-name a {
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-name a:hover { color: var(--text-secondary); }
 
   .footer-right {
     font-size: 14px;
@@ -683,6 +690,9 @@
   .reveal-d2 { transition-delay: 0.12s; }
   .reveal-d3 { transition-delay: 0.18s; }
   .reveal-d4 { transition-delay: 0.24s; }
+  .reveal-d5 { transition-delay: 0.30s; }
+  .reveal-d6 { transition-delay: 0.36s; }
+  .reveal-d7 { transition-delay: 0.42s; }
 
   /* ---- RESPONSIVE ---- */
   @media (max-width: 768px) {
@@ -697,24 +707,65 @@
     }
 
     .track {
-      flex-wrap: wrap;
-      gap: 4px 16px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 4px 12px;
+      padding: 16px 0;
     }
-    .track-title { min-width: unset; }
-    .track-duration { margin-left: 48px; }
+    .track-title {
+      width: auto;
+      font-size: 20px;
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .track-desc {
+      grid-column: 1 / -1;
+      grid-row: 2;
+      font-size: 15px;
+    }
+    .track-duration {
+      grid-column: 2;
+      grid-row: 1;
+      margin-left: 0;
+      font-size: 14px;
+      text-align: right;
+      align-self: baseline;
+    }
 
-    .hero { padding-top: 100px; }
+    .hero { padding-top: 88px; padding-bottom: 56px; }
+    .hero h1 { font-size: clamp(36px, 8vw, 64px); margin-bottom: 24px; }
+    .hero-overline { font-size: 12px; margin-bottom: 14px; }
+    .hero-desc { font-size: 17px; margin-bottom: 32px; }
+    .indicator { margin-bottom: 32px; }
 
     .screenshots-grid {
       grid-template-columns: 1fr 1fr;
       gap: 16px;
     }
+
+    .note-num { font-size: 40px; }
+    .note h3 { font-size: 18px; }
+    .note p { font-size: 15px; }
   }
 
   @media (max-width: 480px) {
-    .hero h1 { font-size: 44px; }
-    .track-title { font-size: 19px; }
+    .container { padding: 0 28px; }
+    nav { padding: 0 28px; }
+    footer { padding: 32px 28px; }
+
+    .hero h1 { font-size: 32px; }
+
+    .track-title { font-size: 18px; }
+    .track-desc { font-size: 14px; }
+
+    .screenshots-grid { grid-template-columns: 1fr; gap: 20px; }
+
+    .nav-name { font-size: 13px; }
+    .nav-link { font-size: 13px; }
+
     footer { flex-direction: column; gap: 8px; text-align: center; }
+    .footer-name { font-size: 12px; }
   }
 </style>
 </head>
@@ -762,31 +813,51 @@
   <div class="tracklist-header reveal">Features</div>
 
   <div class="track reveal">
-    <span class="track-num">A1</span>
     <span class="track-title">Voice Dictation</span>
     <span class="track-desc">Press your hotkey, speak, and formatted text appears at your cursor in any app. ~1 second with WhisperKit on Apple Silicon.</span>
     <span class="track-duration">~1s</span>
   </div>
 
   <div class="track reveal reveal-d1">
-    <span class="track-num">A2</span>
     <span class="track-title">Meeting Capture</span>
     <span class="track-desc">Record system audio from Zoom, Meet, or Teams. Continuous real-time transcription with live display.</span>
     <span class="track-duration">Live</span>
   </div>
 
   <div class="track reveal reveal-d2">
-    <span class="track-num">B1</span>
     <span class="track-title">AI Meeting Notes</span>
     <span class="track-desc">Transform raw transcripts into structured notes with decisions, action items, and summaries. Ollama runs locally.</span>
     <span class="track-duration">Local</span>
   </div>
 
   <div class="track reveal reveal-d3">
-    <span class="track-num">B2</span>
     <span class="track-title">Private by Design</span>
     <span class="track-desc">Zero cloud processing. Zero telemetry. Zero accounts. Works fully offline after initial model download.</span>
     <span class="track-duration">0 req</span>
+  </div>
+
+  <div class="track reveal reveal-d4">
+    <span class="track-title">Custom Vocabulary</span>
+    <span class="track-desc">Teach the app your terminology. Add custom word replacements so domain-specific jargon transcribes correctly every time.</span>
+    <span class="track-duration">Smart</span>
+  </div>
+
+  <div class="track reveal reveal-d5">
+    <span class="track-title">Meeting Types</span>
+    <span class="track-desc">Choose from seven tailored analysis modes — Standup, 1:1, Customer Call, and more — or write your own custom prompt.</span>
+    <span class="track-duration">7 modes</span>
+  </div>
+
+  <div class="track reveal reveal-d6">
+    <span class="track-title">Audio Import</span>
+    <span class="track-desc">Drop in a recording and get a transcript. Supports WAV, MP3, M4A, and AIFF with progress tracking.</span>
+    <span class="track-duration">Files</span>
+  </div>
+
+  <div class="track reveal reveal-d7">
+    <span class="track-title">Flexible Hotkeys</span>
+    <span class="track-desc">Caps Lock is just the default. Configure any key combo, double-tap Fn, or Right Option. Toggle dictation on and off with Cmd+Shift+D.</span>
+    <span class="track-duration">Custom</span>
   </div>
 </section>
 
@@ -871,7 +942,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <span class="footer-name">Look Ma No Hands</span>
+  <span class="footer-name">Look Ma No Hands: a project by <a href="https://constellation.design">constellation design</a></span>
   <div class="footer-right">
     <a href="https://github.com/qaid/look-ma-no-hands">GitHub</a>
     <span>MIT License</span>

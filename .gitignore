@@ -16,3 +16,8 @@ Package.resolved
 docs/sketchpad.md
 docs/security-audit-report.md
 
+# Playwright / Node.js (marketing site tests)
+docs/tests/node_modules/
+docs/tests/playwright-report/
+docs/tests/test-results/
+
