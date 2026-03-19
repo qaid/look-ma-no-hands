@@ -27,6 +27,7 @@ class AutoUpdateService: NSObject, ObservableObject, @unchecked Sendable {
 
     private var downloadTask: URLSessionDownloadTask?
     private var downloadContinuation: CheckedContinuation<URL, Error>?
+    private var downloadDestinationDirectory: URL?
     private lazy var downloadSession: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForResource = 300
@@ -83,8 +84,9 @@ class AutoUpdateService: NSObject, ObservableObject, @unchecked Sendable {
             // Replace existing app
             try installApp(from: appBundle)
 
-            // Post-install: reset TCC and update Launch Services
-            await resetAccessibility()
+            // Post-install: update Launch Services so the system recognizes the new app
+            // Note: TCC Accessibility reset is not done here — tccutil silently fails on macOS 15+,
+            // and AppDelegate's existing permission-check flow handles stale TCC entries on relaunch.
             await updateLaunchServices()
 
             // Unmount and cleanup
@@ -145,9 +147,8 @@ class AutoUpdateService: NSObject, ObservableObject, @unchecked Sendable {
     // MARK: - Download
 
     private func downloadDMG(from url: URL, to directory: URL) async throws -> URL {
-        let dmgPath = directory.appendingPathComponent(url.lastPathComponent)
-
         return try await withCheckedThrowingContinuation { continuation in
+            self.downloadDestinationDirectory = directory
             self.downloadContinuation = continuation
             let task = self.downloadSession.downloadTask(with: url)
             self.downloadTask = task
@@ -258,15 +259,6 @@ class AutoUpdateService: NSObject, ObservableObject, @unchecked Sendable {
 
     // MARK: - Post-Install
 
-    private func resetAccessibility() async {
-        do {
-            _ = try await runProcess("/usr/bin/tccutil", ["reset", "Accessibility", bundleID])
-            Logger.shared.info("Reset Accessibility TCC entry for \(bundleID)")
-        } catch {
-            Logger.shared.warning("Failed to reset TCC: \(error). Permission re-grant may require manual action.")
-        }
-    }
-
     private func updateLaunchServices() async {
         do {
             _ = try await runProcess(Self.lsregisterPath, ["-f", appPath.path])
@@ -327,13 +319,16 @@ extension AutoUpdateService: URLSessionDownloadDelegate {
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        // Move file from temp location before it's deleted
-        let destDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("LookMaNoHands-update-download")
+        // Move file from temp location before URLSession deletes it
+        guard let destDir = downloadDestinationDirectory else {
+            downloadContinuation?.resume(throwing: NSError(domain: "AutoUpdateService", code: 3,
+                                                          userInfo: [NSLocalizedDescriptionKey: "No download destination directory set"]))
+            downloadContinuation = nil
+            return
+        }
         let dest = destDir.appendingPathComponent(downloadTask.originalRequest?.url?.lastPathComponent ?? "update.dmg")
 
         do {
-            try FileManager.default.createDirectory(at: destDir, withIntermediateDirectories: true)
             if FileManager.default.fileExists(atPath: dest.path) {
                 try FileManager.default.removeItem(at: dest)
             }
