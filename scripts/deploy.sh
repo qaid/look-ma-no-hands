@@ -104,6 +104,8 @@ for bundle in .build/release/*.bundle; do
     if [ -d "$bundle" ]; then
         bundle_name=$(basename "$bundle")
         echo "📦 Copying resource bundle: $bundle_name"
+        # Remove existing bundle first to avoid nested copies and read-only file conflicts
+        rm -rf "$APP_PATH/Contents/Resources/$bundle_name"
         cp -R "$bundle" "$APP_PATH/Contents/Resources/$bundle_name"
     fi
 done

@@ -149,13 +149,17 @@ class MeetingStore: @unchecked Sendable {
                 case .local:
                     labeledText = "[Me] \(seg.text)"
                 case .remote, .mixed:
-                    let duration = seg.endTime - seg.startTime
-                    let withChanges = insertSpeakerChangeMarkers(
-                        text: seg.text,
-                        changes: seg.speakerChangeOffsets,
-                        segmentDuration: duration > 0 ? duration : 1
-                    )
-                    labeledText = "[Mac OS] \(withChanges)"
+                    if let label = seg.speakerLabel {
+                        labeledText = "[\(label)] \(seg.text)"
+                    } else {
+                        let duration = seg.endTime - seg.startTime
+                        let withChanges = insertSpeakerChangeMarkers(
+                            text: seg.text,
+                            changes: seg.speakerChangeOffsets,
+                            segmentDuration: duration > 0 ? duration : 1
+                        )
+                        labeledText = "[Mac OS] \(withChanges)"
+                    }
                 case .unknown:
                     labeledText = seg.text
                 }

@@ -10,6 +10,8 @@ struct TranscriptSegment: Sendable {
     let timestamp: Date
     let source: DiarizationSource
     let speakerChangeOffsets: [TimeInterval]
+    /// Speaker label from SpeakerKit diarization (e.g., "Speaker A"). Nil means use source-based label.
+    let speakerLabel: String?
 
     init(
         text: String,
@@ -17,7 +19,8 @@ struct TranscriptSegment: Sendable {
         endTime: TimeInterval,
         timestamp: Date,
         source: DiarizationSource = .unknown,
-        speakerChangeOffsets: [TimeInterval] = []
+        speakerChangeOffsets: [TimeInterval] = [],
+        speakerLabel: String? = nil
     ) {
         self.text = text
         self.startTime = startTime
@@ -25,6 +28,7 @@ struct TranscriptSegment: Sendable {
         self.timestamp = timestamp
         self.source = source
         self.speakerChangeOffsets = speakerChangeOffsets
+        self.speakerLabel = speakerLabel
     }
 }
 
