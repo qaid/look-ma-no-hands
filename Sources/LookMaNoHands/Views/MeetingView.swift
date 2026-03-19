@@ -47,6 +47,7 @@ struct MeetingView: View {
     let recordingIndicator: RecordingIndicatorWindowController?
     weak var appDelegate: AppDelegate?
 
+    @ObservedObject private var settings = Settings.shared
     @State private var store = MeetingStore()
     @State private var selectedTab: MeetingTab = .record
     @State private var selectedMeeting: MeetingRecord?
@@ -98,7 +99,7 @@ struct MeetingView: View {
             .tag(MeetingTab.library)
         }
         .frame(minWidth: 700, minHeight: 500)
-        .preferredColorScheme(Settings.shared.appearanceTheme == .light ? .light :
-                              Settings.shared.appearanceTheme == .dark ? .dark : nil)
+        .preferredColorScheme(settings.appearanceTheme == .light ? .light :
+                              settings.appearanceTheme == .dark ? .dark : nil)
     }
 }

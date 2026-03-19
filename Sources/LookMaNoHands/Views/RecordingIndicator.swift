@@ -301,6 +301,10 @@ class RecordingIndicatorWindowController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
 
+        // Set concrete appearance to avoid stale inheritance under hardened runtime
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        window.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+
         // Start hidden
         window.alphaValue = 0
         window.orderOut(nil)

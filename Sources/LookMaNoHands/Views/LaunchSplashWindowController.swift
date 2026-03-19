@@ -39,6 +39,10 @@ class LaunchSplashWindowController {
         window.hasShadow = false
         window.isMovable = false
 
+        // Set concrete appearance to avoid stale inheritance under hardened runtime
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        window.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+
         // Position in upper third of screen
         positionWindow(window)
 
