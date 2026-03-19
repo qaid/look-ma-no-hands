@@ -246,20 +246,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Window Appearance
 
     /// Returns a concrete NSAppearance for the current theme setting.
-    /// Always returns a non-nil value to avoid the stale-appearance race condition
-    /// that occurs when LSUIElement apps transition from .accessory to .regular
-    /// activation policy. Under hardened runtime (notarized builds),
-    /// NSApp.effectiveAppearance may not update before window display, causing
-    /// windows to render with the wrong appearance. Reading AppleInterfaceStyle
-    /// from UserDefaults is reliable regardless of activation policy state.
+    /// Delegates to the shared AppearanceResolver so overlay window controllers
+    /// use the same logic.
     private func resolvedWindowAppearance() -> NSAppearance? {
-        switch Settings.shared.appearanceTheme {
-        case .light:  return NSAppearance(named: .aqua)
-        case .dark:   return NSAppearance(named: .darkAqua)
-        case .system:
-            let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
-            return NSAppearance(named: isDark ? .darkAqua : .aqua)
-        }
+        AppearanceResolver.resolved()
     }
 
     /// Start observing system appearance changes to update open windows.
@@ -280,6 +270,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.appearance = appearance
         meetingWindow?.appearance = appearance
         onboardingWindow?.appearance = appearance
+        recordingIndicator.updateAppearance()
+        launchSplash.updateAppearance()
+        hotkeyToggleSplash.updateAppearance()
     }
 
     // MARK: - Onboarding

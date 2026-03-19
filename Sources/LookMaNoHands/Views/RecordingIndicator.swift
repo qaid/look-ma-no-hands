@@ -301,9 +301,8 @@ class RecordingIndicatorWindowController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
 
-        // Set concrete appearance to avoid stale inheritance under hardened runtime
-        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
-        window.appearance = NSAppearance(named: isDark ? .darkAqua : .aqua)
+        // Set concrete appearance respecting user's in-app theme preference
+        window.appearance = AppearanceResolver.resolved()
 
         // Start hidden
         window.alphaValue = 0
@@ -472,6 +471,11 @@ class RecordingIndicatorWindowController {
     private func stopPositionUpdates() {
         positionUpdateTimer?.invalidate()
         positionUpdateTimer = nil
+    }
+
+    /// Update window appearance to match current theme setting.
+    func updateAppearance() {
+        window?.appearance = AppearanceResolver.resolved()
     }
 
     /// Hide the recording indicator
