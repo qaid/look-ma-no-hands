@@ -18,7 +18,7 @@ jobs:
   test:
     name: Run Tests
     if: github.event.review.state == 'approved'
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

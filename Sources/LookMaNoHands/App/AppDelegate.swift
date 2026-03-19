@@ -59,6 +59,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     // MARK: - Application Lifecycle
 
     func applicationWillFinishLaunching(_ notification: Notification) {
+        // Set app-level appearance before any windows are created so all windows
+        // (including the auto-created SwiftUI Settings window) inherit the correct theme.
+        NSApp.appearance = AppearanceResolver.resolved()
+
         // Install an observer to intercept the SwiftUI Settings window before it becomes visible.
         // The SwiftUI `Settings` scene auto-creates an NSWindow on first launch; this observer
         // catches it via didBecomeKey and orderOut immediately to prevent a visible flash.
