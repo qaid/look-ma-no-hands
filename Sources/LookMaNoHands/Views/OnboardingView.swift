@@ -7,6 +7,7 @@ import AppKit
 struct OnboardingView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var onboardingState = OnboardingState()
+    @ObservedObject private var settings = Settings.shared
 
     // Services (injected from AppDelegate)
     let whisperService: WhisperService
@@ -75,8 +76,8 @@ struct OnboardingView: View {
             }
         }
         .frame(width: 600, height: 520)
-        .preferredColorScheme(Settings.shared.appearanceTheme == .light ? .light :
-                              Settings.shared.appearanceTheme == .dark ? .dark : nil)
+        .preferredColorScheme(settings.appearanceTheme == .light ? .light :
+                              settings.appearanceTheme == .dark ? .dark : nil)
         .onAppear {
             // If starting at permissions, configure the state accordingly
             if startAtPermissions {

@@ -39,6 +39,9 @@ class LaunchSplashWindowController {
         window.hasShadow = false
         window.isMovable = false
 
+        // Set concrete appearance respecting user's in-app theme preference
+        window.appearance = AppearanceResolver.resolved()
+
         // Position in upper third of screen
         positionWindow(window)
 
@@ -146,6 +149,11 @@ class LaunchSplashWindowController {
             self.window = nil
             NSLog("✅ LaunchSplash: Dismissed (no animation)")
         }
+    }
+
+    /// Update window appearance to match current theme setting.
+    func updateAppearance() {
+        window?.appearance = AppearanceResolver.resolved()
     }
 
     /// Public method to manually dismiss (called if needed)

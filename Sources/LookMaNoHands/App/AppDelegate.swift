@@ -103,6 +103,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Logger.shared.info("AppDelegate: applicationDidFinishLaunching called", category: .app)
 
+        // Observe system dark/light mode changes to update open windows
+        startObservingAppearanceChanges()
+
         // Hide dock icon (menu bar app only)
         NSApp.setActivationPolicy(.accessory)
         Logger.shared.info("AppDelegate: Set activation policy to accessory", category: .app)
@@ -237,18 +240,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Observer for system appearance (dark/light mode) changes
+    private var appearanceChangeObserver: Any?
+
     // MARK: - Window Appearance
 
-    /// Returns a concrete NSAppearance when the user has picked Light or Dark,
-    /// or nil to let the window inherit dynamically from the screen/system context.
-    /// Using nil avoids the stale-snapshot race that occurs when reading
-    /// NSApp.effectiveAppearance immediately after setActivationPolicy(.regular).
+    /// Returns a concrete NSAppearance for the current theme setting.
+    /// Delegates to the shared AppearanceResolver so overlay window controllers
+    /// use the same logic.
     private func resolvedWindowAppearance() -> NSAppearance? {
-        switch Settings.shared.appearanceTheme {
-        case .light:  return NSAppearance(named: .aqua)
-        case .dark:   return NSAppearance(named: .darkAqua)
-        case .system: return nil
+        AppearanceResolver.resolved()
+    }
+
+    /// Start observing system appearance changes to update open windows.
+    private func startObservingAppearanceChanges() {
+        appearanceChangeObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateAllWindowAppearances()
         }
+    }
+
+    /// Update appearance on all open windows when the system theme changes.
+    private func updateAllWindowAppearances() {
+        guard Settings.shared.appearanceTheme == .system else { return }
+        let appearance = resolvedWindowAppearance()
+        settingsWindow?.appearance = appearance
+        meetingWindow?.appearance = appearance
+        onboardingWindow?.appearance = appearance
+        recordingIndicator.updateAppearance()
+        launchSplash.updateAppearance()
+        hotkeyToggleSplash.updateAppearance()
     }
 
     // MARK: - Onboarding

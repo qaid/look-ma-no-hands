@@ -301,6 +301,9 @@ class RecordingIndicatorWindowController {
         window.hasShadow = false
         window.ignoresMouseEvents = true
 
+        // Set concrete appearance respecting user's in-app theme preference
+        window.appearance = AppearanceResolver.resolved()
+
         // Start hidden
         window.alphaValue = 0
         window.orderOut(nil)
@@ -468,6 +471,11 @@ class RecordingIndicatorWindowController {
     private func stopPositionUpdates() {
         positionUpdateTimer?.invalidate()
         positionUpdateTimer = nil
+    }
+
+    /// Update window appearance to match current theme setting.
+    func updateAppearance() {
+        window?.appearance = AppearanceResolver.resolved()
     }
 
     /// Hide the recording indicator
