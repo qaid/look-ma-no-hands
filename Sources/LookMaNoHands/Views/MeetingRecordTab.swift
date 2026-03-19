@@ -92,6 +92,14 @@ struct MeetingRecordTab: View {
             if liveState.isRecording {
                 startAudioLevelUpdates()
             }
+            // Prompt for screen recording permission immediately when the tab appears,
+            // so the user doesn't have to discover the requirement by clicking Record.
+            // Guard against pendingScreenRecordingGrant to prevent a relaunch loop:
+            // after macOS relaunches the app for a TCC grant, hasPermission() can return
+            // false transiently, which would re-trigger CGRequestScreenCaptureAccess().
+            if liveState.status == .missingPermissions && !SystemAudioRecorder.hasPermission() && !Settings.shared.pendingScreenRecordingGrant {
+                requestScreenRecordingPermission()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             guard Settings.shared.pendingScreenRecordingGrant else { return }
@@ -137,6 +145,20 @@ struct MeetingRecordTab: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
             .background(Capsule().fill(liveState.status.badgeColor))
+            .onTapGesture {
+                if liveState.status == .missingModel {
+                    appDelegate?.openSettings()
+                }
+            }
+            .onHover { hovering in
+                if liveState.status == .missingModel {
+                    if hovering {
+                        NSCursor.pointingHand.push()
+                    } else {
+                        NSCursor.pop()
+                    }
+                }
+            }
     }
 
     // MARK: - Type Picker
@@ -375,6 +397,21 @@ struct MeetingRecordTab: View {
 
     private static let pastelBlue = Color(red: 0.68, green: 0.78, blue: 0.95)     // Me
     private static let pastelGreen = Color(red: 0.68, green: 0.90, blue: 0.75)     // Remote/Mac OS
+
+    /// Distinct colors for individual remote speakers identified by SpeakerKit
+    private static let remoteSpeakerColors: [Color] = [
+        Color(red: 0.68, green: 0.90, blue: 0.75),  // Green (Speaker A)
+        Color(red: 0.85, green: 0.72, blue: 0.90),  // Purple (Speaker B)
+        Color(red: 0.90, green: 0.80, blue: 0.65),  // Peach (Speaker C)
+        Color(red: 0.70, green: 0.85, blue: 0.90),  // Teal (Speaker D)
+        Color(red: 0.90, green: 0.70, blue: 0.75),  // Pink (Speaker E)
+    ]
+
+    /// Pick a consistent color for a speaker label by hashing
+    private static func colorForSpeakerLabel(_ label: String) -> Color {
+        let index = abs(label.hashValue) % remoteSpeakerColors.count
+        return remoteSpeakerColors[index]
+    }
     static let pastelAmber = Color(red: 0.96, green: 0.84, blue: 0.62)     // Notes
 
     private static let pastelBlueTint = Color(red: 0.68, green: 0.78, blue: 0.95).opacity(0.12)
@@ -402,8 +439,8 @@ struct MeetingRecordTab: View {
                         ForEach(groups) { group in
                             Group {
                                 switch group.key {
-                                case .speaker(let source):
-                                    speakerGroupView(group: group, source: source)
+                                case .speaker(let source, let label):
+                                    speakerGroupView(group: group, source: source, speakerLabel: label)
                                 case .note:
                                     noteGroupView(group: group)
                                 }
@@ -466,12 +503,17 @@ struct MeetingRecordTab: View {
 
     // MARK: - Speaker Group View
 
-    private func speakerGroupView(group: TimelineGroup, source: DiarizationSource) -> some View {
+    private func speakerGroupView(group: TimelineGroup, source: DiarizationSource, speakerLabel: String? = nil) -> some View {
         let isLocal = source == .local
-        let badgeColor = isLocal ? Self.pastelBlue : Self.pastelGreen
-        let tintColor = isLocal ? Self.pastelBlueTint : Self.pastelGreenTint
+        let badgeColor: Color = {
+            if isLocal { return Self.pastelBlue }
+            if let sl = speakerLabel { return Self.colorForSpeakerLabel(sl) }
+            return Self.pastelGreen
+        }()
+        let tintColor = badgeColor.opacity(0.12)
         let label: String = {
             if source == .unknown { return "" }
+            if let sl = speakerLabel { return sl }
             return isLocal ? "Me" : "Mac OS"
         }()
         let timeRange: String = {
@@ -718,11 +760,11 @@ struct MeetingRecordTab: View {
 
     // MARK: - Recording Control
 
+    /// Request screen recording permission — hides the meeting window so the macOS
+    /// System Settings permission prompt is visible above menu bar apps with .accessory
+    /// activation policy (Issue #245, fixed in PR #247 and #265).
     private func requestScreenRecordingPermission() {
         Settings.shared.pendingScreenRecordingGrant = true
-        // Hide the meeting window so the macOS System Settings permission prompt is visible.
-        // Without this, the permission dialog appears behind the meeting window on menu bar
-        // apps with .accessory activation policy (Issue #245, fixed in PR #247 and #265).
         appDelegate?.minimizeMeetingWindowForPermission()
         CGRequestScreenCaptureAccess()
     }
@@ -782,7 +824,10 @@ struct MeetingRecordTab: View {
         stopTimer()
         stopAudioLevelUpdates()
 
+        // Stop recording first so all in-flight audio callbacks complete,
+        // then drain the accumulated system audio for SpeakerKit post-processing.
         _ = await mixedAudioRecorder.stopRecording()
+        let systemAudio = mixedAudioRecorder.drainAccumulatedSystemAudio()
         let finalSegments = await continuousTranscriber.endSession()
 
         let sessionStartIndex = liveState.segments.count - finalSegments.count
@@ -794,6 +839,36 @@ struct MeetingRecordTab: View {
                 segmentRange: sessionStartIndex..<sessionEndIndex
             )
             liveState.recordingSessions.append(newSession)
+        }
+
+        // Run SpeakerKit diarization on system audio to identify individual remote speakers
+        if Settings.shared.speakerDiarizationEnabled && !systemAudio.isEmpty {
+            let remoteIndices = liveState.segments.enumerated().compactMap { (i, seg) -> Int? in
+                (seg.source == .remote || seg.source == .mixed) ? i : nil
+            }
+            let remoteSegments = remoteIndices.map { liveState.segments[$0] }
+
+            if !remoteSegments.isEmpty {
+                liveState.statusMessage = "Identifying speakers..."
+                do {
+                    let diarizationService = SpeakerDiarizationService()
+                    let diarized = try await diarizationService.diarize(
+                        systemAudio: systemAudio,
+                        remoteSegments: remoteSegments,
+                        onProgress: { msg in
+                            Task { @MainActor in self.liveState.statusMessage = msg }
+                        }
+                    )
+                    // Replace remote segments with diarized versions
+                    for (idx, remoteIdx) in remoteIndices.enumerated() {
+                        if idx < diarized.count {
+                            liveState.segments[remoteIdx] = diarized[idx]
+                        }
+                    }
+                } catch {
+                    Logger.shared.warning("SpeakerKit diarization failed, using fallback: \(error.localizedDescription)", category: .transcription)
+                }
+            }
         }
 
         liveState.isRecording = false

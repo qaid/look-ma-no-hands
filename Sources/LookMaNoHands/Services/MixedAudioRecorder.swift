@@ -28,6 +28,11 @@ class MixedAudioRecorder: @unchecked Sendable {
     /// Callback for source-classified audio chunks (preferred over onAudioChunk for diarization)
     var onAudioChunkWithSource: ((AudioChunkWithSource) -> Void)?
 
+    /// Accumulated raw system audio for post-recording SpeakerKit diarization.
+    /// Capped at 1 hour (~230MB) to bound memory usage.
+    private var systemAudioAccumulator: [Float] = []
+    private static let maxAccumulatorSamples = 16000 * 3600  // 1 hour at 16kHz
+
     // MARK: - Source Classification
 
     /// Compute root-mean-square energy of audio samples
@@ -181,11 +186,24 @@ class MixedAudioRecorder: @unchecked Sendable {
 
     // MARK: - Audio Mixing
 
+    /// Return accumulated raw system audio and clear the buffer.
+    /// Called after recording stops to feed SpeakerKit for speaker diarization.
+    func drainAccumulatedSystemAudio() -> [Float] {
+        let audio = systemAudioAccumulator
+        systemAudioAccumulator.removeAll()
+        return audio
+    }
+
     /// Setup callback from system audio recorder
     /// When system audio has a chunk, drain corresponding microphone audio and mix
     private func setupSystemAudioCallback() {
         systemAudioRecorder.onAudioChunk = { [weak self] systemChunk in
             guard let self = self else { return }
+
+            // Accumulate raw system audio for post-recording SpeakerKit diarization
+            if self.systemAudioAccumulator.count + systemChunk.count <= Self.maxAccumulatorSamples {
+                self.systemAudioAccumulator.append(contentsOf: systemChunk)
+            }
 
             // Drain raw (unnormalized) mic samples for fair RMS comparison
             let micChunkRaw = self.microphoneRecorder.drainAvailableSamples(normalize: false)

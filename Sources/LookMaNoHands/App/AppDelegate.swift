@@ -139,8 +139,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             return  // Skip rest of initialization until onboarding completes
         }
 
-        // Check for missing permissions after app update (permissions were reset)
-        if Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding {
+        // Check for missing permissions after app update (permissions were reset).
+        // Skip this check when restarting after a screen recording permission grant —
+        // macOS-initiated relaunches can cause transient event tap failures that
+        // incorrectly trigger the re-grant dialog (the TCC state hasn't propagated yet).
+        let isScreenRecordingRelaunch = Settings.shared.pendingScreenRecordingGrant
+        if Settings.shared.hasCompletedOnboarding && !justCompletedOnboarding && !isScreenRecordingRelaunch {
             let micStatus = AVCaptureDevice.authorizationStatus(for: .audio)
             var hasAccessibility = AXIsProcessTrusted()
             let hasMicrophone = (micStatus == .authorized)
@@ -628,7 +632,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         NSLog("🔀 Hotkey monitoring %@", newState ? "enabled" : "disabled")
     }
 
-    @objc private func openSettings() {
+    @objc func openSettings() {
         NSLog("📋 Opening Settings window...")
 
         // Switch to regular app mode so window appears in Dock and Cmd+Tab

@@ -297,6 +297,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let pendingScreenRecordingGrant = "pendingScreenRecordingGrant"
         static let autoSaveNotes = "autoSaveNotes"
         static let autoSaveFolder = "autoSaveFolder"
+        static let speakerDiarizationEnabled = "speakerDiarizationEnabled"
     }
 
     // MARK: - File Paths
@@ -499,6 +500,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to run SpeakerKit diarization after meeting recordings to identify individual remote speakers
+    @Published var speakerDiarizationEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(speakerDiarizationEnabled, forKey: Keys.speakerDiarizationEnabled)
+        }
+    }
+
     /// SHA of an update the user chose to skip (suppresses auto-check notifications)
     var skippedUpdateSHA: String? {
         get { UserDefaults.standard.string(forKey: Keys.skippedUpdateSHA) }
@@ -624,6 +632,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         // Meeting window state restoration
         self.pendingScreenRecordingGrant = UserDefaults.standard.bool(forKey: Keys.pendingScreenRecordingGrant)
         self.meetingWindowWasOpen = UserDefaults.standard.bool(forKey: Keys.meetingWindowWasOpen)
+
+        // Speaker diarization defaults to true (enabled by default)
+        if UserDefaults.standard.object(forKey: Keys.speakerDiarizationEnabled) != nil {
+            self.speakerDiarizationEnabled = UserDefaults.standard.bool(forKey: Keys.speakerDiarizationEnabled)
+        } else {
+            self.speakerDiarizationEnabled = true
+        }
 
         // Auto-save notes defaults to false (opt-in)
         self.autoSaveNotes = UserDefaults.standard.bool(forKey: Keys.autoSaveNotes)
@@ -811,5 +826,6 @@ Now produce the complete meeting notes following the format above. Ensure every 
         meetingWindowWasOpen = false
         autoSaveNotes = false
         autoSaveFolder = Settings.defaultAutoSaveFolder
+        speakerDiarizationEnabled = true
     }
 }

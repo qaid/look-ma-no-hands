@@ -23,7 +23,7 @@ enum TimelineEntry: Identifiable {
     var groupKey: TimelineGroupKey {
         switch self {
         case .segment(let seg, _):
-            return .speaker(seg.source)
+            return .speaker(seg.source, label: seg.speakerLabel)
         case .note:
             return .note
         }
@@ -65,7 +65,7 @@ enum TimelineEntry: Identifiable {
         for entry in entries.dropFirst() {
             let key = entry.groupKey
             // Never merge .unknown segments — keep each as its own block for readability
-            let isUnknown = key == .speaker(.unknown)
+            let isUnknown = key == .speaker(.unknown, label: nil)
             if key == currentKey && !isUnknown {
                 currentEntries.append(entry)
             } else {
@@ -81,7 +81,7 @@ enum TimelineEntry: Identifiable {
 
 /// Key used to decide whether consecutive timeline entries belong to the same group
 enum TimelineGroupKey: Equatable {
-    case speaker(DiarizationSource)
+    case speaker(DiarizationSource, label: String?)
     case note
 }
 

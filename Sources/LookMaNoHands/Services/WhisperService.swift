@@ -258,7 +258,7 @@ class WhisperService: @unchecked Sendable {
             return false
         }
 
-        // WhisperKit 0.14.1 uses a simpler cache structure:
+        // WhisperKit cache structure:
         // ~/Library/Caches/models/argmaxinc/whisperkit-coreml/openai_whisper-<model>/
         let modelDir = cacheDir
             .appendingPathComponent("models")

@@ -37,6 +37,21 @@ class MeetingAnalyzer: @unchecked Sendable {
 IMPORTANT: The transcript contains lines marked with [USER NOTE @ MM:SS]. These are the user's own observations, questions, and action items captured during the meeting. In your output, include a dedicated "## My Notes" section that lists each user note with its timestamp, preserving the user's original wording. Do not mix user notes into the main analysis prose.
 """
 
+    /// Instruction suffix for SpeakerKit-labeled transcripts (voice-identified speakers)
+    static let speakerKitDiarizationSuffix = """
+
+SPEAKER DIARIZATION RULES: The transcript uses speaker labels from voice analysis:
+- [Me] — spoken by the local user (the person who recorded this meeting)
+- [Speaker A], [Speaker B], etc. — distinct remote participants identified by voice
+- These labels are consistent throughout the transcript (same voice = same label)
+
+When attributing speech:
+1. [Me] always refers to the local user.
+2. Infer real names from greetings, introductions, or context clues.
+3. Once a name is identified for a speaker label, use that name consistently.
+4. Fall back to the letter label (Speaker A, etc.) when names cannot be determined.
+"""
+
     /// Instruction suffix appended when transcript contains speaker diarization markers
     static let diarizationInstructionSuffix = """
 
@@ -88,8 +103,11 @@ When attributing speech:
         }
 
         // Append diarization instructions when speaker markers are present
-        let hasDiarization = transcript.contains("[Me]") || transcript.contains("[Mac OS]") || transcript.contains("[Remote]")
-        if hasDiarization {
+        let hasSpeakerKit = transcript.contains("[Speaker ")
+        let hasLegacyDiarization = transcript.contains("[Me]") || transcript.contains("[Mac OS]") || transcript.contains("[Remote]")
+        if hasSpeakerKit {
+            system += speakerKitDiarizationSuffix
+        } else if hasLegacyDiarization {
             system += diarizationInstructionSuffix
         }
 
