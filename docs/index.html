@@ -399,7 +399,7 @@
     font-weight: 700;
     letter-spacing: -0.02em;
     flex-shrink: 0;
-    min-width: 200px;
+    width: 200px;
   }
 
   .track-desc {
@@ -654,6 +654,12 @@
     font-weight: 600;
     color: var(--text-faint);
   }
+  .footer-name a {
+    color: var(--text-faint);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .footer-name a:hover { color: var(--text-secondary); }
 
   .footer-right {
     font-size: 14px;
@@ -683,6 +689,9 @@
   .reveal-d2 { transition-delay: 0.12s; }
   .reveal-d3 { transition-delay: 0.18s; }
   .reveal-d4 { transition-delay: 0.24s; }
+  .reveal-d5 { transition-delay: 0.30s; }
+  .reveal-d6 { transition-delay: 0.36s; }
+  .reveal-d7 { transition-delay: 0.42s; }
 
   /* ---- RESPONSIVE ---- */
   @media (max-width: 768px) {
@@ -762,31 +771,51 @@
   <div class="tracklist-header reveal">Features</div>
 
   <div class="track reveal">
-    <span class="track-num">A1</span>
     <span class="track-title">Voice Dictation</span>
     <span class="track-desc">Press your hotkey, speak, and formatted text appears at your cursor in any app. ~1 second with WhisperKit on Apple Silicon.</span>
     <span class="track-duration">~1s</span>
   </div>
 
   <div class="track reveal reveal-d1">
-    <span class="track-num">A2</span>
     <span class="track-title">Meeting Capture</span>
     <span class="track-desc">Record system audio from Zoom, Meet, or Teams. Continuous real-time transcription with live display.</span>
     <span class="track-duration">Live</span>
   </div>
 
   <div class="track reveal reveal-d2">
-    <span class="track-num">B1</span>
     <span class="track-title">AI Meeting Notes</span>
     <span class="track-desc">Transform raw transcripts into structured notes with decisions, action items, and summaries. Ollama runs locally.</span>
     <span class="track-duration">Local</span>
   </div>
 
   <div class="track reveal reveal-d3">
-    <span class="track-num">B2</span>
     <span class="track-title">Private by Design</span>
     <span class="track-desc">Zero cloud processing. Zero telemetry. Zero accounts. Works fully offline after initial model download.</span>
     <span class="track-duration">0 req</span>
+  </div>
+
+  <div class="track reveal reveal-d4">
+    <span class="track-title">Custom Vocabulary</span>
+    <span class="track-desc">Teach the app your terminology. Add custom word replacements so domain-specific jargon transcribes correctly every time.</span>
+    <span class="track-duration">Smart</span>
+  </div>
+
+  <div class="track reveal reveal-d5">
+    <span class="track-title">Meeting Types</span>
+    <span class="track-desc">Choose from seven tailored analysis modes — Standup, 1:1, Customer Call, and more — or write your own custom prompt.</span>
+    <span class="track-duration">7 modes</span>
+  </div>
+
+  <div class="track reveal reveal-d6">
+    <span class="track-title">Audio Import</span>
+    <span class="track-desc">Drop in a recording and get a transcript. Supports WAV, MP3, M4A, and AIFF with progress tracking.</span>
+    <span class="track-duration">Files</span>
+  </div>
+
+  <div class="track reveal reveal-d7">
+    <span class="track-title">Flexible Hotkeys</span>
+    <span class="track-desc">Caps Lock is just the default. Configure any key combo, double-tap Fn, or Right Option. Toggle dictation on and off with Cmd+Shift+D.</span>
+    <span class="track-duration">Custom</span>
   </div>
 </section>
 
@@ -871,7 +900,7 @@
 
 <!-- FOOTER -->
 <footer>
-  <span class="footer-name">Look Ma No Hands</span>
+  <span class="footer-name">Look Ma No Hands: a project by <a href="https://constellation.design">constellation design</a></span>
   <div class="footer-right">
     <a href="https://github.com/qaid/look-ma-no-hands">GitHub</a>
     <span>MIT License</span>
