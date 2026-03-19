@@ -27,7 +27,7 @@ jobs:
   verify-dependencies:
     name: Verify Package.resolved Integrity
     if: github.event_name == 'push' || github.event.review.state == 'approved'
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -60,7 +60,7 @@ jobs:
   build-verification:
     name: Verify Clean Build
     if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -124,7 +124,7 @@ jobs:
   entitlements-check:
     name: Verify App Entitlements
     if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
