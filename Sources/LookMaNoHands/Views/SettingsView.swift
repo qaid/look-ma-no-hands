@@ -59,6 +59,8 @@ struct SettingsView: View {
     @State private var isCheckingForUpdates = false
     @State private var updateCheckError: String?
     @State private var updateCopiedConfirmation = false
+    @State private var releaseInfo: UpdateService.ReleaseInfo?
+    @ObservedObject private var autoUpdater = AutoUpdateService.shared
 
     // Track permission changes for restart prompt
     @State private var permissionsChanged = false
@@ -108,6 +110,13 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
             isModelReloading = false
             checkWhisperModelStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .startAutoUpdate)) { notification in
+            if let release = notification.userInfo?["release"] as? UpdateService.ReleaseInfo {
+                releaseInfo = release
+                selectedTab = .about
+                Task { await autoUpdater.performUpdate(release: release) }
+            }
         }
     }
 
@@ -1277,39 +1286,8 @@ struct SettingsView: View {
                             }
                             .padding(.vertical, 4)
 
-                            Text("To update: git pull && ./scripts/deploy.sh")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .padding(.vertical, 4)
-
-                            HStack(spacing: 8) {
-                                Button("Update Now") {
-                                    let pasteboard = NSPasteboard.general
-                                    pasteboard.clearContents()
-                                    pasteboard.setString("git pull && ./scripts/deploy.sh", forType: .string)
-                                    updateCopiedConfirmation = true
-                                }
-                                .controlSize(.small)
-
-                                Button("View on GitHub") {
-                                    if let url = URL(string: update.compareURL) {
-                                        NSWorkspace.shared.open(url)
-                                    }
-                                }
-                                .controlSize(.small)
-
-                                Button("Skip This Update") {
-                                    Settings.shared.skippedUpdateSHA = update.latestCommitSHA
-                                    availableUpdate = nil
-                                }
-                                .controlSize(.small)
-                            }
-
-                            if updateCopiedConfirmation {
-                                Text("Update command copied to clipboard. Paste in Terminal to update.")
-                                    .font(.caption2)
-                                    .foregroundColor(.green)
-                            }
+                            // Auto-update progress or action buttons
+                            updateActionView(update: update)
                         }
                     } else {
                         Image(systemName: "checkmark.circle.fill")
@@ -1387,21 +1365,27 @@ struct SettingsView: View {
         isCheckingForUpdates = true
         updateCheckError = nil
         availableUpdate = nil
+        releaseInfo = nil
 
         Task {
             do {
                 let service = UpdateService()
-                if let update = try await service.checkForUpdates() {
-                    await MainActor.run {
-                        self.availableUpdate = update
-                        settings.lastUpdateCheckDate = Date()
-                        self.isCheckingForUpdates = false
-                    }
-                } else {
-                    await MainActor.run {
-                        settings.lastUpdateCheckDate = Date()
-                        self.isCheckingForUpdates = false
-                    }
+                let update = try await service.checkForUpdates()
+
+                // Also fetch the latest release for one-click install
+                let release: UpdateService.ReleaseInfo?
+                do {
+                    release = try await service.fetchLatestRelease()
+                } catch {
+                    Logger.shared.warning("Failed to fetch release info: \(error)")
+                    release = nil
+                }
+
+                await MainActor.run {
+                    self.availableUpdate = update
+                    self.releaseInfo = release
+                    settings.lastUpdateCheckDate = Date()
+                    self.isCheckingForUpdates = false
                 }
             } catch UpdateService.UpdateError.noBuildInfo {
                 await MainActor.run {
@@ -1412,6 +1396,136 @@ struct SettingsView: View {
                 await MainActor.run {
                     self.updateCheckError = error.localizedDescription
                     self.isCheckingForUpdates = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Auto-Update UI
+
+    @ViewBuilder
+    private func updateActionView(update: UpdateService.UpdateInfo) -> some View {
+        switch autoUpdater.state {
+        case .idle:
+            if let release = releaseInfo {
+                HStack(spacing: 8) {
+                    Button("Update to v\(release.version)") {
+                        Task { await autoUpdater.performUpdate(release: release) }
+                    }
+                    .controlSize(.small)
+
+                    Button("View on GitHub") {
+                        if let url = URL(string: update.compareURL) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .controlSize(.small)
+
+                    Button("Skip This Update") {
+                        Settings.shared.skippedUpdateSHA = update.latestCommitSHA
+                        availableUpdate = nil
+                    }
+                    .controlSize(.small)
+                }
+            } else {
+                // No release available — fall back to clipboard approach
+                Text("To update: git pull && ./scripts/deploy.sh")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.vertical, 4)
+
+                HStack(spacing: 8) {
+                    Button("Copy Command") {
+                        let pasteboard = NSPasteboard.general
+                        pasteboard.clearContents()
+                        pasteboard.setString("git pull && ./scripts/deploy.sh", forType: .string)
+                        updateCopiedConfirmation = true
+                    }
+                    .controlSize(.small)
+
+                    Button("View on GitHub") {
+                        if let url = URL(string: update.compareURL) {
+                            NSWorkspace.shared.open(url)
+                        }
+                    }
+                    .controlSize(.small)
+
+                    Button("Skip This Update") {
+                        Settings.shared.skippedUpdateSHA = update.latestCommitSHA
+                        availableUpdate = nil
+                    }
+                    .controlSize(.small)
+                }
+
+                if updateCopiedConfirmation {
+                    Text("Update command copied to clipboard. Paste in Terminal to update.")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                }
+            }
+
+        case .downloading(let progress):
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: progress)
+                HStack {
+                    Text("Downloading update... \(Int(progress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button("Cancel") {
+                        autoUpdater.cancelUpdate()
+                    }
+                    .controlSize(.small)
+                }
+            }
+
+        case .verifying:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Verifying download...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+        case .installing:
+            HStack(spacing: 8) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Installing update...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+        case .readyToRelaunch:
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                    Text("Update installed successfully")
+                        .font(.caption)
+                }
+                Button("Restart Now") {
+                    autoUpdater.relaunchApp()
+                }
+                .controlSize(.small)
+            }
+
+        case .failed(let message):
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.red)
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                }
+                if let release = releaseInfo {
+                    Button("Retry") {
+                        Task { await autoUpdater.performUpdate(release: release) }
+                    }
+                    .controlSize(.small)
                 }
             }
         }

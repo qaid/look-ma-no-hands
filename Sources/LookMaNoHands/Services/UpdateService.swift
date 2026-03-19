@@ -54,9 +54,19 @@ class UpdateService: @unchecked Sendable {
         let repoURL: String
     }
 
+    struct ReleaseInfo {
+        let tagName: String
+        let version: String
+        let dmgURL: URL
+        let checksumsURL: URL?
+        let htmlURL: String
+        let publishedAt: String
+    }
+
     enum UpdateError: LocalizedError {
         case invalidURL
         case noBuildInfo
+        case noRelease
         case apiRateLimited
         case networkError(String)
         case parseError(String)
@@ -67,6 +77,8 @@ class UpdateService: @unchecked Sendable {
                 return "Invalid GitHub API URL"
             case .noBuildInfo:
                 return "Build information not available"
+            case .noRelease:
+                return "No installable release found"
             case .apiRateLimited:
                 return "GitHub API rate limit exceeded. Try again later."
             case .networkError(let reason):
@@ -77,7 +89,37 @@ class UpdateService: @unchecked Sendable {
         }
     }
 
-    // MARK: - GitHub API Response
+    // MARK: - GitHub Releases API Response
+
+    private struct GitHubRelease: Codable {
+        let tagName: String
+        let name: String?
+        let htmlUrl: String
+        let publishedAt: String
+        let assets: [GitHubAsset]
+
+        enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case name
+            case htmlUrl = "html_url"
+            case publishedAt = "published_at"
+            case assets
+        }
+    }
+
+    private struct GitHubAsset: Codable {
+        let name: String
+        let browserDownloadUrl: String
+        let size: Int
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case browserDownloadUrl = "browser_download_url"
+            case size
+        }
+    }
+
+    // MARK: - GitHub Commits API Response
 
     private struct GitHubCommit: Codable {
         let sha: String
@@ -381,5 +423,97 @@ class UpdateService: @unchecked Sendable {
             compareURL: compareURL,
             repoURL: repoURL
         )
+    }
+
+    // MARK: - GitHub Releases
+
+    /// Fetch the latest GitHub Release with DMG download info. Returns nil if current version is up to date.
+    func fetchLatestRelease() async throws -> ReleaseInfo? {
+        let urlString = "https://api.github.com/repos/\(repoOwner)/\(repoName)/releases/latest"
+        guard let url = URL(string: urlString) else {
+            throw UpdateError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 15
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: request)
+        } catch {
+            throw UpdateError.networkError(error.localizedDescription)
+        }
+
+        if let httpResponse = response as? HTTPURLResponse {
+            if httpResponse.statusCode == 403 {
+                if let remaining = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining"),
+                   remaining == "0" {
+                    throw UpdateError.apiRateLimited
+                }
+            }
+            if httpResponse.statusCode == 404 {
+                return nil
+            }
+            if httpResponse.statusCode != 200 {
+                throw UpdateError.networkError("HTTP \(httpResponse.statusCode)")
+            }
+        }
+
+        let decoder = JSONDecoder()
+        let release: GitHubRelease
+        do {
+            release = try decoder.decode(GitHubRelease.self, from: data)
+        } catch {
+            throw UpdateError.parseError(error.localizedDescription)
+        }
+
+        // Find the DMG asset
+        guard let dmgAsset = release.assets.first(where: { $0.name.hasSuffix(".dmg") }),
+              let dmgURL = URL(string: dmgAsset.browserDownloadUrl) else {
+            return nil
+        }
+
+        // Find checksums.txt asset (optional)
+        let checksumsURL: URL? = release.assets
+            .first(where: { $0.name == "checksums.txt" })
+            .flatMap { URL(string: $0.browserDownloadUrl) }
+
+        // Parse version from tag (strip "v" prefix)
+        let version = release.tagName.hasPrefix("v")
+            ? String(release.tagName.dropFirst())
+            : release.tagName
+
+        // Only return if the release is newer than the current version
+        let currentVersion = getCurrentVersion()
+        guard Self.isVersion(version, newerThan: currentVersion) else {
+            return nil
+        }
+
+        return ReleaseInfo(
+            tagName: release.tagName,
+            version: version,
+            dmgURL: dmgURL,
+            checksumsURL: checksumsURL,
+            htmlURL: release.htmlUrl,
+            publishedAt: release.publishedAt
+        )
+    }
+
+    // MARK: - Version Comparison
+
+    /// Compare two semantic version strings. Returns true if `a` is newer than `b`.
+    static func isVersion(_ a: String, newerThan b: String) -> Bool {
+        let aParts = a.split(separator: ".").compactMap { Int($0) }
+        let bParts = b.split(separator: ".").compactMap { Int($0) }
+
+        for i in 0..<max(aParts.count, bParts.count) {
+            let aVal = i < aParts.count ? aParts[i] : 0
+            let bVal = i < bParts.count ? bParts[i] : 0
+            if aVal > bVal { return true }
+            if aVal < bVal { return false }
+        }
+        return false
     }
 }
