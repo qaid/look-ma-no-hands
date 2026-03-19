@@ -25,7 +25,7 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 ## ✨ Features
 
 ### Voice Dictation
-- **Lightning Fast**: ~1 second transcription with WhisperKit acceleration (2.7x faster, 75% less energy than CPU)
+- **Lightning Fast**: ~1 second transcription with WhisperKit acceleration on Apple Neural Engine
 - **System-wide**: Works in any app, any text field
 - **Fully Customizable Hotkeys**:
   - Caps Lock toggle (default, press once to start, again to stop)
@@ -38,10 +38,13 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 - **Smart formatting**: Automatic capitalization, punctuation, context-aware insertion, and cleanup
 - **Auto-pause media**: Automatically pauses playing media (Apple Music, Spotify, Pocket Casts, etc.) when dictation starts and resumes when it stops. Toggle in Settings → General.
 
-### Meeting Transcription 🆕
+### Meeting Transcription
 - **System audio capture**: Record video calls from Zoom, Meet, Teams, etc.
 - **Continuous transcription**: Real-time speech-to-text during meetings
 - **AI-powered notes**: Transform transcripts into structured, actionable documents using Ollama
+- **Meeting library**: Save, browse, and search past meetings with automatic retention management
+- **Flexible import**: Import transcripts from files, audio recordings, or clipboard
+- **Tabbed interface**: Dedicated Record, Analyze, and Library tabs
 - **Customizable prompts**: Add domain-specific jargon and customize output format
 - **Structured output**: Automatically extracts:
   - Meeting overview (participants, date, purpose)
@@ -61,6 +64,10 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 - **WhisperKit Optimized**: Utilizes Apple Neural Engine with native async/await for maximum performance
 - **Automatic model management**: Download and switch between Whisper models from the UI
 - **Persistent vocabulary**: Custom vocabulary stored locally and survives app reinstalls
+- **Guided onboarding**: Step-by-step setup wizard for model download, permissions, and Ollama configuration
+- **Auto-update**: Built-in update checking with verified downloads
+- **Crash reporting**: Privacy-safe crash reports with transcription content fully redacted
+- **Memory monitoring**: Proactive resource tracking to prevent excessive memory usage
 
 ## 📦 Install
 
@@ -102,13 +109,17 @@ The app supports:
 - **medium** (1.5 GB) - Highest accuracy
 - **large-v3-turbo** - Optimized for faster inference with high accuracy
 
-### 3. Run
+### 2. Run
+
+Launch the app from the Applications folder, or if building from source:
 
 ```bash
-.build/release/LookMaNoHands
+open ~/Applications/LookMaNoHands.app
+# Or run directly:
+swift run LookMaNoHands
 ```
 
-### 4. Optional: Install Ollama (for Meeting Transcription)
+### 3. Optional: Install Ollama (for Meeting Transcription)
 
 If you want AI-powered meeting notes:
 
@@ -123,7 +134,7 @@ ollama serve
 ollama pull qwen2.5:3b
 ```
 
-### 5. Grant Permissions
+### 4. Grant Permissions
 
 On first launch, grant:
 1. **Microphone access**: To capture your voice for dictation
@@ -163,20 +174,20 @@ On first launch, grant:
 3. Speak naturally
 4. Click the menu bar icon again and select **Stop Recording**
 
-### Meeting Transcription 🆕
+### Meeting Transcription
 1. **Start a video call** (Zoom, Meet, Teams, etc.)
 2. Click the menu bar icon → **Start Meeting Transcription**
-3. Select audio source:
+3. **Record tab**: Select audio source and start recording
    - **System Audio**: Records what you hear from speakers (video call audio)
    - **Microphone**: Records your voice only
-4. Click **Start Recording**
-5. Speak during your meeting - live transcript appears in real-time
-6. Click **Stop Recording** when done
-7. Click **Generate Notes** to create structured meeting summary
-8. **Customize prompt** (optional):
-   - Add domain-specific jargon/terms
+4. Live transcript appears in real-time as you speak
+5. Click **Stop Recording** when done
+6. **Analyze tab**: Generate structured meeting notes with Ollama
+   - Customize prompt with domain-specific jargon
    - Edit the full prompt template
-9. Review and copy/export the generated notes
+7. **Library tab**: Browse, search, and manage past meetings
+   - Import transcripts from files, audio recordings, or clipboard
+   - Automatic retention management
 
 ### Settings Window
 Access via menu bar → **Settings** to:
@@ -186,11 +197,12 @@ Access via menu bar → **Settings** to:
   - Recording indicator style preferences
   - Predefined hotkey shortcuts (Caps Lock, Right Option, Fn)
 - **Models Tab**:
-  - Download and switch Whisper models (tiny, base, small, medium)
+  - Download and switch Whisper models (tiny, base, small, medium, large-v3-turbo)
   - Configure Ollama model for meeting notes
   - Check Ollama connection status
 - **Permissions Tab**: Check and grant microphone, accessibility, and screen recording permissions
-- **About Tab**: View app version and information
+- **Diagnostics Tab**: View logs, memory usage, and system information
+- **About Tab**: View app version and check for updates
 
 | General | Recording | Models | Vocabulary |
 |:---:|:---:|:---:|:---:|
@@ -204,9 +216,7 @@ Access via menu bar → **Settings** to:
 | base | 142 MB | ~1-2s (WhisperKit) | Better accuracy | For longer transcriptions |
 | small | 466 MB | ~2-3s (WhisperKit) | High accuracy | Complex terminology |
 
-**WhisperKit Performance**: 2.7x faster than CPU, 75% less energy consumption on Apple Silicon with native async/await streaming.
-
-**Benchmarks**: Measured on Apple Silicon (M-series) with whisper.cpp/SwiftWhisper baseline. WhisperKit provides improved performance through native integration with Core ML and the Neural Engine.
+**WhisperKit Performance**: WhisperKit provides fast inference through native integration with Core ML and the Apple Neural Engine on Apple Silicon.
 
 See [PERFORMANCE.md](PERFORMANCE.md) for optimization details.
 
@@ -247,9 +257,10 @@ All processing happens on your Mac in under 1 second with WhisperKit acceleratio
 ### Meeting Transcription
 1. **System Audio Capture**: ScreenCaptureKit records audio from your video call app
 2. **Continuous Transcription**: Audio is chunked and transcribed in real-time using WhisperKit
-3. **Live Display**: Transcript appears as you speak during the meeting (with session dividers for clarity)
-4. **AI Processing**: When you click "Generate Notes", Ollama transforms the raw transcript into structured meeting notes
-5. **Structured Output**: Returns formatted document with decisions, action items, discussion summary, etc.
+3. **Live Display**: Transcript appears as you speak during the meeting
+4. **AI Processing**: Ollama transforms the raw transcript into structured meeting notes
+5. **Structured Output**: Formatted document with decisions, action items, discussion summary, etc.
+6. **Persistence**: Meetings are automatically saved to the library for later review
 
 ## 🔧 Configuration
 
@@ -319,27 +330,60 @@ LookMaNoHands/
 │   ├── Services/         # Core functionality
 │   │   ├── AudioRecorder.swift       # Microphone capture (dictation)
 │   │   ├── SystemAudioRecorder.swift # System audio (meetings)
+│   │   ├── MixedAudioRecorder.swift  # Combined mic + system audio
+│   │   ├── AudioDeviceManager.swift  # Audio device enumeration
+│   │   ├── AudioFileImporter.swift   # Import audio files for transcription
 │   │   ├── WhisperService.swift      # WhisperKit with Core ML
 │   │   ├── ContinuousTranscriber.swift # Real-time transcription
 │   │   ├── MeetingAnalyzer.swift     # Ollama integration
+│   │   ├── MeetingStore.swift        # Meeting persistence and library
+│   │   ├── OllamaService.swift       # Ollama API client
 │   │   ├── TextFormatter.swift       # Rule-based text cleanup
 │   │   ├── TextInsertionService.swift # Accessibility API + context-aware formatting
+│   │   ├── CursorPositionService.swift # Text cursor tracking
 │   │   ├── KeyboardMonitor.swift     # Custom hotkey detection and validation
-│   │   └── MediaControlService.swift # Auto-pause/resume system media during dictation
+│   │   ├── HotkeyToggleMonitor.swift # Global hotkey toggle (Cmd+Shift+D)
+│   │   ├── MediaControlService.swift # Auto-pause/resume media during dictation
+│   │   ├── UpdateService.swift       # Auto-update with signature verification
+│   │   ├── CrashReporter.swift       # Privacy-safe crash reporting
+│   │   ├── MemoryMonitor.swift       # Runtime memory tracking
+│   │   ├── NotificationService.swift # System notifications
+│   │   ├── OperationWatchdog.swift   # Timeout protection for long operations
+│   │   ├── Logger.swift              # Structured logging
+│   │   ├── BuildInfo.swift           # Version and build metadata
+│   │   └── FileUtilities.swift       # Safe file operations
 │   ├── Views/            # SwiftUI + AppKit UI
 │   │   ├── RecordingIndicator.swift  # Floating indicator with animated border
+│   │   ├── MenuBarView.swift         # Menu bar popover
 │   │   ├── SettingsView.swift        # Settings window
-│   │   ├── MeetingView.swift         # Meeting transcription UI
-│   │   └── HotkeyRecorderView.swift  # Raycast-style hotkey configuration
+│   │   ├── MeetingView.swift         # Meeting transcription container
+│   │   ├── MeetingRecordTab.swift    # Meeting recording tab
+│   │   ├── MeetingAnalyzeTab.swift   # Meeting analysis tab
+│   │   ├── MeetingLibraryTab.swift   # Meeting history and import
+│   │   ├── HotkeyRecorderView.swift  # Raycast-style hotkey configuration
+│   │   ├── OnboardingView.swift      # First-launch setup wizard
+│   │   ├── LaunchSplashView.swift    # Launch splash screen
+│   │   └── HotkeyToggleSplashView.swift # Hotkey toggle feedback
 │   └── Models/           # State management
 │       ├── Settings.swift            # User preferences
-│       ├── Hotkey.swift              # Custom hotkey validation and management
-│       └── TranscriptionState.swift  # App state
+│       ├── Hotkey.swift              # Custom hotkey validation
+│       ├── TranscriptionState.swift  # Dictation state
+│       ├── LiveMeetingState.swift    # Active meeting session state
+│       ├── MeetingRecord.swift       # Persisted meeting data
+│       ├── MeetingType.swift         # Meeting classification
+│       ├── TimelineEntry.swift       # Meeting timeline events
+│       ├── UserNote.swift            # User-added meeting annotations
+│       ├── AudioSource.swift         # Audio input configuration
+│       ├── OnboardingState.swift     # Onboarding flow state
+│       └── AppearanceResolver.swift  # UI theme resolution
+├── Tests/LookMaNoHandsTests/  # Unit and integration tests
+├── scripts/              # Build, deploy, and utility scripts
 ├── docs/                 # Documentation
 │   ├── ARCHITECTURE.md
-│   ├── MEETING_TRANSCRIPTION_PLAN.md
+│   ├── SECURITY.md
+│   ├── NOTARIZATION.md
 │   ├── ROADMAP.md
-│   └── enable-custom-hotkeys.md     # Custom hotkey feature documentation
+│   └── test-inventory.md
 └── PERFORMANCE.md        # Optimization guide
 ```
 
@@ -391,7 +435,6 @@ For the full audit summary, resolved findings, and current security posture, see
 - System audio capture requires macOS 14+ (Sonoma or later)
 - Speaker identification not yet implemented (all text appears as one speaker)
 - Ollama must be running locally for AI-powered note generation
-- Meeting notes are not automatically saved (copy/paste to save)
 
 ## 📖 Advanced Usage
 
@@ -442,6 +485,7 @@ MIT License - see [LICENSE](LICENSE) file.
 
 - [WhisperKit](https://github.com/argmax-ai/WhisperKit) - Fast Whisper inference with native Swift and Core ML
 - [whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Underlying Whisper implementation
+- [MarkdownUI](https://github.com/gonzalezreal/swift-markdown-ui) - Markdown rendering in SwiftUI
 - [Ollama](https://ollama.ai) - Local LLM infrastructure
 - Inspired by macOS built-in dictation, but faster and fully local
 
