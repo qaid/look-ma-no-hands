@@ -5,7 +5,8 @@ on:
     branches: [ main ]
     paths:
       - 'Resources/Info.plist'  # Only run on version bumps
-  pull_request:
+  pull_request_review:
+    types: [submitted]
     branches: [ main ]
     paths:
       - 'Resources/Info.plist'  # Only run on version bumps
@@ -19,6 +20,7 @@ permissions:
 jobs:
   analyze:
     name: Analyze Swift Code
+    if: github.event_name != 'pull_request_review' || github.event.review.state == 'approved'
     runs-on: macos-14
 
     steps:

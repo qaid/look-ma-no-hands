@@ -284,6 +284,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let customVocabulary = "customVocabulary" // Legacy UserDefaults key (for migration)
         static let checkForUpdatesOnLaunch = "checkForUpdatesOnLaunch"
         static let lastUpdateCheckDate = "lastUpdateCheckDate"
+        static let skippedUpdateSHA = "skippedUpdateSHA"
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
         static let hotkeyEnabled = "hotkeyEnabled"
         static let toggleHotkeyShortcut = "toggleHotkeyShortcut"
@@ -493,6 +494,18 @@ Now produce the complete meeting notes following the format above. Ensure every 
     @Published var autoSaveFolder: String {
         didSet {
             UserDefaults.standard.set(autoSaveFolder, forKey: Keys.autoSaveFolder)
+        }
+    }
+
+    /// SHA of an update the user chose to skip (suppresses auto-check notifications)
+    var skippedUpdateSHA: String? {
+        get { UserDefaults.standard.string(forKey: Keys.skippedUpdateSHA) }
+        set {
+            if let sha = newValue {
+                UserDefaults.standard.set(sha, forKey: Keys.skippedUpdateSHA)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.skippedUpdateSHA)
+            }
         }
     }
 
@@ -786,6 +799,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         customVocabulary = []
         checkForUpdatesOnLaunch = false
         lastUpdateCheckDate = nil
+        skippedUpdateSHA = nil
         pauseMediaDuringDictation = true
         hotkeyEnabled = true
         toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))

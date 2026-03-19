@@ -1,7 +1,8 @@
 name: Test Coverage
 
 on:
-  pull_request:
+  pull_request_review:
+    types: [submitted]
     branches: [ main ]
     paths-ignore:
       - '**.md'
@@ -16,6 +17,7 @@ permissions:
 jobs:
   test:
     name: Run Tests
+    if: github.event.review.state == 'approved'
     runs-on: macos-14
     steps:
       - name: Checkout code

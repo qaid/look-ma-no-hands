@@ -57,6 +57,7 @@ struct SettingsView: View {
     @State private var availableUpdate: UpdateService.UpdateInfo?
     @State private var isCheckingForUpdates = false
     @State private var updateCheckError: String?
+    @State private var updateCopiedConfirmation = false
 
     // Track permission changes for restart prompt
     @State private var permissionsChanged = false
@@ -1277,19 +1278,32 @@ struct SettingsView: View {
                                 .padding(.vertical, 4)
 
                             HStack(spacing: 8) {
-                                Button("View Changes on GitHub") {
+                                Button("Update Now") {
+                                    let pasteboard = NSPasteboard.general
+                                    pasteboard.clearContents()
+                                    pasteboard.setString("git pull && ./scripts/deploy.sh", forType: .string)
+                                    updateCopiedConfirmation = true
+                                }
+                                .controlSize(.small)
+
+                                Button("View on GitHub") {
                                     if let url = URL(string: update.compareURL) {
                                         NSWorkspace.shared.open(url)
                                     }
                                 }
                                 .controlSize(.small)
 
-                                Button("Copy Command") {
-                                    let pasteboard = NSPasteboard.general
-                                    pasteboard.clearContents()
-                                    pasteboard.setString("git pull && ./scripts/deploy.sh", forType: .string)
+                                Button("Skip This Update") {
+                                    Settings.shared.skippedUpdateSHA = update.latestCommitSHA
+                                    availableUpdate = nil
                                 }
                                 .controlSize(.small)
+                            }
+
+                            if updateCopiedConfirmation {
+                                Text("Update command copied to clipboard. Paste in Terminal to update.")
+                                    .font(.caption2)
+                                    .foregroundColor(.green)
                             }
                         }
                     } else {

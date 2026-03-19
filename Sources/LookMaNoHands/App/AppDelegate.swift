@@ -1673,6 +1673,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             if let updateInfo = try await updateService.checkForUpdates() {
                 Settings.shared.lastUpdateCheckDate = Date()
+                // Skip notification if user previously chose to ignore this update
+                if updateInfo.latestCommitSHA == Settings.shared.skippedUpdateSHA {
+                    return
+                }
                 let commitText = updateInfo.commitCount == 1 ? "commit" : "commits"
                 await NotificationService.shared.sendNotification(
                     title: "Update Available",
@@ -1748,27 +1752,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Recent changes:
         \(commitSummaries)
 
-        To update:
-        1. Open Terminal
-        2. cd to the project directory
-        3. Run: \(updateCommand)
+        To update, run in Terminal:
+        \(updateCommand)
         """
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "View Changes on GitHub")
-        alert.addButton(withTitle: "Copy Command")
-        alert.addButton(withTitle: "Later")
+        alert.addButton(withTitle: "Update Now")
+        alert.addButton(withTitle: "View on GitHub")
+        alert.addButton(withTitle: "Skip This Update")
 
         let response = alert.runModal()
 
         if response == .alertFirstButtonReturn {
+            // Copy update command to clipboard
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            pasteboard.setString("cd \(FileManager.default.currentDirectoryPath) && \(updateCommand)", forType: .string)
+            showAlert(title: "Command Copied", message: "The update command has been copied to your clipboard.\n\nOpen Terminal and paste to update.")
+        } else if response == .alertSecondButtonReturn {
             if let url = URL(string: updateInfo.compareURL) {
                 NSWorkspace.shared.open(url)
             }
-        } else if response == .alertSecondButtonReturn {
-            // Copy the update command to clipboard
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString(updateCommand, forType: .string)
+        } else if response == .alertThirdButtonReturn {
+            Settings.shared.skippedUpdateSHA = updateInfo.latestCommitSHA
         }
     }
 
