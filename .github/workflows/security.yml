@@ -9,7 +9,8 @@ on:
       - '.github/**'
       - 'LICENSE'
       - '.gitignore'
-  pull_request:
+  pull_request_review:
+    types: [submitted]
     branches: [ main ]
     paths-ignore:
       - '**.md'
@@ -25,6 +26,7 @@ permissions:
 jobs:
   verify-dependencies:
     name: Verify Package.resolved Integrity
+    if: github.event_name == 'push' || github.event.review.state == 'approved'
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -57,7 +59,7 @@ jobs:
 
   build-verification:
     name: Verify Clean Build
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/security-')
+    if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
     runs-on: macos-14
     steps:
       - name: Checkout code
@@ -74,6 +76,7 @@ jobs:
 
   secret-scan:
     name: Scan for Secrets
+    if: github.event_name == 'push' || github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -88,6 +91,7 @@ jobs:
 
   dependency-scan:
     name: Scan Dependencies for Vulnerabilities
+    if: github.event_name == 'push' || github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -119,7 +123,7 @@ jobs:
 
   entitlements-check:
     name: Verify App Entitlements
-    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/security-')
+    if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
     runs-on: macos-14
     steps:
       - name: Checkout code

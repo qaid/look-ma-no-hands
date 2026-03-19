@@ -1,7 +1,8 @@
 name: License Compliance
 
 on:
-  pull_request:
+  pull_request_review:
+    types: [submitted]
     branches: [ main ]
     paths:
       - 'Package.swift'
@@ -14,6 +15,7 @@ permissions:
 jobs:
   license-scan:
     name: Scan OSS Licenses
+    if: github.event_name == 'workflow_dispatch' || github.event.review.state == 'approved'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
