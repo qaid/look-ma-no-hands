@@ -27,6 +27,7 @@ extension Notification.Name {
     static let toggleShortcutChanged = Notification.Name("toggleShortcutChanged")
     static let whisperModelChanged = Notification.Name("whisperModelChanged")
     static let whisperModelReady = Notification.Name("whisperModelReady")
+    static let startAutoUpdate = Notification.Name("startAutoUpdate")
 }
 
 /// Available Whisper model sizes (WhisperKit format)

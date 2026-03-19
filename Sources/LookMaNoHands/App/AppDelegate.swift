@@ -1746,10 +1746,25 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 if updateInfo.latestCommitSHA == Settings.shared.skippedUpdateSHA {
                     return
                 }
+
+                // Check for release version to include in notification
+                let release: UpdateService.ReleaseInfo?
+                do {
+                    release = try await updateService.fetchLatestRelease()
+                } catch {
+                    release = nil
+                }
+
                 let commitText = updateInfo.commitCount == 1 ? "commit" : "commits"
+                let body: String
+                if let release = release {
+                    body = "Version \(release.version) is available (\(updateInfo.commitCount) new \(commitText)). Open Settings to update."
+                } else {
+                    body = "\(updateInfo.commitCount) new \(commitText) on main. Click \"Check for Updates\" in the menu bar for details."
+                }
                 await NotificationService.shared.sendNotification(
                     title: "Update Available",
-                    body: "\(updateInfo.commitCount) new \(commitText) on main. Click \"Check for Updates\" in the menu bar for details."
+                    body: body
                 )
             } else {
                 Settings.shared.lastUpdateCheckDate = Date()
@@ -1767,9 +1782,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         Task {
             do {
                 if let updateInfo = try await updateService.checkForUpdates() {
+                    // Also fetch release info for one-click install
+                    let release: UpdateService.ReleaseInfo?
+                    do {
+                        release = try await updateService.fetchLatestRelease()
+                    } catch {
+                        Logger.shared.warning("Failed to fetch release info: \(error)")
+                        release = nil
+                    }
+
                     await MainActor.run {
                         Settings.shared.lastUpdateCheckDate = Date()
-                        showUpdateDialog(updateInfo: updateInfo)
+                        showUpdateDialog(updateInfo: updateInfo, releaseInfo: release)
                     }
                 } else {
                     await MainActor.run {
@@ -1801,7 +1825,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
 
     /// Show dialog with commit-based update information
-    private func showUpdateDialog(updateInfo: UpdateService.UpdateInfo) {
+    private func showUpdateDialog(updateInfo: UpdateService.UpdateInfo, releaseInfo: UpdateService.ReleaseInfo?) {
         let alert = NSAlert()
         alert.messageText = "Update Available"
 
@@ -1813,30 +1837,44 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             "• \(commit.shortSHA): \(commit.message)"
         }.joined(separator: "\n")
 
-        let updateCommand = "git pull && ./scripts/deploy.sh"
+        if let release = releaseInfo {
+            alert.informativeText = """
+            Version \(release.version) is available (\(updateInfo.commitCount) new \(commitText)).
 
-        alert.informativeText = """
-        \(updateInfo.commitCount) new \(commitText) available on main.
+            Recent changes:
+            \(commitSummaries)
+            """
+        } else {
+            alert.informativeText = """
+            \(updateInfo.commitCount) new \(commitText) available on main.
 
-        Recent changes:
-        \(commitSummaries)
+            Recent changes:
+            \(commitSummaries)
 
-        To update, run in Terminal:
-        \(updateCommand)
-        """
+            To update, run in Terminal:
+            git pull && ./scripts/deploy.sh
+            """
+        }
+
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Update Now")
+        alert.addButton(withTitle: releaseInfo != nil ? "Update Now" : "Copy Command")
         alert.addButton(withTitle: "View on GitHub")
         alert.addButton(withTitle: "Skip This Update")
 
         let response = alert.runModal()
 
         if response == .alertFirstButtonReturn {
-            // Copy update command to clipboard
-            let pasteboard = NSPasteboard.general
-            pasteboard.clearContents()
-            pasteboard.setString("cd \(FileManager.default.currentDirectoryPath) && \(updateCommand)", forType: .string)
-            showAlert(title: "Command Copied", message: "The update command has been copied to your clipboard.\n\nOpen Terminal and paste to update.")
+            if let release = releaseInfo {
+                // Open Settings to About tab and trigger auto-update
+                openSettings()
+                NotificationCenter.default.post(name: .startAutoUpdate, object: nil, userInfo: ["release": release])
+            } else {
+                // Fallback: copy command to clipboard
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString("cd \(FileManager.default.currentDirectoryPath) && git pull && ./scripts/deploy.sh", forType: .string)
+                showAlert(title: "Command Copied", message: "The update command has been copied to your clipboard.\n\nOpen Terminal and paste to update.")
+            }
         } else if response == .alertSecondButtonReturn {
             if let url = URL(string: updateInfo.compareURL) {
                 NSWorkspace.shared.open(url)
