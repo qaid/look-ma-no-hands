@@ -2,7 +2,7 @@ import Foundation
 
 /// Tracks progress through the onboarding wizard
 @Observable
-class OnboardingState {
+class OnboardingState: @unchecked Sendable {
     enum Step: Int, CaseIterable {
         case welcome = 0
         case ollama = 1

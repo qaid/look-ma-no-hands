@@ -1,7 +1,7 @@
 import Foundation
 
 /// Available trigger keys for starting/stopping recording
-enum TriggerKey: String, CaseIterable, Identifiable {
+enum TriggerKey: String, CaseIterable, Identifiable, Sendable {
     case capsLock = "Caps Lock"
     case rightOption = "Right Option"
     case fn = "Fn (Double-tap)"
@@ -28,7 +28,7 @@ extension Notification.Name {
 }
 
 /// Available Whisper model sizes (WhisperKit format)
-enum WhisperModel: String, CaseIterable, Identifiable {
+enum WhisperModel: String, CaseIterable, Identifiable, Sendable {
     case tiny = "tiny"
     case base = "base"
     case small = "small"
@@ -49,7 +49,7 @@ enum WhisperModel: String, CaseIterable, Identifiable {
 }
 
 /// A custom vocabulary entry for biasing Whisper and post-transcription replacement
-struct VocabularyEntry: Codable, Identifiable, Hashable {
+struct VocabularyEntry: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     /// What Whisper tends to produce (e.g. "swift ui"). Blank = prompt-bias only.
     var phrase: String
@@ -67,7 +67,7 @@ struct VocabularyEntry: Codable, Identifiable, Hashable {
 }
 
 /// Recording indicator position
-enum IndicatorPosition: String, CaseIterable, Identifiable {
+enum IndicatorPosition: String, CaseIterable, Identifiable, Sendable {
     case followCursor = "Follow Cursor"
     case top = "Top"
     case bottom = "Bottom"
@@ -76,7 +76,7 @@ enum IndicatorPosition: String, CaseIterable, Identifiable {
 }
 
 /// Appearance theme for the recording indicator
-enum AppearanceTheme: String, CaseIterable, Identifiable {
+enum AppearanceTheme: String, CaseIterable, Identifiable, Sendable {
     case system = "System"
     case light = "Light"
     case dark = "Dark"
@@ -86,7 +86,7 @@ enum AppearanceTheme: String, CaseIterable, Identifiable {
 
 /// User preferences and settings
 /// Persisted to UserDefaults
-class Settings: ObservableObject {
+class Settings: ObservableObject, @unchecked Sendable {
 
     // MARK: - Singleton
 

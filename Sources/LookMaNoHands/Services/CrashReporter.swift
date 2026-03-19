@@ -3,7 +3,7 @@ import Darwin
 
 /// Service for handling crashes and capturing diagnostics
 /// Must be initialized early in app lifecycle (applicationDidFinishLaunching)
-final class CrashReporter {
+final class CrashReporter: @unchecked Sendable {
 
     static let shared = CrashReporter()
 
@@ -275,7 +275,7 @@ final class CrashReporter {
 // MARK: - Signal Handler (C function)
 
 /// Global reference for signal handler access
-private var sharedCrashReporter: CrashReporter?
+nonisolated(unsafe) private var sharedCrashReporter: CrashReporter?
 
 /// C-compatible signal handler function
 private func signalHandler(signal: Int32) {

@@ -3,7 +3,7 @@ import AppKit
 
 /// Monitors for a global keyboard shortcut to toggle hotkey enabled/disabled state
 /// Uses both local and global NSEvent monitors to work from any app
-class HotkeyToggleMonitor {
+class HotkeyToggleMonitor: @unchecked Sendable {
 
     // MARK: - Properties
 

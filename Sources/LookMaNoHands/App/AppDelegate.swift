@@ -4,7 +4,7 @@ import AVFoundation
 
 /// AppDelegate handles menu bar setup and application lifecycle
 /// This is where we configure the app to run as a menu bar app without a dock icon
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     // MARK: - Properties
 
@@ -209,7 +209,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func closeAutoOpenedSettingsWindow() {
         // Synchronous pass: hide immediately to prevent any visible flash
         for window in NSApp.windows where window.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" {
-            window.orderOut(nil)
+            window.orderOut(self)
             window.close()
         }
         // Safety net: async check in case the window is created after this call.

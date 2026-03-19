@@ -624,7 +624,7 @@ struct PermissionsStepView: View {
     private func openAccessibilitySettings() {
         // First, trigger the system prompt to add this app to Accessibility
         // IMPORTANT: The dictionary must be created as NSDictionary and cast to CFDictionary
-        let options = NSDictionary(dictionary: [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true])
+        let options = NSDictionary(dictionary: ["AXTrustedCheckOptionPrompt": true])
         let _ = AXIsProcessTrustedWithOptions(options as CFDictionary)
 
         // Small delay to let the dialog appear before opening System Settings

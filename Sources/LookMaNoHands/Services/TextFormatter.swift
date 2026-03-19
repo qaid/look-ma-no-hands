@@ -2,7 +2,7 @@ import Foundation
 
 /// Rule-based text formatter that cleans up transcribed text
 /// No AI required - uses deterministic rules for fast, predictable formatting
-class TextFormatter {
+class TextFormatter: @unchecked Sendable {
 
     // MARK: - Configuration
 

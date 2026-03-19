@@ -12,7 +12,7 @@ private struct AXTextFieldState {
 
 /// Service for inserting text into the currently focused text field
 /// Uses multiple strategies to maximize compatibility across applications
-class TextInsertionService {
+class TextInsertionService: @unchecked Sendable {
 
     // MARK: - Public Methods
 
@@ -218,8 +218,9 @@ class TextInsertionService {
             let delay = Double(attempt * attempt) * 0.01
             print("TextInsertionService: Cursor positioning failed (attempt \(attempt)), retrying in \(Int(delay * 1000))ms...")
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                self.setCursorPosition(element: element, location: location, attempt: attempt + 1)
+            nonisolated(unsafe) let capturedElement = element
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { @Sendable [self] in
+                self.setCursorPosition(element: capturedElement, location: location, attempt: attempt + 1)
             }
         } else {
             print("TextInsertionService: ❌ Cursor positioning failed after \(attempt) attempts")

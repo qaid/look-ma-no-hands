@@ -2,13 +2,13 @@ import Foundation
 import SwiftUI
 
 /// Audio source for recording
-enum AudioSource: String, Equatable {
+enum AudioSource: String, Equatable, Sendable {
     case microphone = "Microphone"
     case systemAudio = "System Audio"
 }
 
 /// Represents the current state of the recording/transcription process
-enum RecordingState: Equatable {
+enum RecordingState: Equatable, Sendable {
     case idle
     case recording
     case processing
@@ -36,7 +36,7 @@ enum RecordingState: Equatable {
 /// Central state management for the transcription pipeline
 /// Observable so SwiftUI views can react to changes
 @Observable
-class TranscriptionState {
+class TranscriptionState: @unchecked Sendable {
     
     // MARK: - State Properties
     

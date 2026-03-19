@@ -2,7 +2,7 @@ import Foundation
 import Dispatch
 
 /// Service for monitoring memory usage and handling memory pressure
-final class MemoryMonitor {
+final class MemoryMonitor: @unchecked Sendable {
 
     static let shared = MemoryMonitor()
 

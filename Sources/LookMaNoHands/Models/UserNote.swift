@@ -1,7 +1,7 @@
 import Foundation
 
 /// A user-authored note captured during live meeting recording
-struct UserNote: Identifiable, Codable, Equatable {
+struct UserNote: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let text: String
     /// Seconds from session start (matches TranscriptSegment.startTime scale)

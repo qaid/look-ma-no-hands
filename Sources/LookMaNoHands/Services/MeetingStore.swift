@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-enum MeetingImportError: LocalizedError {
+enum MeetingImportError: LocalizedError, Sendable {
     case emptyTranscript
     var errorDescription: String? { "The transcript text is empty." }
 }
@@ -14,7 +14,7 @@ enum MeetingImportError: LocalizedError {
 ///   - audio.{ext}     — optional imported audio copy
 @available(macOS 13.0, *)
 @Observable
-class MeetingStore {
+class MeetingStore: @unchecked Sendable {
 
     // MARK: - State
 
@@ -268,7 +268,7 @@ class MeetingStore {
         from url: URL,
         type: MeetingType,
         whisperService: WhisperService,
-        onProgress: @escaping (Double, String) async -> Void
+        onProgress: @Sendable @escaping (Double, String) async -> Void
     ) async throws -> MeetingRecord {
         isImportingAudio = true
         defer { isImportingAudio = false }

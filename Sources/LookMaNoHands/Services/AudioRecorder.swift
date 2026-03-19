@@ -4,7 +4,7 @@ import Accelerate
 
 /// Records audio from the microphone
 /// Outputs audio data suitable for Whisper transcription (16kHz, mono)
-class AudioRecorder {
+class AudioRecorder: @unchecked Sendable {
 
     // MARK: - Properties
 

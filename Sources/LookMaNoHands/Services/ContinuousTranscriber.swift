@@ -3,7 +3,7 @@ import AVFoundation
 import Accelerate
 
 /// Segment of transcribed audio with timing information
-struct TranscriptSegment {
+struct TranscriptSegment: Sendable {
     let text: String
     let startTime: TimeInterval
     let endTime: TimeInterval
@@ -31,7 +31,7 @@ struct TranscriptSegment {
 /// Service for continuous transcription of long-form audio
 /// Handles chunking, segment deduplication, and segment stitching
 @available(macOS 13.0, *)
-class ContinuousTranscriber {
+class ContinuousTranscriber: @unchecked Sendable {
 
     // MARK: - Properties
 

@@ -1,8 +1,14 @@
 import Foundation
 
+/// Thread-safe counter for tracking streamed character counts
+final class CharCounter: @unchecked Sendable {
+    private(set) var total = 0
+    func add(_ count: Int) { total += count }
+}
+
 /// Service for analyzing meeting transcripts and generating structured notes
 /// Uses Ollama LLM to extract key information from raw transcripts
-class MeetingAnalyzer {
+class MeetingAnalyzer: @unchecked Sendable {
 
     /// Holds the split system/user parts of an LLM prompt
     struct SplitPrompt {
@@ -161,14 +167,14 @@ When attributing speech:
         transcript: String,
         customPrompt: String? = nil,
         model: String? = nil,
-        onProgress: @escaping (Int, String) async -> Void
+        onProgress: @Sendable @escaping (Int, String) async -> Void
     ) async throws -> String {
         let splitPrompt = try await prepareAnalysis(transcript: transcript, customPrompt: customPrompt, model: model, label: "streaming")
 
-        var totalChars = 0
+        let charCounter = CharCounter()
         let structuredNotes = try await ollamaService.generateStreaming(prompt: splitPrompt.prompt, system: splitPrompt.system, numCtx: Self.defaultContextSize) { chunk in
-            totalChars += chunk.count
-            await onProgress(totalChars, chunk)
+            charCounter.add(chunk.count)
+            await onProgress(charCounter.total, chunk)
         }
 
         print("MeetingAnalyzer: Streaming analysis complete, generated \(structuredNotes.count) characters")

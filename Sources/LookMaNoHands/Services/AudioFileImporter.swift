@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// Imports external audio files and transcribes them via WhisperService
 /// Uses AVAssetReader to decode directly to 16kHz mono Linear PCM in 30-second streaming chunks
 @available(macOS 13.0, *)
-class AudioFileImporter {
+class AudioFileImporter: @unchecked Sendable {
 
     // MARK: - Constants
 

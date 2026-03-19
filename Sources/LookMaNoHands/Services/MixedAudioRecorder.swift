@@ -6,7 +6,7 @@ import CoreAudio
 /// Service that captures and mixes both system audio and microphone audio
 /// Used for meeting transcription to capture both remote participants and local speaker
 @available(macOS 13.0, *)
-class MixedAudioRecorder {
+class MixedAudioRecorder: @unchecked Sendable {
 
     // MARK: - Properties
 

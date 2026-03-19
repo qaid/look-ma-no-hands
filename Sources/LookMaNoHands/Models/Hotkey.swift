@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 /// Represents a keyboard shortcut (key + modifiers)
-struct Hotkey: Codable, Equatable, Hashable {
+struct Hotkey: Codable, Equatable, Hashable, Sendable {
     /// The virtual key code (CGKeyCode)
     let keyCode: UInt16
 
@@ -10,7 +10,7 @@ struct Hotkey: Codable, Equatable, Hashable {
     let modifiers: ModifierFlags
 
     /// Modifier flags as a Codable struct
-    struct ModifierFlags: Codable, Equatable, Hashable {
+    struct ModifierFlags: Codable, Equatable, Hashable, Sendable {
         var command: Bool = false
         var shift: Bool = false
         var option: Bool = false
