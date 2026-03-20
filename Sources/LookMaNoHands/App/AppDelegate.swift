@@ -27,6 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     // Focused element before recording started (for restoring focus on cancel)
     private var focusedElementBeforeRecording: AXUIElement?
+    private var cursorSnapshotBeforeRecording: CursorSnapshot?
 
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
@@ -1171,10 +1172,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Update state to idle (skips processing)
         transcriptionState.cancelRecording()
 
-        // Restore focus to the original field
+        // Restore focus and cursor position to the original field
         if let focusedElement = focusedElementBeforeRecording {
             restoreFocus(to: focusedElement)
+            Thread.sleep(forTimeInterval: 0.05)
+            if let snapshot = cursorSnapshotBeforeRecording {
+                textInsertionService.restoreCursorPosition(snapshot)
+            }
             focusedElementBeforeRecording = nil
+            cursorSnapshotBeforeRecording = nil
         }
 
         // Update UI
@@ -1261,8 +1267,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             return
         }
 
-        // Capture the focused element BEFORE showing indicator
+        // Capture the focused element and cursor position BEFORE showing indicator
         focusedElementBeforeRecording = textInsertionService.getFocusedElement()
+        if let element = focusedElementBeforeRecording {
+            cursorSnapshotBeforeRecording = textInsertionService.captureCursorPosition(for: element)
+        }
 
         // Capture field context NOW, before any previous transcription could contaminate it
         capturedInitialPrompt = buildInitialPrompt()
@@ -1480,6 +1489,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                         if let targetElement = self.focusedElementBeforeRecording {
                             self.restoreFocus(to: targetElement)
                             Thread.sleep(forTimeInterval: 0.05)
+                            // Restore cursor position so Cmd+V pastes at the right location
+                            if let snapshot = self.cursorSnapshotBeforeRecording {
+                                self.textInsertionService.restoreCursorPosition(snapshot)
+                                Thread.sleep(forTimeInterval: 0.05)
+                            }
                         }
 
                         self.textInsertionService.insertText(formattedText)
@@ -1488,6 +1502,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
                         // Clear the stored focus since we successfully completed
                         self.focusedElementBeforeRecording = nil
+                        self.cursorSnapshotBeforeRecording = nil
                     }
                 }
                 let insertTime = Date().timeIntervalSince(insertStart)

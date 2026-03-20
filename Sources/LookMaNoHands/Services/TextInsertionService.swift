@@ -10,6 +10,13 @@ private struct AXTextFieldState {
     let selectionLength: Int // UTF-16 offset
 }
 
+/// Snapshot of cursor position within an AX element, for later restoration
+struct CursorSnapshot {
+    let element: AXUIElement
+    let cursorLocation: Int  // UTF-16 offset
+    let selectionLength: Int // UTF-16 offset
+}
+
 /// Service for inserting text into the currently focused text field
 /// Uses multiple strategies to maximize compatibility across applications
 class TextInsertionService: @unchecked Sendable {
@@ -142,7 +149,39 @@ class TextInsertionService: @unchecked Sendable {
         
         return (element as! AXUIElement)
     }
-    
+
+    /// Capture the cursor position of a given AX element for later restoration
+    func captureCursorPosition(for element: AXUIElement) -> CursorSnapshot? {
+        var selectedRange: CFTypeRef?
+        let rangeResult = AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRange
+        )
+
+        guard rangeResult == .success, let rangeValue = selectedRange else {
+            return nil
+        }
+
+        var range = CFRange()
+        AXValueGetValue(rangeValue as! AXValue, .cfRange, &range)
+
+        return CursorSnapshot(
+            element: element,
+            cursorLocation: range.location,
+            selectionLength: range.length
+        )
+    }
+
+    /// Restore a previously captured cursor position
+    func restoreCursorPosition(_ snapshot: CursorSnapshot) {
+        setCursorPosition(
+            element: snapshot.element,
+            location: snapshot.cursorLocation,
+            length: snapshot.selectionLength
+        )
+    }
+
     /// Insert text at the current selection point using captured AX state
     /// Uses UTF-16 offsets (NSString convention) to match AX API behavior
     private func insertAtSelection(_ state: AXTextFieldState, text: String) -> Bool {
@@ -197,8 +236,8 @@ class TextInsertionService: @unchecked Sendable {
     }
 
     /// Helper to set cursor position with retry logic
-    private func setCursorPosition(element: AXUIElement, location: Int, attempt: Int = 1) {
-        var newRange = CFRange(location: location, length: 0)
+    private func setCursorPosition(element: AXUIElement, location: Int, length: Int = 0, attempt: Int = 1) {
+        var newRange = CFRange(location: location, length: length)
 
         guard let rangeValue = AXValueCreate(.cfRange, &newRange) else {
             print("TextInsertionService: Failed to create CFRange for cursor")
@@ -220,7 +259,7 @@ class TextInsertionService: @unchecked Sendable {
 
             nonisolated(unsafe) let capturedElement = element
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { @Sendable [self] in
-                self.setCursorPosition(element: capturedElement, location: location, attempt: attempt + 1)
+                self.setCursorPosition(element: capturedElement, location: location, length: length, attempt: attempt + 1)
             }
         } else {
             print("TextInsertionService: ❌ Cursor positioning failed after \(attempt) attempts")
