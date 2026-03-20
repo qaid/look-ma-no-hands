@@ -131,21 +131,18 @@ fi
 # App defaults (conditional based on flag)
 if [ "$RESET_DEFAULTS" = true ]; then
     echo "🧹 Resetting app preferences (preserving vocabulary & user data)..."
-    # Delete all preference keys EXCEPT user data worth preserving
+    # Delete only ephemeral/state keys that should be reset between deploys.
+    # All user-configured settings (hotkeys, vocabulary, models, folder selections,
+    # appearance, meeting prompts, etc.) are preserved by default.
     # Note: vocabulary and toggleHotkey now live in Application Support files,
-    # but legacy UserDefaults keys (customVocabulary, toggleHotkeyShortcut) must
-    # also be preserved for users who haven't yet launched the app to trigger migration.
-    # hasCompletedOnboarding is preserved to avoid forcing full re-onboarding.
-    PRESERVE_KEYS="hasCompletedOnboarding|meetingTypePrompts|customVocabulary|toggleHotkeyShortcut"
-    ALL_KEYS=$(defaults read com.lookmanohands.app 2>/dev/null | grep -oE '^\s{4}[a-zA-Z][a-zA-Z0-9]*' | sed 's/^ *//' || true)
-    for key in $ALL_KEYS; do
-        if ! echo "$key" | grep -qE "^($PRESERVE_KEYS)$"; then
-            defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
-        fi
+    # but legacy UserDefaults keys (customVocabulary, toggleHotkeyShortcut) are
+    # also preserved for users who haven't yet launched the app to trigger migration.
+    RESET_KEYS="pendingScreenRecordingGrant meetingWindowWasOpen lastUpdateCheckDate skippedUpdateSHA"
+    for key in $RESET_KEYS; do
+        defaults delete com.lookmanohands.app "$key" 2>/dev/null || true
     done
-    defaults write com.lookmanohands.app triggerKey "Right Option"
-    echo "   ✅ App preferences reset to factory settings"
-    echo "   ℹ️  Vocabulary, custom prompts, and onboarding state preserved"
+    echo "   ✅ Ephemeral state reset"
+    echo "   ℹ️  All user settings preserved (vocabulary, hotkeys, folders, models, prompts)"
 else
     echo "ℹ️  Preserving existing app defaults"
     echo "   (use './deploy.sh --reset-defaults' to reset)"
