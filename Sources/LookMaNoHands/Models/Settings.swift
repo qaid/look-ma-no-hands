@@ -20,7 +20,7 @@ enum TriggerKey: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Notification posted when hotkey configuration changes
+/// App-wide notification names
 extension Notification.Name {
     static let hotkeyConfigurationChanged = Notification.Name("hotkeyConfigurationChanged")
     static let hotkeyEnabledChanged = Notification.Name("hotkeyEnabledChanged")
@@ -28,6 +28,7 @@ extension Notification.Name {
     static let whisperModelChanged = Notification.Name("whisperModelChanged")
     static let whisperModelReady = Notification.Name("whisperModelReady")
     static let startAutoUpdate = Notification.Name("startAutoUpdate")
+    static let navigateToAboutAndCheckForUpdates = Notification.Name("navigateToAboutAndCheckForUpdates")
 }
 
 /// Available Whisper model sizes (WhisperKit format)
