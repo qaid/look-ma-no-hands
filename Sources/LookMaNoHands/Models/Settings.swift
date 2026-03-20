@@ -20,7 +20,7 @@ enum TriggerKey: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// Notification posted when hotkey configuration changes
+/// App-wide notification names
 extension Notification.Name {
     static let hotkeyConfigurationChanged = Notification.Name("hotkeyConfigurationChanged")
     static let hotkeyEnabledChanged = Notification.Name("hotkeyEnabledChanged")

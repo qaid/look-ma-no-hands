@@ -1796,7 +1796,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     /// Opens Settings to the About tab and triggers an update check there.
     @objc private func checkForUpdatesManually() {
         openSettings()
-        NotificationCenter.default.post(name: .navigateToAboutAndCheckForUpdates, object: nil)
+        // Defer notification to next run loop pass so SettingsView has time to mount
+        // and register its .onReceive subscription before the notification fires.
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .navigateToAboutAndCheckForUpdates, object: nil)
+        }
     }
 
     // MARK: - Developer Tools
