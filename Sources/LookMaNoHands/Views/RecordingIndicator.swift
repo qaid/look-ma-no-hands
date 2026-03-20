@@ -168,14 +168,23 @@ struct RecordingIndicator: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Static recording dot (no pulsing)
-            Circle()
-                .fill(Color(red: 1.0, green: 0.23, blue: 0.19))
-                .frame(width: 10, height: 10)
-                .shadow(color: Color(red: 1.0, green: 0.23, blue: 0.19).opacity(0.4), radius: 4, x: 0, y: 0)
+            if state.isProcessing {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.8)
+                Text("Transcribing...")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+            } else {
+                // Static recording dot (no pulsing)
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.23, blue: 0.19))
+                    .frame(width: 10, height: 10)
+                    .shadow(color: Color(red: 1.0, green: 0.23, blue: 0.19).opacity(0.4), radius: 4, x: 0, y: 0)
 
-            // Smooth waveform line
-            WaveformLineView(frequencyBands: $state.frequencyBands, width: 260, height: 34)
+                // Smooth waveform line
+                WaveformLineView(frequencyBands: $state.frequencyBands, width: 260, height: 34)
+            }
         }
         .padding(.leading, 14)
         .padding(.trailing, 12)
@@ -230,6 +239,7 @@ struct RecordingIndicatorPreview: View {
 /// Observable state for the recording indicator
 class RecordingIndicatorState: ObservableObject, @unchecked Sendable {
     @Published var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
+    @Published var isProcessing: Bool = false
 
     // Exponential smoothing for fluid animation
     func updateFrequencyBands(_ newBands: [Float]) {
@@ -404,9 +414,33 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
         window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
+    /// Show the processing indicator (reuses existing window at same position)
+    func showProcessing() {
+        guard let window = window else { return }
+
+        state.isProcessing = true
+
+        // Window position is preserved from recording — just make it visible
+        window.orderFront(nil)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.15
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().alphaValue = 1.0
+        }
+    }
+
+    /// Hide the processing indicator
+    func hideProcessing() {
+        state.isProcessing = false
+        hide()
+    }
+
     /// Show the recording indicator
     func show() {
         guard let window = window else { return }
+
+        // Ensure we're in recording mode (not processing)
+        state.isProcessing = false
 
         // Get user's position preference
         let position = Settings.shared.indicatorPosition
