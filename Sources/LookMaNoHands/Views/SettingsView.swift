@@ -118,6 +118,10 @@ struct SettingsView: View {
                 Task { await autoUpdater.performUpdate(release: release) }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToAboutAndCheckForUpdates)) { _ in
+            selectedTab = .about
+            performUpdateCheck()
+        }
     }
 
     // MARK: - Sidebar

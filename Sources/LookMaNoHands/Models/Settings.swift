@@ -28,6 +28,7 @@ extension Notification.Name {
     static let whisperModelChanged = Notification.Name("whisperModelChanged")
     static let whisperModelReady = Notification.Name("whisperModelReady")
     static let startAutoUpdate = Notification.Name("startAutoUpdate")
+    static let navigateToAboutAndCheckForUpdates = Notification.Name("navigateToAboutAndCheckForUpdates")
 }
 
 /// Available Whisper model sizes (WhisperKit format)
