@@ -153,6 +153,7 @@ struct RecordingIndicator: View {
     @ObservedObject var state: RecordingIndicatorState
     @ObservedObject private var settings = Settings.shared
     @Environment(\.colorScheme) var colorScheme
+    @State private var processingPulse = false
 
     /// Compute the effective color scheme based on user's theme preference
     private var effectiveColorScheme: ColorScheme? {
@@ -169,12 +170,21 @@ struct RecordingIndicator: View {
     var body: some View {
         HStack(spacing: 10) {
             if state.isProcessing {
-                ProgressView()
-                    .controlSize(.small)
-                    .scaleEffect(0.8)
+                // Pulsing blue dot
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 10, height: 10)
+                    .shadow(color: Color.blue.opacity(0.4), radius: 4, x: 0, y: 0)
+                    .opacity(processingPulse ? 0.4 : 1.0)
+                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: processingPulse)
+                    .onAppear { processingPulse = true }
+                    .onDisappear { processingPulse = false }
+
+                // Processing text in place of waveform (same width to preserve window size)
                 Text("Transcribing...")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 260, height: 34)
             } else {
                 // Static recording dot (no pulsing)
                 Circle()
