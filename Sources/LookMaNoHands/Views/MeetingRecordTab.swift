@@ -106,6 +106,9 @@ struct MeetingRecordTab: View {
             checkStatus()
             appDelegate?.restoreMeetingWindowAfterPermission()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
+            checkStatus()
+        }
         .onDisappear {
             // Only pause visualization — don't stop recording or tear down state.
             // Tab switches trigger onDisappear/onAppear; recording must survive them.
