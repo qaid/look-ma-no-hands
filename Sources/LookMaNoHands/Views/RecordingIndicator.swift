@@ -145,8 +145,8 @@ struct WaveformLineView: View {
     }
 }
 
-/// Floating window that appears during recording to show the user that audio is being captured
-/// Shows a recording dot + smooth waveform line at the cursor position
+/// Floating window that appears during dictation to show recording and processing states
+/// Recording: red dot + smooth waveform line | Processing: pulsing blue dot + "Transcribing..." text
 /// IMPORTANT: Only shown in dictation mode, NOT in meeting transcription mode
 struct RecordingIndicator: View {
 
@@ -430,13 +430,9 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
 
         state.isProcessing = true
 
-        // Window position is preserved from recording — just make it visible
+        // Cancel any in-progress hide animation before showing
+        window.animator().alphaValue = 1.0
         window.orderFront(nil)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.15
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 1.0
-        }
     }
 
     /// Hide the processing indicator
