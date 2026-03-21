@@ -55,12 +55,8 @@ fi
 if [ -d "$BACKUP_DIR" ]; then
     for f in vocabulary.json toggleHotkey.json; do
         if [ -f "$BACKUP_DIR/$f" ]; then
-            # Only restore if the backup has actual data (not just "[]")
-            CONTENT=$(cat "$BACKUP_DIR/$f" 2>/dev/null || true)
-            if [ -n "$CONTENT" ] && [ "$CONTENT" != "[]" ]; then
-                mkdir -p "$APP_SUPPORT_DIR"
-                cp "$BACKUP_DIR/$f" "$APP_SUPPORT_DIR/$f"
-            fi
+            mkdir -p "$APP_SUPPORT_DIR"
+            cp "$BACKUP_DIR/$f" "$APP_SUPPORT_DIR/$f"
         fi
     done
     rm -rf "$BACKUP_DIR"
