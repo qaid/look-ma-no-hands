@@ -1,14 +1,6 @@
 name: Security Checks
 
 on:
-  push:
-    branches: [ main, security-* ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/**'
-      - 'LICENSE'
-      - '.gitignore'
   pull_request:
     branches: [ main ]
 
@@ -40,7 +32,7 @@ jobs:
   verify-dependencies:
     name: Verify Package.resolved Integrity
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
@@ -74,7 +66,7 @@ jobs:
   build-verification:
     name: Verify Clean Build
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
@@ -92,7 +84,7 @@ jobs:
   secret-scan:
     name: Scan for Secrets
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -108,7 +100,7 @@ jobs:
   dependency-scan:
     name: Scan Dependencies for Vulnerabilities
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -141,7 +133,7 @@ jobs:
   entitlements-check:
     name: Verify App Entitlements
     needs: [changes]
-    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
