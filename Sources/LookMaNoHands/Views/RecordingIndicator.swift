@@ -289,6 +289,7 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
     private var audioUpdateTimer: DispatchSourceTimer?
     private weak var audioRecorder: AudioRecorder?
     private let state = RecordingIndicatorState()
+    private var processingShownAt: Date?
 
     init() {
         // Create window once during initialization
@@ -429,14 +430,28 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
         guard let window = window else { return }
 
         state.isProcessing = true
+        processingShownAt = Date()
 
         // Cancel any in-progress hide animation before showing
         window.animator().alphaValue = 1.0
         window.orderFront(nil)
     }
 
-    /// Hide the processing indicator
+    /// Hide the processing indicator with minimum display duration to prevent flash
     func hideProcessing() {
+        let minimumDisplayDuration: TimeInterval = 0.4
+        if let shownAt = processingShownAt {
+            let elapsed = Date().timeIntervalSince(shownAt)
+            if elapsed < minimumDisplayDuration {
+                DispatchQueue.main.asyncAfter(deadline: .now() + (minimumDisplayDuration - elapsed)) { [weak self] in
+                    self?.processingShownAt = nil
+                    self?.state.isProcessing = false
+                    self?.hide()
+                }
+                return
+            }
+        }
+        processingShownAt = nil
         state.isProcessing = false
         hide()
     }
