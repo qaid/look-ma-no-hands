@@ -812,9 +812,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
             do {
                 // Try to load the configured model - WhisperKit will download it if needed
+                NSLog("⏳ loadWhisperModel: calling whisperService.loadModel(named: \(configuredModel))...")
                 try await whisperService.loadModel(named: configuredModel)
-                NSLog("✅ Whisper model '\(configuredModel)' loaded successfully")
+                NSLog("✅ loadWhisperModel: model '\(configuredModel)' loaded, isModelLoaded=\(whisperService.isModelLoaded)")
                 await MainActor.run {
+                    NSLog("📮 loadWhisperModel: posting .whisperModelReady on MainActor")
                     NotificationCenter.default.post(name: .whisperModelReady, object: nil)
                 }
 

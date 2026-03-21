@@ -107,7 +107,21 @@ struct MeetingRecordTab: View {
             appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
+            NSLog("📬 MeetingRecordTab: received .whisperModelReady, isModelLoaded=\(whisperService.isModelLoaded)")
             checkStatus()
+        }
+        .task {
+            // Poll for model availability. Handles the race where loadWhisperModel()
+            // completes (or hasn't completed yet) around the time this view appears.
+            // Uses structured concurrency (.task) instead of DispatchQueue to avoid
+            // stale view-struct captures in SwiftUI.
+            while liveState.status == .missingModel && !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                NSLog("🔄 MeetingRecordTab poll: isModelLoaded=\(whisperService.isModelLoaded), isModelLoading=\(whisperService.isModelLoading)")
+                if whisperService.isModelLoaded {
+                    checkStatus()
+                }
+            }
         }
         .onDisappear {
             // Only pause visualization — don't stop recording or tear down state.
@@ -980,15 +994,10 @@ struct MeetingRecordTab: View {
 
     private func checkStatus() {
         if liveState.status == .completed { return }
-        if !whisperService.isModelLoaded {
+        let modelLoaded = whisperService.isModelLoaded
+        NSLog("🔍 MeetingRecordTab.checkStatus: isModelLoaded=\(modelLoaded), isModelLoading=\(whisperService.isModelLoading), current status=\(liveState.status)")
+        if !modelLoaded {
             liveState.status = .missingModel
-            // Model may still be loading — re-check shortly in case the
-            // .whisperModelReady notification fired before we subscribed.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                if liveState.status == .missingModel {
-                    checkStatus()
-                }
-            }
             return
         }
         if !SystemAudioRecorder.hasPermission() {
@@ -998,6 +1007,7 @@ struct MeetingRecordTab: View {
         if Settings.shared.pendingScreenRecordingGrant {
             Settings.shared.pendingScreenRecordingGrant = false
         }
+        NSLog("✅ MeetingRecordTab.checkStatus: setting status to .ready")
         liveState.status = .ready
     }
 
