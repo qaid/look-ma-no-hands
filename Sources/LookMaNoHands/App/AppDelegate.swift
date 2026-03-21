@@ -1427,17 +1427,17 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         updateMenuBarIcon(isRecording: false)
 
         // DESIGN: Recording indicator hides immediately when recording stops.
-        // A processing indicator appears after 500ms if transcription is still running.
+        // A processing indicator appears after 750ms if transcription is still running.
         // This makes short dictations feel instant while giving feedback for longer ones.
         recordingIndicator.hide()
 
-        // Schedule processing indicator to appear after 500ms (avoids flash for fast transcriptions)
+        // Schedule processing indicator to appear after 750ms (avoids flash for fast transcriptions)
         pendingProcessingIndicator?.cancel()
         let processingWorkItem = DispatchWorkItem { [weak self] in
             self?.recordingIndicator.showProcessing()
         }
         pendingProcessingIndicator = processingWorkItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: processingWorkItem)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.75, execute: processingWorkItem)
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
