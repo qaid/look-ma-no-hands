@@ -9,24 +9,38 @@ on:
       - '.github/**'
       - 'LICENSE'
       - '.gitignore'
-  pull_request_review:
-    types: [submitted]
+  pull_request:
     branches: [ main ]
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-      - '.github/**'
-      - 'LICENSE'
-      - '.gitignore'
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code || 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**'
+              - '!**.md'
+              - '!docs/**'
+              - '!.github/**'
+              - '!LICENSE'
+              - '!.gitignore'
+
   verify-dependencies:
     name: Verify Package.resolved Integrity
-    if: github.event_name == 'push' || github.event.review.state == 'approved'
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
@@ -59,7 +73,8 @@ jobs:
 
   build-verification:
     name: Verify Clean Build
-    if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
@@ -76,7 +91,8 @@ jobs:
 
   secret-scan:
     name: Scan for Secrets
-    if: github.event_name == 'push' || github.event.review.state == 'approved'
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -91,7 +107,8 @@ jobs:
 
   dependency-scan:
     name: Scan Dependencies for Vulnerabilities
-    if: github.event_name == 'push' || github.event.review.state == 'approved'
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -123,7 +140,8 @@ jobs:
 
   entitlements-check:
     name: Verify App Entitlements
-    if: (github.event_name == 'pull_request_review' && github.event.review.state == 'approved') || startsWith(github.ref, 'refs/heads/security-')
+    needs: [changes]
+    if: github.event_name == 'push' || needs.changes.outputs.code == 'true'
     runs-on: macos-26
     steps:
       - name: Checkout code
