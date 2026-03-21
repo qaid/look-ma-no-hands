@@ -1,3 +1,4 @@
+import CoreML
 import Foundation
 import WhisperKit
 
@@ -29,6 +30,9 @@ class WhisperService: @unchecked Sendable {
     /// Serializes transcription calls (shared between dictation and meeting mode)
     /// Uses an actor-based semaphore to avoid spin-lock polling
     private let transcriptionSemaphore = TranscriptionSemaphore()
+
+    /// Cache for tokenized prompts to avoid re-tokenizing identical strings
+    private var promptTokenCache: (text: String, tokens: [Int])?
     
     // MARK: - Initialization
 
@@ -51,9 +55,17 @@ class WhisperService: @unchecked Sendable {
             throw WhisperError.downloadFailed("Could not access caches directory")
         }
 
+        let computeOptions = ModelComputeOptions(
+            melCompute: .cpuAndGPU,
+            audioEncoderCompute: .cpuAndNeuralEngine,
+            textDecoderCompute: .cpuAndNeuralEngine,
+            prefillCompute: .cpuAndNeuralEngine
+        )
+
         let config = WhisperKitConfig(
             model: modelName,
             downloadBase: cacheDir,
+            computeOptions: computeOptions,
             verbose: false,
             logLevel: .info
         )
@@ -119,9 +131,15 @@ class WhisperService: @unchecked Sendable {
             noSpeechThreshold: 0.4
         )
 
-        // Token-based prompt (converted from string)
+        // Token-based prompt (converted from string, cached to avoid re-tokenizing)
         if let prompt = initialPrompt, let tokenizer = self.tokenizer {
-            options.promptTokens = tokenizePrompt(prompt, tokenizer: tokenizer)
+            if let cached = promptTokenCache, cached.text == prompt {
+                options.promptTokens = cached.tokens
+            } else {
+                let tokens = tokenizePrompt(prompt, tokenizer: tokenizer)
+                promptTokenCache = (text: prompt, tokens: tokens)
+                options.promptTokens = tokens
+            }
             Logger.shared.info("📋 Initial prompt set (\(prompt.count) chars, \(options.promptTokens?.count ?? 0) tokens): \"\(prompt.prefix(100))...\"", category: .transcription)
         }
 
@@ -129,6 +147,12 @@ class WhisperService: @unchecked Sendable {
         let transcribeStart = Date()
         let results = try await whisperKit.transcribe(audioArray: samples, decodeOptions: options)
         let transcribeElapsed = Date().timeIntervalSince(transcribeStart)
+
+        // Log granular timing breakdown from WhisperKit
+        if let timings = results.first?.timings {
+            let ttft = timings.firstTokenTime - timings.pipelineStart
+            Logger.shared.info("📊 WhisperKit timings: encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, prefill=\(String(format: "%.3f", timings.prefill))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond)), RTF=\(String(format: "%.3f", timings.realTimeFactor))", category: .transcription)
+        }
 
         let text = results.map { $0.text }.joined(separator: " ")
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
@@ -139,6 +163,13 @@ class WhisperService: @unchecked Sendable {
             var fallbackOptions = options
             fallbackOptions.promptTokens = nil
             let fallbackResults = try await whisperKit.transcribe(audioArray: samples, decodeOptions: fallbackOptions)
+
+            // Log fallback timings
+            if let timings = fallbackResults.first?.timings {
+                let ttft = timings.firstTokenTime - timings.pipelineStart
+                Logger.shared.info("📊 WhisperKit timings (fallback): encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, prefill=\(String(format: "%.3f", timings.prefill))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond))", category: .transcription)
+            }
+
             let fallbackText = fallbackResults.map { $0.text }.joined(separator: " ")
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 

@@ -215,20 +215,24 @@ class AudioRecorder: @unchecked Sendable {
 
         let frameCount = Int(buffer.frameLength)
         let channelCount = Int(buffer.format.channelCount)
+        let length = vDSP_Length(frameCount)
 
-        // Pre-allocate and convert to mono first
-        var samples = [Float]()
-        samples.reserveCapacity(frameCount)
-
-        for frame in 0..<frameCount {
-            var sample: Float = 0
-
-            // Average all channels to mono
-            for channel in 0..<channelCount {
-                sample += channelData[channel][frame]
+        // Convert to mono using vectorized operations
+        var samples: [Float]
+        if channelCount == 1 {
+            samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
+        } else if channelCount == 2 {
+            samples = [Float](repeating: 0, count: frameCount)
+            vDSP_vadd(channelData[0], 1, channelData[1], 1, &samples, 1, length)
+            var half: Float = 0.5
+            vDSP_vsmul(samples, 1, &half, &samples, 1, length)
+        } else {
+            samples = Array(UnsafeBufferPointer(start: channelData[0], count: frameCount))
+            for ch in 1..<channelCount {
+                vDSP_vadd(samples, 1, channelData[ch], 1, &samples, 1, length)
             }
-            sample /= Float(channelCount)
-            samples.append(sample)
+            var scale = 1.0 / Float(channelCount)
+            vDSP_vsmul(samples, 1, &scale, &samples, 1, length)
         }
 
         // Thread-safe append to buffer
@@ -237,28 +241,39 @@ class AudioRecorder: @unchecked Sendable {
         }
     }
 
-    /// Resample audio to 16kHz using Accelerate framework
+    /// Resample audio to 16kHz using vectorized vDSP linear interpolation
     private func resampleToTarget(_ samples: [Float]) -> [Float] {
         guard !samples.isEmpty else { return samples }
 
         let inputLength = samples.count
         let ratio = targetSampleRate / inputSampleRate
         let outputLength = Int(Double(inputLength) * ratio)
+        guard outputLength > 0 else { return [] }
+
+        // Build fractional index ramp: [0, 1/ratio, 2/ratio, ...]
+        // vDSP_vlint interprets each value as: integer part = base index, fractional part = blend weight
+        var indices = [Float](repeating: 0, count: outputLength)
+        var start: Float = 0.0
+        var step = Float(1.0 / ratio)
+        vDSP_vramp(&start, &step, &indices, 1, vDSP_Length(outputLength))
+
+        // Clamp to valid range — vDSP_vlint reads index[i] and index[i]+1
+        var maxIndex = Float(inputLength - 2)
+        var zero: Float = 0.0
+        vDSP_vclip(indices, 1, &zero, &maxIndex, &indices, 1, vDSP_Length(outputLength))
 
         var output = [Float](repeating: 0, count: outputLength)
 
-        // Use vDSP for high-quality linear interpolation
         samples.withUnsafeBufferPointer { inputPtr in
-            output.withUnsafeMutableBufferPointer { outputPtr in
-                for i in 0..<outputLength {
-                    let inputIndex = Double(i) / ratio
-                    let lowerIndex = Int(inputIndex)
-                    let upperIndex = min(lowerIndex + 1, inputLength - 1)
-                    let fraction = Float(inputIndex - Double(lowerIndex))
-
-                    outputPtr[i] = inputPtr[lowerIndex] * (1 - fraction) + inputPtr[upperIndex] * fraction
-                }
-            }
+            vDSP_vlint(
+                inputPtr.baseAddress!,
+                indices,
+                1,
+                &output,
+                1,
+                vDSP_Length(outputLength),
+                vDSP_Length(inputLength)
+            )
         }
 
         return output
@@ -268,18 +283,20 @@ class AudioRecorder: @unchecked Sendable {
     private func normalizeAudio(_ samples: [Float]) -> [Float] {
         guard !samples.isEmpty else { return samples }
 
-        var normalized = samples
-
         // Find the peak amplitude
         var maxAmplitude: Float = 0
         vDSP_maxmgv(samples, 1, &maxAmplitude, vDSP_Length(samples.count))
 
-        // Normalize to 0.9 to prevent clipping while maximizing volume
-        if maxAmplitude > 0 {
-            var scaleFactor = 0.9 / maxAmplitude
-            vDSP_vsmul(samples, 1, &scaleFactor, &normalized, 1, vDSP_Length(samples.count))
-            print("AudioRecorder: Normalized audio (peak: \(maxAmplitude) → 0.9)")
+        // Skip normalization if peak is already in acceptable range for Whisper
+        guard maxAmplitude > 0, maxAmplitude < 0.7 || maxAmplitude > 1.0 else {
+            return samples
         }
+
+        // Normalize to 0.9 to prevent clipping while maximizing volume
+        var normalized = samples
+        var scaleFactor = 0.9 / maxAmplitude
+        vDSP_vsmul(samples, 1, &scaleFactor, &normalized, 1, vDSP_Length(samples.count))
+        print("AudioRecorder: Normalized audio (peak: \(maxAmplitude) → 0.9)")
 
         return normalized
     }
