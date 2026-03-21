@@ -348,7 +348,9 @@ class WhisperService: @unchecked Sendable {
         // Use Caches directory as the download base to avoid Documents folder permission prompt.
         // NOTE: downloadBase controls where HuggingFace Hub downloads models TO.
         //       modelFolder tells WhisperKit to skip downloading and load from a local path.
-        //       We must NOT set modelFolder here, or the download will be skipped entirely.
+        //       We must NOT set modelFolder here (in downloadModel), or the download will
+        //       be skipped entirely. loadModel() intentionally sets modelFolder when a local
+        //       cache exists, to avoid Hub network calls during macOS permission relaunches.
         guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             throw WhisperError.downloadFailed("Could not access caches directory")
         }

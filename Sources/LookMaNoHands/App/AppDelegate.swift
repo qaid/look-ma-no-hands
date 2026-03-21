@@ -807,16 +807,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
             // Try loading the model configured in Settings (respects user's choice from onboarding/settings)
             let configuredModel = Settings.shared.whisperModel.rawValue
-            NSLog("🔍 loadWhisperModel: Attempting to load configured model: \(configuredModel)")
-            NSLog("🔍 loadWhisperModel: hasCompletedOnboarding: \(Settings.shared.hasCompletedOnboarding)")
 
             do {
                 // Try to load the configured model - WhisperKit will download it if needed
-                NSLog("⏳ loadWhisperModel: calling whisperService.loadModel(named: \(configuredModel))...")
                 try await whisperService.loadModel(named: configuredModel)
-                NSLog("✅ loadWhisperModel: model '\(configuredModel)' loaded, isModelLoaded=\(whisperService.isModelLoaded)")
                 await MainActor.run {
-                    NSLog("📮 loadWhisperModel: posting .whisperModelReady on MainActor")
                     NotificationCenter.default.post(name: .whisperModelReady, object: nil)
                 }
 
@@ -832,7 +827,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 }
             } catch {
                 // Model load failed - try fallback models or prompt for download
-                NSLog("⚠️ Failed to load configured model '\(configuredModel)': \(error.localizedDescription)")
+                Logger.shared.warning("Failed to load configured model '\(configuredModel)': \(error.localizedDescription)", category: .whisper)
 
                 // Try fallback models
                 let fallbackModels = ["tiny", "base", "small", "medium", "large-v3-turbo"]
@@ -840,22 +835,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
                 for model in fallbackModels where model != configuredModel {
                     do {
-                        NSLog("🔄 Trying fallback model: \(model)")
                         try await whisperService.loadModel(named: model)
-                        NSLog("✅ Fallback model '\(model)' loaded successfully")
                         await MainActor.run {
                             NotificationCenter.default.post(name: .whisperModelReady, object: nil)
                         }
                         loadedFallback = true
                         break
                     } catch {
-                        NSLog("⚠️ Fallback model '\(model)' also failed: \(error.localizedDescription)")
+                        Logger.shared.warning("Fallback model '\(model)' also failed: \(error.localizedDescription)", category: .whisper)
                     }
                 }
 
                 if !loadedFallback {
-                    // No model could be loaded - prompt user to download
-                    NSLog("❌ No model could be loaded - prompting user to download")
                     await MainActor.run {
                         updateMenuBarStatus("Model not found")
                     }
@@ -1052,9 +1043,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 await MainActor.run {
                     updateMenuBarStatus("Ready")
                 }
-                NSLog("✅ Neural Engine warm-up complete for '\(modelName)'")
+                Logger.shared.info("Neural Engine warm-up complete for '\(modelName)'", category: .whisper)
             } catch {
-                NSLog("❌ Failed to load model '\(modelName)' after settings change: \(error.localizedDescription)")
+                Logger.shared.warning("Failed to load model '\(modelName)' after settings change: \(error.localizedDescription)", category: .whisper)
                 await MainActor.run {
                     updateMenuBarStatus("Model load failed")
                     showAlert(
@@ -1064,7 +1055,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 }
             }
 
-            NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+            await MainActor.run {
+                NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+            }
         }
     }
 

@@ -107,7 +107,6 @@ struct MeetingRecordTab: View {
             appDelegate?.restoreMeetingWindowAfterPermission()
         }
         .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
-            NSLog("📬 MeetingRecordTab: received .whisperModelReady, isModelLoaded=\(whisperService.isModelLoaded)")
             checkStatus()
         }
         .task {
@@ -117,7 +116,6 @@ struct MeetingRecordTab: View {
             // stale view-struct captures in SwiftUI.
             while liveState.status == .missingModel && !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                NSLog("🔄 MeetingRecordTab poll: isModelLoaded=\(whisperService.isModelLoaded), isModelLoading=\(whisperService.isModelLoading)")
                 if whisperService.isModelLoaded {
                     checkStatus()
                 }
@@ -995,7 +993,6 @@ struct MeetingRecordTab: View {
     private func checkStatus() {
         if liveState.status == .completed { return }
         let modelLoaded = whisperService.isModelLoaded
-        NSLog("🔍 MeetingRecordTab.checkStatus: isModelLoaded=\(modelLoaded), isModelLoading=\(whisperService.isModelLoading), current status=\(liveState.status)")
         if !modelLoaded {
             liveState.status = .missingModel
             return
@@ -1007,7 +1004,6 @@ struct MeetingRecordTab: View {
         if Settings.shared.pendingScreenRecordingGrant {
             Settings.shared.pendingScreenRecordingGrant = false
         }
-        NSLog("✅ MeetingRecordTab.checkStatus: setting status to .ready")
         liveState.status = .ready
     }
 
