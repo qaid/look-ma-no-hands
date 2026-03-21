@@ -579,7 +579,7 @@ struct PermissionsStepView: View {
                 PermissionCard(
                     icon: "accessibility",
                     title: "Accessibility",
-                    description: "Monitor Caps Lock and insert text into apps",
+                    description: "Monitor hotkey and insert text into apps",
                     isGranted: onboardingState.hasAccessibilityPermission,
                     actionTitle: "Open System Settings",
                     action: {

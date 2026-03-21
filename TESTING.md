@@ -144,7 +144,7 @@ Expected Result:
    #endif
 
 2. Perform a transcription to populate lastTranscription:
-   - Press trigger key (Caps Lock)
+   - Press trigger key (double-tap Right Option)
    - Say something (e.g., "This is a test transcription")
    - Verify text was transcribed
 

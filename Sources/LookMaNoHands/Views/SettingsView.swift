@@ -764,7 +764,7 @@ struct SettingsView: View {
                         Text("Dictation")
                             .font(.headline)
                             .fontWeight(.semibold)
-                        Text("Voice-to-text using Whisper (Caps Lock trigger)")
+                        Text("Voice-to-text using Whisper (double-tap Right Option)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -1332,7 +1332,7 @@ struct SettingsView: View {
                 FeatureListItem(icon: "bolt.fill", text: "Lightning-fast transcription with Whisper")
                 FeatureListItem(icon: "lock.fill", text: "100% local - your voice never leaves your Mac")
                 FeatureListItem(icon: "waveform", text: "Smart text formatting and punctuation")
-                FeatureListItem(icon: "keyboard", text: "Works in any app with Caps Lock trigger")
+                FeatureListItem(icon: "keyboard", text: "Works in any app with double-tap Right Option")
             }
             .frame(maxWidth: 400)
 

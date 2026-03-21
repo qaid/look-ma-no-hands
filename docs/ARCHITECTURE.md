@@ -25,7 +25,7 @@
 │  ┌──────▼──────┐    ┌───────▼───────┐   ┌──────▼──────┐         │
 │  │  Keyboard   │    │    Audio      │   │    Text     │         │
 │  │  Monitor    │    │   Capture     │   │  Insertion  │         │
-│  │ (Caps Lock) │    │ (Microphone)  │   │(Accessibility│         │
+│  │(Right Opt.) │    │ (Microphone)  │   │(Accessibility│         │
 │  └─────────────┘    └───────┬───────┘   └─────────────┘         │
 │                             │                                    │
 │                    ┌────────▼────────┐                           │
@@ -54,7 +54,7 @@
 
 ### 1. Keyboard Monitor (KeyboardMonitor.swift)
 
-**Purpose**: Detect Caps Lock key press system-wide
+**Purpose**: Detect dictation hotkey press system-wide (default: double-tap Right Option)
 
 **Technology**: CGEvent tap
 
@@ -64,11 +64,9 @@
 - `kCGEventFlagsChanged` - Detect modifier key changes
 
 **Challenges**:
-- Caps Lock is a modifier key, handled differently by macOS
-- May need to intercept and suppress the normal Caps Lock behavior
+- Right Option is a modifier key, handled differently by macOS
+- Double-tap detection requires tracking press timestamps within a 400ms window
 - Requires Accessibility permissions
-
-**Fallback**: If Caps Lock proves problematic, support Right Option key or custom shortcut
 
 ### 2. Audio Recorder (AudioRecorder.swift)
 
@@ -180,7 +178,7 @@
 ## Data Flow
 
 ```
-1. User presses Caps Lock
+1. User double-taps Right Option
          │
          ▼
 2. KeyboardMonitor detects press
@@ -191,7 +189,7 @@
    - AudioRecorder begins capturing
          │
          ▼
-4. User presses Caps Lock again
+4. User double-taps Right Option again
          │
          ▼
 5. Recording stops

@@ -19,7 +19,6 @@ final class HotkeyTests: XCTestCase {
     }
 
     func testSingleModifierKeysAndReserved() {
-        XCTAssertTrue(Hotkey.capsLock.isSingleModifierKey)
         XCTAssertTrue(Hotkey.fn.isSingleModifierKey)
         XCTAssertTrue(Hotkey.rightOption.isSingleModifierKey)
 
@@ -31,7 +30,6 @@ final class HotkeyTests: XCTestCase {
     }
 
     func testIsPredefinedTrigger() {
-        XCTAssertTrue(Hotkey.capsLock.isPredefinedTrigger)
         XCTAssertTrue(Hotkey.rightOption.isPredefinedTrigger)
         XCTAssertTrue(Hotkey.fn.isPredefinedTrigger)
 

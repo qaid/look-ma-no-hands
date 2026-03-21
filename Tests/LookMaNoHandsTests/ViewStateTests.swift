@@ -6,7 +6,7 @@ final class ViewStateTests: XCTestCase {
         let status = LaunchSplashView.statusAccessibility(hotkeyEnabled: false)
         let hint = LaunchSplashView.hintAccessibility(
             hotkeyEnabled: false,
-            hotkeyDisplay: "Caps Lock"
+            hotkeyDisplay: "⌥R"
         )
 
         XCTAssertEqual(status, "Hotkey paused")
@@ -17,11 +17,11 @@ final class ViewStateTests: XCTestCase {
         let status = LaunchSplashView.statusAccessibility(hotkeyEnabled: true)
         let hint = LaunchSplashView.hintAccessibility(
             hotkeyEnabled: true,
-            hotkeyDisplay: "Caps Lock"
+            hotkeyDisplay: "⌥R"
         )
 
         XCTAssertEqual(status, "App ready")
-        XCTAssertEqual(hint, "Press Caps Lock to start recording")
+        XCTAssertEqual(hint, "Press ⌥R to start recording")
     }
 
     func testOllamaPickerIncludesCurrentModelWhenMissing() {

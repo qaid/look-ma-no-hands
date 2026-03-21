@@ -519,7 +519,7 @@ This document analyzes the security threats facing Look Ma No Hands, a privacy-f
 **Current Mitigations**:
 - App only reads text fields when actively inserting transcription
 - 200-character context limit reduces exposure
-- User controls when recording happens (Caps Lock trigger)
+- User controls when recording happens (hotkey trigger)
 
 **Residual Risk**: Any app with accessibility permissions can read all text fields
 

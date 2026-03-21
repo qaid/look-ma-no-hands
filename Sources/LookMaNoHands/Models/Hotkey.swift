@@ -79,20 +79,19 @@ struct Hotkey: Codable, Equatable, Hashable, Sendable {
         return parts.joined(separator: "+")
     }
 
-    /// Check if this hotkey is a single modifier key (Caps Lock, Fn, etc.)
+    /// Check if this hotkey is a single modifier key (Right Option, Fn, etc.)
     var isSingleModifierKey: Bool {
         !modifiers.hasModifiers && Hotkey.isModifierKeyCode(keyCode)
     }
 
     /// Predefined hotkeys for common trigger keys
-    static let capsLock = Hotkey(keyCode: 57, modifiers: .init())
     static let rightOption = Hotkey(keyCode: 61, modifiers: .init())
     static let fn = Hotkey(keyCode: 63, modifiers: .init())
 
     /// Check if this is one of the predefined single-key triggers
     /// These are exempt from the 2-3 keypress validation rule
     var isPredefinedTrigger: Bool {
-        self == .capsLock || self == .rightOption || self == .fn
+        self == .rightOption || self == .fn
     }
 
     // MARK: - Key Code Utilities

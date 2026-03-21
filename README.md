@@ -28,9 +28,9 @@ Fast, local voice dictation and meeting transcription for macOS. Use custom keyb
 - **Lightning Fast**: ~1 second transcription with WhisperKit acceleration on Apple Neural Engine
 - **System-wide**: Works in any app, any text field
 - **Fully Customizable Hotkeys**:
-  - Caps Lock toggle (default, press once to start, again to stop)
+  - Double-tap Right Option (default) to start/stop recording
   - Custom key combinations with real-time validation
-  - Predefined alternatives (Right Option, Fn key)
+  - Predefined alternative: Fn key (double-tap)
   - Dynamic switching without app restart
   - System-reserved hotkey protection
 - **Hotkey Toggle**: Global keyboard shortcut (Cmd+Shift+D) to temporarily disable/enable dictation. State persists across restarts.
@@ -138,7 +138,7 @@ ollama pull qwen2.5:3b
 
 On first launch, grant:
 1. **Microphone access**: To capture your voice for dictation
-2. **Accessibility access**: To insert text and monitor Caps Lock key
+2. **Accessibility access**: To insert text and monitor the dictation hotkey
 3. **Screen recording** (optional): Required for system audio capture in meeting transcription
 
 <p align="center">
@@ -195,7 +195,7 @@ Access via menu bar → **Settings** to:
   - Configure recording hotkey with real-time validation (Raycast-style hotkey recorder)
   - Hotkey toggle enabled/disabled state
   - Recording indicator style preferences
-  - Predefined hotkey shortcuts (Caps Lock, Right Option, Fn)
+  - Predefined hotkey shortcuts (Right Option, Fn)
 - **Models Tab**:
   - Download and switch Whisper models (tiny, base, small, medium, large-v3-turbo)
   - Configure Ollama model for meeting notes
@@ -297,9 +297,9 @@ In the Meeting Transcription window:
 - Some apps restrict accessibility—Look Ma No Hands falls back to clipboard
 - Check Accessibility permissions in System Settings
 
-**Caps Lock not working?**
-- The app monitors Caps Lock presses (doesn't change actual Caps Lock state)
+**Hotkey not working?**
 - Ensure Accessibility permission is granted
+- Try double-tapping Right Option quickly (within 400ms)
 
 ### Meeting Transcription Issues
 
@@ -425,7 +425,7 @@ For the full audit summary, resolved findings, and current security posture, see
 ## 🚧 Known Limitations
 
 ### Voice Dictation
-- Caps Lock monitoring requires Accessibility permission
+- Hotkey monitoring requires Accessibility permission
 - Some sandboxed apps may not allow direct text insertion
 - Best accuracy with clear audio in quiet environments
 - English-only (Whisper supports other languages, but not tested)
