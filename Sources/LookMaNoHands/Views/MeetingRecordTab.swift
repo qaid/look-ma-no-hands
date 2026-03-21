@@ -106,6 +106,21 @@ struct MeetingRecordTab: View {
             checkStatus()
             appDelegate?.restoreMeetingWindowAfterPermission()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .whisperModelReady)) { _ in
+            checkStatus()
+        }
+        .task {
+            // Poll for model availability. Handles the race where loadWhisperModel()
+            // completes (or hasn't completed yet) around the time this view appears.
+            // Uses structured concurrency (.task) instead of DispatchQueue to avoid
+            // stale view-struct captures in SwiftUI.
+            while liveState.status == .missingModel && !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                if whisperService.isModelLoaded {
+                    checkStatus()
+                }
+            }
+        }
         .onDisappear {
             // Only pause visualization — don't stop recording or tear down state.
             // Tab switches trigger onDisappear/onAppear; recording must survive them.
@@ -977,7 +992,8 @@ struct MeetingRecordTab: View {
 
     private func checkStatus() {
         if liveState.status == .completed { return }
-        if !whisperService.isModelLoaded {
+        let modelLoaded = whisperService.isModelLoaded
+        if !modelLoaded {
             liveState.status = .missingModel
             return
         }
