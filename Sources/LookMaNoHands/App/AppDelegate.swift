@@ -1187,6 +1187,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
         // Update UI
         updateMenuBarIcon(isRecording: false)
+        pendingProcessingIndicator?.cancel()
+        pendingProcessingIndicator = nil
         recordingIndicator.hide()
 
         // Resume system media if we paused it

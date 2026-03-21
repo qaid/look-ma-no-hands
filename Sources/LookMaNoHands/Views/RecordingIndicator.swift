@@ -290,6 +290,7 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
     private weak var audioRecorder: AudioRecorder?
     private let state = RecordingIndicatorState()
     private var processingShownAt: Date?
+    private var pendingHideWorkItem: DispatchWorkItem?
 
     init() {
         // Create window once during initialization
@@ -429,6 +430,10 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
     func showProcessing() {
         guard let window = window else { return }
 
+        // Cancel any pending deferred hide from a previous session
+        pendingHideWorkItem?.cancel()
+        pendingHideWorkItem = nil
+
         state.isProcessing = true
         processingShownAt = Date()
 
@@ -439,15 +444,21 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
 
     /// Hide the processing indicator with minimum display duration to prevent flash
     func hideProcessing() {
+        pendingHideWorkItem?.cancel()
+        pendingHideWorkItem = nil
+
         let minimumDisplayDuration: TimeInterval = 0.4
         if let shownAt = processingShownAt {
             let elapsed = Date().timeIntervalSince(shownAt)
             if elapsed < minimumDisplayDuration {
-                DispatchQueue.main.asyncAfter(deadline: .now() + (minimumDisplayDuration - elapsed)) { [weak self] in
+                let workItem = DispatchWorkItem { [weak self] in
+                    self?.pendingHideWorkItem = nil
                     self?.processingShownAt = nil
                     self?.state.isProcessing = false
                     self?.hide()
                 }
+                pendingHideWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + (minimumDisplayDuration - elapsed), execute: workItem)
                 return
             }
         }
@@ -459,6 +470,10 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
     /// Show the recording indicator
     func show() {
         guard let window = window else { return }
+
+        // Cancel any pending deferred hide from a previous session
+        pendingHideWorkItem?.cancel()
+        pendingHideWorkItem = nil
 
         // Ensure we're in recording mode (not processing)
         state.isProcessing = false
