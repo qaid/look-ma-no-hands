@@ -1127,7 +1127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     // MARK: - Recording Workflow
 
-    /// Handle hotkey press (Caps Lock, etc.) - toggles recording
+    /// Handle hotkey press (Right Option double-tap, etc.) - toggles recording
     /// This method respects the hotkeyEnabled setting
     private func handleHotkeyTrigger() {
         guard Settings.shared.hotkeyEnabled else {
@@ -1370,7 +1370,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private func showAccessibilityPermissionAlert() {
         let alert = NSAlert()
         alert.messageText = "Accessibility Permission Required"
-        alert.informativeText = "Look Ma No Hands needs accessibility permission to:\n\n• Monitor the Caps Lock key\n• Insert transcribed text into other apps\n\nClick 'Open System Settings' to grant permission, then restart the app."
+        alert.informativeText = "Look Ma No Hands needs accessibility permission to:\n\n• Monitor the dictation hotkey\n• Insert transcribed text into other apps\n\nClick 'Open System Settings' to grant permission, then restart the app."
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Open System Settings")
         alert.addButton(withTitle: "Cancel")

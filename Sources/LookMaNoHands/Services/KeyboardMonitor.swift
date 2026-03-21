@@ -22,7 +22,7 @@ class KeyboardMonitor: @unchecked Sendable {
     private var onCancel: CancellationCallback?
 
     /// The hotkey configuration to listen for
-    private var hotkey: Hotkey = .capsLock
+    private var hotkey: Hotkey = .rightOption
 
     /// Lock for thread-safe hotkey access
     private let hotkeyLock = NSLock()
@@ -35,6 +35,12 @@ class KeyboardMonitor: @unchecked Sendable {
 
     /// Track modifier key state to avoid double-triggering
     private var lastModifierFlags: CGEventFlags = []
+
+    /// Track Right Option press time for double-tap detection
+    private var lastRightOptionPressTime: Date?
+
+    /// Time window for double-tap detection (400ms, matching macOS conventions)
+    private let doubleTapInterval: TimeInterval = 0.4
 
     // MARK: - Public Methods
 
@@ -61,12 +67,12 @@ class KeyboardMonitor: @unchecked Sendable {
 
     /// Start monitoring for the trigger key
     /// - Parameters:
-    ///   - hotkey: The hotkey to monitor for (defaults to Caps Lock)
+    ///   - hotkey: The hotkey to monitor for (defaults to Right Option)
     ///   - callback: Called when the trigger key is pressed
     ///   - showPrompt: Whether to show the system permission prompt if not granted (defaults to false)
     /// - Returns: True if monitoring started successfully
     @discardableResult
-    func startMonitoring(hotkey: Hotkey = .capsLock, showPrompt: Bool = false, onTrigger callback: @escaping TriggerCallback) -> Bool {
+    func startMonitoring(hotkey: Hotkey = .rightOption, showPrompt: Bool = false, onTrigger callback: @escaping TriggerCallback) -> Bool {
         guard !isMonitoring else { return true }
 
         // Check accessibility permission (optionally prompting)
@@ -87,7 +93,7 @@ class KeyboardMonitor: @unchecked Sendable {
         self.onTrigger = callback
 
         // Determine which events to monitor
-        // For single modifier keys (Caps Lock, etc.), monitor flagsChanged
+        // For single modifier keys (Right Option, Fn, etc.), monitor flagsChanged
         // For key+modifier combinations, monitor keyDown
         // Monitor both to support dynamic switching
         var eventMask: CGEventMask = 0
@@ -112,7 +118,6 @@ class KeyboardMonitor: @unchecked Sendable {
             let shouldConsume = monitor.handleEvent(type: type, event: event)
 
             // If handleEvent returned true, consume the event (return nil) to prevent system handling
-            // This fixes the issue where Caps Lock would trigger Music app and other system shortcuts
             if shouldConsume {
                 return nil // Consume event - prevent propagation
             }
@@ -220,7 +225,7 @@ class KeyboardMonitor: @unchecked Sendable {
         let currentHotkey = getHotkey()
 
         if currentHotkey.isSingleModifierKey {
-            // Handle single modifier keys (Caps Lock, Right Option, Fn, etc.)
+            // Handle single modifier keys (Right Option, Fn, etc.)
             guard type == .flagsChanged else { return false }
 
             let keyCode = event.getIntegerValueField(.keyboardEventKeycode)
@@ -232,8 +237,6 @@ class KeyboardMonitor: @unchecked Sendable {
             // Determine the relevant flag for this modifier key
             let relevantFlag: CGEventFlags
             switch currentHotkey.keyCode {
-            case 57: // Caps Lock
-                relevantFlag = .maskAlphaShift
             case 61: // Right Option
                 relevantFlag = .maskAlternate
             case 63: // Fn
@@ -249,34 +252,34 @@ class KeyboardMonitor: @unchecked Sendable {
             // Update state
             lastModifierFlags = eventFlags
 
-            // For Caps Lock (a toggle key), trigger on BOTH press and release
-            // For other modifier keys, only trigger on press
-            let shouldTrigger: Bool
-            if currentHotkey.keyCode == 57 { // Caps Lock
-                // Trigger on any state change (toggle)
-                shouldTrigger = isPressed != wasPressed
-            } else {
-                // Trigger only on press (not release)
-                shouldTrigger = isPressed && !wasPressed
-            }
+            // Only trigger on press (not release)
+            guard isPressed && !wasPressed else { return false }
 
-            if shouldTrigger {
-                NSLog("🔔 KeyboardMonitor: %@ detected (toggle/press) - consuming event", currentHotkey.displayString)
-                DispatchQueue.main.async { [weak self] in
-                    self?.onTrigger?()
+            // For Right Option, require double-tap to avoid interfering with normal Option usage
+            if currentHotkey.keyCode == 61 {
+                let now = Date()
+                if let lastPress = lastRightOptionPressTime,
+                   now.timeIntervalSince(lastPress) <= doubleTapInterval {
+                    // Double-tap detected — trigger and reset
+                    lastRightOptionPressTime = nil
+                    NSLog("🔔 KeyboardMonitor: %@ double-tap detected - consuming event", currentHotkey.displayString)
+                    DispatchQueue.main.async { [weak self] in
+                        self?.onTrigger?()
+                    }
+                    return true // Consume second tap
+                } else {
+                    // First tap — record time, don't consume
+                    lastRightOptionPressTime = now
+                    return false
                 }
-                return true // Consume the event to prevent system handling (e.g., Music app)
             }
 
-            // For Caps Lock, always consume the key event to prevent system interference
-            // even during state transitions (e.g., toggle off after recording)
-            // This prevents Music app launch and other system shortcuts from triggering
-            if currentHotkey.keyCode == 57 { // Caps Lock
-                return true
+            // For other single modifier keys (Fn), trigger on press
+            NSLog("🔔 KeyboardMonitor: %@ detected (press) - consuming event", currentHotkey.displayString)
+            DispatchQueue.main.async { [weak self] in
+                self?.onTrigger?()
             }
-
-            // For other modifier keys, only consume when we trigger
-            return false
+            return true
         } else {
             // Handle key+modifier combinations
             // Only process keyDown events for key+modifier combinations

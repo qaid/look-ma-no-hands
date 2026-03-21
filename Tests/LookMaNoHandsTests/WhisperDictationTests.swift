@@ -33,7 +33,7 @@ final class WhisperDictationTests: XCTestCase {
         // After reset, should have default values
         settings.resetToDefaults()
         
-        XCTAssertEqual(settings.triggerKey, .capsLock)
+        XCTAssertEqual(settings.triggerKey, .rightOption)
         XCTAssertEqual(settings.whisperModel, .base)
         XCTAssertTrue(settings.showIndicator)
     }

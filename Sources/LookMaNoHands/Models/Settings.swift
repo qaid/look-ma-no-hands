@@ -2,8 +2,7 @@ import Foundation
 
 /// Available trigger keys for starting/stopping recording
 enum TriggerKey: String, CaseIterable, Identifiable, Sendable {
-    case capsLock = "Caps Lock"
-    case rightOption = "Right Option"
+    case rightOption = "Right Option (Double-tap)"
     case fn = "Fn (Double-tap)"
     case custom = "Custom..."
 
@@ -12,7 +11,6 @@ enum TriggerKey: String, CaseIterable, Identifiable, Sendable {
     /// Get the Hotkey for this trigger key
     func toHotkey(customHotkey: Hotkey?) -> Hotkey? {
         switch self {
-        case .capsLock: return .capsLock
         case .rightOption: return .rightOption
         case .fn: return .fn
         case .custom: return customHotkey
@@ -354,7 +352,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
 
     /// Get the effective hotkey based on current settings
     var effectiveHotkey: Hotkey {
-        triggerKey.toHotkey(customHotkey: customHotkey) ?? .capsLock
+        triggerKey.toHotkey(customHotkey: customHotkey) ?? .rightOption
     }
     
     /// The Whisper model to use for transcription
@@ -538,11 +536,17 @@ Now produce the complete meeting notes following the format above. Ensure every 
     private init() {
         // Load saved values or use defaults
         
+        // Migration: Caps Lock was removed as a trigger option; also handle old "Right Option" raw value
+        if let saved = UserDefaults.standard.string(forKey: Keys.triggerKey),
+           (saved == "Caps Lock" || saved == "Right Option") {
+            UserDefaults.standard.set(TriggerKey.rightOption.rawValue, forKey: Keys.triggerKey)
+        }
+
         if let savedTriggerKey = UserDefaults.standard.string(forKey: Keys.triggerKey),
            let key = TriggerKey(rawValue: savedTriggerKey) {
             self.triggerKey = key
         } else {
-            self.triggerKey = .capsLock
+            self.triggerKey = .rightOption
         }
 
         // Load custom hotkey if saved
@@ -804,7 +808,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
 
     /// Reset all settings to defaults
     func resetToDefaults() {
-        triggerKey = .capsLock
+        triggerKey = .rightOption
         customHotkey = nil
         whisperModel = .base
         ollamaModel = "qwen2.5:3b"

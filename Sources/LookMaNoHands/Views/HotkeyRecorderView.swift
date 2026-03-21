@@ -173,7 +173,7 @@ struct HotkeyRecorderView: View {
             return "Reserved by system"
         }
 
-        // Predefined triggers (Caps Lock, Fn, Right Option) are always valid
+        // Predefined triggers (Right Option, Fn) are always valid
         // These are special system keys that work with single keypress
         if hotkey.isPredefinedTrigger {
             return nil

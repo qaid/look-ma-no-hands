@@ -23,7 +23,7 @@
 **Look Ma No Hands** - macOS menu bar app for system-wide voice dictation and meeting transcription.
 
 **Core Features**:
-- Press Caps Lock → Record → Speak → Auto-insert formatted text anywhere
+- Double-tap Right Option → Record → Speak → Auto-insert formatted text anywhere
 - Meeting mode (active): System audio capture + structured notes via Ollama
 - 100% local processing (whisper.cpp + optional Ollama)
 
@@ -265,7 +265,7 @@ Unsure if tool is available?
 | Platform | macOS 14+ (Sonoma) for @Observable macro |
 | No Xcode | SPM command-line only |
 | Local only | No cloud services, no data leaves device |
-| Caps Lock trigger | Preferred key (with fallback to Right Option/Fn if needed) |
+| Right Option trigger | Double-tap Right Option (default, with Fn and custom alternatives) |
 
 ## Current Dependencies
 
