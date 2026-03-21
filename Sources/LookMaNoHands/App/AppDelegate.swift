@@ -51,6 +51,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
 
     // UI
     private let recordingIndicator = RecordingIndicatorWindowController()
+    private var pendingProcessingIndicator: DispatchWorkItem?
     private let launchSplash = LaunchSplashWindowController()
     private let hotkeyToggleSplash = HotkeyToggleSplashWindowController()
 
@@ -1424,11 +1425,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         transcriptionState.stopRecording()
         updateMenuBarIcon(isRecording: false)
 
-        // DESIGN: No processing indicator is shown after recording stops.
-        // Hide the recording indicator immediately and process in the background.
-        // The transcribed text appears directly - no spinner, shimmer, or progress bar.
-        // This makes dictation feel instant. The Neural Engine warm-up happens during onboarding.
+        // DESIGN: Recording indicator hides immediately when recording stops.
+        // A processing indicator appears after 500ms if transcription is still running.
+        // This makes short dictations feel instant while giving feedback for longer ones.
         recordingIndicator.hide()
+
+        // Schedule processing indicator to appear after 500ms (avoids flash for fast transcriptions)
+        pendingProcessingIndicator?.cancel()
+        let processingWorkItem = DispatchWorkItem { [weak self] in
+            self?.recordingIndicator.showProcessing()
+        }
+        pendingProcessingIndicator = processingWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: processingWorkItem)
 
         // Resume system media if we paused it
         if Settings.shared.pauseMediaDuringDictation {
@@ -1496,6 +1504,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                             }
                         }
 
+                        self.pendingProcessingIndicator?.cancel()
+                        self.pendingProcessingIndicator = nil
+                        self.recordingIndicator.hideProcessing()
+
                         self.textInsertionService.insertText(formattedText)
                         self.transcriptionState.setFormattedText(formattedText)
                         self.transcriptionState.completeProcessing()
@@ -1516,6 +1528,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 Logger.shared.error("❌ Processing failed after \(String(format: "%.2f", failTime))s: \(error.localizedDescription)", category: .transcription)
 
                 await MainActor.run {
+                    self.pendingProcessingIndicator?.cancel()
+                    self.pendingProcessingIndicator = nil
+                    self.recordingIndicator.hideProcessing()
+
                     self.transcriptionState.setError("Processing failed: \(error.localizedDescription)")
                     // Auto-recover from error state after 3 seconds
                     Task { @MainActor in

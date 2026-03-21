@@ -145,14 +145,15 @@ struct WaveformLineView: View {
     }
 }
 
-/// Floating window that appears during recording to show the user that audio is being captured
-/// Shows a recording dot + smooth waveform line at the cursor position
+/// Floating window that appears during dictation to show recording and processing states
+/// Recording: red dot + smooth waveform line | Processing: pulsing blue dot + "Transcribing..." text
 /// IMPORTANT: Only shown in dictation mode, NOT in meeting transcription mode
 struct RecordingIndicator: View {
 
     @ObservedObject var state: RecordingIndicatorState
     @ObservedObject private var settings = Settings.shared
     @Environment(\.colorScheme) var colorScheme
+    @State private var processingPulse = false
 
     /// Compute the effective color scheme based on user's theme preference
     private var effectiveColorScheme: ColorScheme? {
@@ -168,14 +169,32 @@ struct RecordingIndicator: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            // Static recording dot (no pulsing)
-            Circle()
-                .fill(Color(red: 1.0, green: 0.23, blue: 0.19))
-                .frame(width: 10, height: 10)
-                .shadow(color: Color(red: 1.0, green: 0.23, blue: 0.19).opacity(0.4), radius: 4, x: 0, y: 0)
+            if state.isProcessing {
+                // Pulsing blue dot
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 10, height: 10)
+                    .shadow(color: Color.blue.opacity(0.4), radius: 4, x: 0, y: 0)
+                    .opacity(processingPulse ? 0.4 : 1.0)
+                    .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: processingPulse)
+                    .onAppear { processingPulse = true }
+                    .onDisappear { processingPulse = false }
 
-            // Smooth waveform line
-            WaveformLineView(frequencyBands: $state.frequencyBands, width: 260, height: 34)
+                // Processing text in place of waveform (same width to preserve window size)
+                Text("Transcribing...")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 260, height: 34)
+            } else {
+                // Static recording dot (no pulsing)
+                Circle()
+                    .fill(Color(red: 1.0, green: 0.23, blue: 0.19))
+                    .frame(width: 10, height: 10)
+                    .shadow(color: Color(red: 1.0, green: 0.23, blue: 0.19).opacity(0.4), radius: 4, x: 0, y: 0)
+
+                // Smooth waveform line
+                WaveformLineView(frequencyBands: $state.frequencyBands, width: 260, height: 34)
+            }
         }
         .padding(.leading, 14)
         .padding(.trailing, 12)
@@ -230,6 +249,7 @@ struct RecordingIndicatorPreview: View {
 /// Observable state for the recording indicator
 class RecordingIndicatorState: ObservableObject, @unchecked Sendable {
     @Published var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
+    @Published var isProcessing: Bool = false
 
     // Exponential smoothing for fluid animation
     func updateFrequencyBands(_ newBands: [Float]) {
@@ -404,9 +424,29 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
         window.setFrameOrigin(NSPoint(x: x, y: y))
     }
 
+    /// Show the processing indicator (reuses existing window at same position)
+    func showProcessing() {
+        guard let window = window else { return }
+
+        state.isProcessing = true
+
+        // Cancel any in-progress hide animation before showing
+        window.animator().alphaValue = 1.0
+        window.orderFront(nil)
+    }
+
+    /// Hide the processing indicator
+    func hideProcessing() {
+        state.isProcessing = false
+        hide()
+    }
+
     /// Show the recording indicator
     func show() {
         guard let window = window else { return }
+
+        // Ensure we're in recording mode (not processing)
+        state.isProcessing = false
 
         // Get user's position preference
         let position = Settings.shared.indicatorPosition
