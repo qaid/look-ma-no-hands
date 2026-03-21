@@ -47,10 +47,6 @@ class WhisperService: @unchecked Sendable {
 
         Logger.shared.info("Loading WhisperKit model '\(modelName)'...", category: .whisper)
 
-        // Use Caches directory as the download base to avoid Documents folder permission prompt.
-        // NOTE: downloadBase controls where HuggingFace Hub downloads models TO.
-        //       modelFolder tells WhisperKit to skip downloading and load from a local path.
-        //       We must NOT set modelFolder here, or the download will be skipped entirely.
         guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             throw WhisperError.downloadFailed("Could not access caches directory")
         }
@@ -62,16 +58,22 @@ class WhisperService: @unchecked Sendable {
             prefillCompute: .cpuAndNeuralEngine
         )
 
+        // When the model is already downloaded, load from the local folder directly.
+        // This avoids a HuggingFace Hub network call (hubApi.snapshot) that can hang
+        // during macOS-initiated relaunches (e.g., after granting screen recording permission).
+        let localModelFolder: String? = Self.localModelPath(named: modelName, in: cacheDir)
+
         let config = WhisperKitConfig(
             model: modelName,
             downloadBase: cacheDir,
+            modelFolder: localModelFolder,
             computeOptions: computeOptions,
             verbose: false,
-            logLevel: .info
+            logLevel: .info,
+            load: localModelFolder != nil ? true : nil,
+            download: localModelFolder == nil
         )
 
-        // Initialize WhisperKit (downloads model if needed)
-        // Retry once if initialization fails (handles corrupted downloads - WhisperKit issue #171)
         do {
             let kit = try await WhisperKit(config)
             self.whisperKit = kit
@@ -79,14 +81,31 @@ class WhisperService: @unchecked Sendable {
             isModelLoaded = true
             Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully with Neural Engine acceleration", category: .whisper)
         } catch {
-            Logger.shared.warning("First load attempt failed, retrying after cleanup: \(error.localizedDescription)", category: .whisper)
+            Logger.shared.warning("First load attempt failed: \(error.localizedDescription)", category: .whisper)
 
-            // Retry initialization (WhisperKit will re-download if needed)
-            let kit = try await WhisperKit(config)
-            self.whisperKit = kit
-            self.tokenizer = kit.tokenizer
-            isModelLoaded = true
-            Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully on retry", category: .whisper)
+            if localModelFolder != nil {
+                // Local load failed — retry with Hub download in case files are corrupted
+                Logger.shared.info("Retrying with Hub download...", category: .whisper)
+                let retryConfig = WhisperKitConfig(
+                    model: modelName,
+                    downloadBase: cacheDir,
+                    computeOptions: computeOptions,
+                    verbose: false,
+                    logLevel: .info
+                )
+                let kit = try await WhisperKit(retryConfig)
+                self.whisperKit = kit
+                self.tokenizer = kit.tokenizer
+                isModelLoaded = true
+                Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully via Hub retry", category: .whisper)
+            } else {
+                // Hub download failed — retry once (handles corrupted downloads, WhisperKit issue #171)
+                let kit = try await WhisperKit(config)
+                self.whisperKit = kit
+                self.tokenizer = kit.tokenizer
+                isModelLoaded = true
+                Logger.shared.info("✅ WhisperKit model '\(modelName)' loaded successfully on retry", category: .whisper)
+            }
         }
     }
     
@@ -277,27 +296,29 @@ class WhisperService: @unchecked Sendable {
 
     // MARK: - Model Management
 
-    /// Check if a WhisperKit model is available in the cache.
-    /// Models are downloaded to ~/Library/Caches/models/argmaxinc/whisperkit-coreml/
-    ///
-    /// **NOTE**: This is a basic existence check. For reliability,
-    /// prefer using `loadModel()` and catching errors instead.
-    static func modelExists(named modelName: String) -> Bool {
-        let fileManager = FileManager.default
-
-        guard let cacheDir = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            return false
-        }
-
-        // WhisperKit cache structure:
-        // ~/Library/Caches/models/argmaxinc/whisperkit-coreml/openai_whisper-<model>/
+    /// Returns the local model folder path if the model is already downloaded, or nil.
+    /// Used by `loadModel` to bypass HuggingFace Hub network calls when loading cached models.
+    private static func localModelPath(named modelName: String, in cacheDir: URL) -> String? {
         let modelDir = cacheDir
             .appendingPathComponent("models")
             .appendingPathComponent("argmaxinc")
             .appendingPathComponent("whisperkit-coreml")
             .appendingPathComponent("openai_whisper-\(modelName)")
 
-        return fileManager.fileExists(atPath: modelDir.path)
+        guard FileManager.default.fileExists(atPath: modelDir.path) else { return nil }
+        return modelDir.path
+    }
+
+    /// Check if a WhisperKit model is available in the cache.
+    /// Models are downloaded to ~/Library/Caches/models/argmaxinc/whisperkit-coreml/
+    ///
+    /// **NOTE**: This is a basic existence check. For reliability,
+    /// prefer using `loadModel()` and catching errors instead.
+    static func modelExists(named modelName: String) -> Bool {
+        guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return false
+        }
+        return localModelPath(named: modelName, in: cacheDir) != nil
     }
 
     /// Get available WhisperKit models to download
