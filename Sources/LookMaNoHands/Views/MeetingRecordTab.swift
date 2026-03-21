@@ -982,6 +982,13 @@ struct MeetingRecordTab: View {
         if liveState.status == .completed { return }
         if !whisperService.isModelLoaded {
             liveState.status = .missingModel
+            // Model may still be loading — re-check shortly in case the
+            // .whisperModelReady notification fired before we subscribed.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                if liveState.status == .missingModel {
+                    checkStatus()
+                }
+            }
             return
         }
         if !SystemAudioRecorder.hasPermission() {

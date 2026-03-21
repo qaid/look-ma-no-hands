@@ -814,7 +814,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 // Try to load the configured model - WhisperKit will download it if needed
                 try await whisperService.loadModel(named: configuredModel)
                 NSLog("✅ Whisper model '\(configuredModel)' loaded successfully")
-                NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+                await MainActor.run {
+                    NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+                }
 
                 // Warm up the Neural Engine to prevent latency on first dictation (issue #161)
                 // This is crucial for first-launch experience - skipping would result in 10+ second latency
@@ -839,7 +841,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                         NSLog("🔄 Trying fallback model: \(model)")
                         try await whisperService.loadModel(named: model)
                         NSLog("✅ Fallback model '\(model)' loaded successfully")
-                        NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+                        await MainActor.run {
+                            NotificationCenter.default.post(name: .whisperModelReady, object: nil)
+                        }
                         loadedFallback = true
                         break
                     } catch {
