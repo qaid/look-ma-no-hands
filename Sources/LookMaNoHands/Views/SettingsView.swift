@@ -1209,7 +1209,7 @@ struct SettingsView: View {
     // MARK: - About Tab
 
     private var aboutTab: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 28) {
             Image(systemName: "mic.fill")
                 .font(.system(size: 64))
                 .foregroundColor(.accentColor)
@@ -1218,7 +1218,7 @@ struct SettingsView: View {
                 .font(.title)
                 .fontWeight(.bold)
 
-            VStack(spacing: 4) {
+            VStack(spacing: 6) {
                 Text("Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")")
                     .foregroundColor(.secondary)
 
@@ -1229,15 +1229,15 @@ struct SettingsView: View {
 
                 if isDev {
                     Text("Development Build")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.orange)
                 } else {
                     Text("Build: \(buildCommit)")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                     if !buildDate.isEmpty {
                         Text(buildDate)
-                            .font(.caption2)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     }
                 }
@@ -1247,22 +1247,20 @@ struct SettingsView: View {
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
 
-            Divider()
-
-            // Update check section
+            // Update check section card
             VStack(spacing: 12) {
                 HStack {
                     if isCheckingForUpdates {
                         ProgressView()
                             .controlSize(.small)
                         Text("Checking for updates...")
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     } else if let error = updateCheckError {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
                         Text(error)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundColor(.secondary)
                     } else if let update = availableUpdate {
                         VStack(alignment: .leading, spacing: 8) {
@@ -1283,7 +1281,7 @@ struct SettingsView: View {
                                             .monospaced()
                                             .foregroundColor(.secondary)
                                         Text(commit.message)
-                                            .font(.caption)
+                                            .font(.callout)
                                             .lineLimit(1)
                                     }
                                 }
@@ -1297,7 +1295,7 @@ struct SettingsView: View {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
                         Text("Up to date")
-                            .font(.caption)
+                            .font(.callout)
                     }
 
                     Spacer()
@@ -1313,54 +1311,81 @@ struct SettingsView: View {
                 if let lastCheck = settings.lastUpdateCheckDate {
                     HStack {
                         Text("Last checked: \(formatElapsedTime(since: lastCheck))")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
                     }
                 }
 
                 Toggle("Automatically check for updates on launch", isOn: $settings.checkForUpdatesOnLaunch)
-                    .font(.caption)
+                    .font(.callout)
+            }
+            .padding(16)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(availableUpdate != nil ? Color.accentColor.opacity(0.1) : Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(availableUpdate != nil ? Color.accentColor.opacity(0.3) : Color(nsColor: .separatorColor), lineWidth: 1)
+                    )
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 12) {
+            // Features section card
+            VStack(alignment: .leading, spacing: 14) {
                 Text("Features")
                     .font(.headline)
+                    .fontWeight(.semibold)
 
                 FeatureListItem(icon: "bolt.fill", text: "Lightning-fast transcription with Whisper")
                 FeatureListItem(icon: "lock.fill", text: "100% local - your voice never leaves your Mac")
-                FeatureListItem(icon: "waveform", text: "Smart text formatting and punctuation")
+                FeatureListItem(icon: "textformat", text: "Smart text formatting and punctuation")
                 FeatureListItem(icon: "keyboard", text: "Works in any app with double-tap Right Option")
             }
-            .frame(maxWidth: 400)
+            .padding(16)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    )
+            }
 
-            Divider()
-
-            VStack(spacing: 8) {
+            // Powered By section card
+            VStack(alignment: .leading, spacing: 14) {
                 Text("Powered By")
                     .font(.headline)
+                    .fontWeight(.semibold)
 
                 Link(destination: URL(string: "https://github.com/ggerganov/whisper.cpp")!) {
-                    Label("Whisper.cpp - Local speech recognition", systemImage: "link")
-                        .font(.caption)
+                    Label("Whisper.cpp - Local speech recognition", systemImage: "waveform")
+                        .font(.callout)
                 }
 
                 Link(destination: URL(string: "https://ollama.ai")!) {
-                    Label("Ollama - Local LLM for meeting notes", systemImage: "link")
-                        .font(.caption)
+                    Label("Ollama - Local LLM for meeting notes", systemImage: "brain")
+                        .font(.callout)
                 }
 
                 Link(destination: URL(string: "https://github.com/qaid/look-ma-no-hands")!) {
-                    Label("Source code on GitHub", systemImage: "link")
-                        .font(.caption)
+                    Label("Source code on GitHub", systemImage: "chevron.left.slash.chevron.right")
+                        .font(.callout)
                 }
+            }
+            .padding(16)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(nsColor: .separatorColor), lineWidth: 1)
+                    )
             }
 
             Spacer()
         }
-        .padding()
+        .frame(maxWidth: 400)
+        .padding(24)
     }
 
     // MARK: - Update Checking
@@ -1416,6 +1441,7 @@ struct SettingsView: View {
                     Button("Update to v\(release.version)") {
                         Task { await autoUpdater.performUpdate(release: release) }
                     }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.small)
 
                     Button("View on GitHub") {
@@ -1434,7 +1460,7 @@ struct SettingsView: View {
             } else {
                 // No release available — fall back to clipboard approach
                 Text("To update: git pull && ./scripts/deploy.sh")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
                     .padding(.vertical, 4)
 
@@ -1463,7 +1489,7 @@ struct SettingsView: View {
 
                 if updateCopiedConfirmation {
                     Text("Update command copied to clipboard. Paste in Terminal to update.")
-                        .font(.caption2)
+                        .font(.caption)
                         .foregroundColor(.green)
                 }
             }
@@ -1473,7 +1499,7 @@ struct SettingsView: View {
                 ProgressView(value: progress)
                 HStack {
                     Text("Downloading update... \(Int(progress * 100))%")
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                     Spacer()
                     Button("Cancel") {
@@ -1488,7 +1514,7 @@ struct SettingsView: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("Verifying download...")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -1497,7 +1523,7 @@ struct SettingsView: View {
                 ProgressView()
                     .controlSize(.small)
                 Text("Installing update...")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundColor(.secondary)
             }
 
@@ -1507,11 +1533,12 @@ struct SettingsView: View {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundColor(.green)
                     Text("Update installed successfully")
-                        .font(.caption)
+                        .font(.callout)
                 }
                 Button("Restart Now") {
                     autoUpdater.relaunchApp()
                 }
+                .buttonStyle(.borderedProminent)
                 .controlSize(.small)
             }
 
@@ -1521,7 +1548,7 @@ struct SettingsView: View {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
                     Text(message)
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundColor(.secondary)
                         .lineLimit(3)
                 }
@@ -2154,11 +2181,11 @@ struct FeatureListItem: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 14))
+                .font(.system(size: 20))
                 .foregroundColor(.accentColor)
-                .frame(width: 20)
+                .frame(width: 28, height: 28)
 
             Text(text)
                 .font(.body)
