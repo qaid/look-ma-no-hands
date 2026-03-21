@@ -560,8 +560,8 @@ class RecordingIndicatorWindowController: @unchecked Sendable {
 
         // Animate fade-out
         NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.15
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            context.duration = 0.35
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 0.0
         }, completionHandler: {
             window.orderOut(nil)
