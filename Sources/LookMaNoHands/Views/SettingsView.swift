@@ -567,6 +567,18 @@ struct SettingsView: View {
                 }
             }
 
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Meeting App Detection")
+                    .font(.headline)
+
+                Toggle("Detect active meeting apps (Zoom, Teams, Meet)", isOn: $settings.meetingAppDetectionEnabled)
+                    .toggleStyle(.checkbox)
+
+                Text("When enabled, the app detects if a video call is active and shows the app name and participant count during recording.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             Spacer()
         }
     }
