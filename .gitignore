@@ -16,6 +16,12 @@ Package.resolved
 docs/sketchpad.md
 docs/security-audit-report.md
 
+# Pi agent sessions (ephemeral, not committed)
+.pi/agent-sessions/
+
+# Memory scratchpad (ephemeral cross-agent working files)
+memory/scratchpad/
+
 # Playwright / Node.js (marketing site tests)
 docs/tests/node_modules/
 docs/tests/playwright-report/
