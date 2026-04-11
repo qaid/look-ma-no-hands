@@ -17,12 +17,12 @@
 |skills/frontend-design:{SKILL.md}
 |skills/ux-review:{SKILL.md}
 |skills/web-research-synthesizer:{SKILL.md}
-|pi/agents:{teams.yaml,agent-chain.yaml,orchestrator.md,planner.md,plan-reviewer.md,engineering-manager.md,swift-engineer.md,code-reviewer.md,scout.md,documenter.md}
-|pi:{damage-control-rules.yaml,settings.json,package.json}
-|pi/skills:{lmnh-heartbeat/SKILL.md,lmnh-wrap-up/SKILL.md,lmnh-implement-ticket/SKILL.md,mental-model/SKILL.md}
-|pi/extensions:{agent-team.ts,memory-bridge.ts,damage-control.ts,git-status.ts,tool-counter.ts,subagent-widget.ts,themeMap.ts}
-|memory:{last-session.md,MEMORY.md}
-|expertise:{orchestrator.md,planner.md,engineering-manager.md,code-reviewer.md}
+|root:./.pi/agents|{teams.yaml,agent-chain.yaml,orchestrator.md,planner.md,plan-reviewer.md,engineering-manager.md,swift-engineer.md,code-reviewer.md,scout.md,documenter.md}
+|root:./.pi|{damage-control-rules.yaml,settings.json,package.json}
+|root:./.pi/skills|{lmnh-heartbeat/SKILL.md,lmnh-wrap-up/SKILL.md,lmnh-implement-ticket/SKILL.md,mental-model/SKILL.md}
+|root:./.pi/extensions|{agent-team.ts,memory-bridge.ts,damage-control.ts,git-status.ts,tool-counter.ts,subagent-widget.ts,themeMap.ts}
+|root:./memory|{last-session.md,MEMORY.md}
+|root:./expertise|{orchestrator.md,planner.md,engineering-manager.md,code-reviewer.md}
 
 ## Project Overview
 

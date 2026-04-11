@@ -7,8 +7,8 @@ bashToolPatterns:
     reason: "rm -rf / is always blocked"
   - pattern: "git\\s+reset\\s+--hard"
     reason: "git reset --hard discards uncommitted work — use git stash or revert instead"
-  - pattern: "git\\s+push\\s+(--force|-f)(?!\\s+--force-with-lease)"
-    reason: "force push without --force-with-lease is blocked — risks overwriting remote history"
+  - pattern: "git\\s+push\\s+(--force|-f)\\b"
+    reason: "force push is blocked — use --force-with-lease instead (it is a distinct flag, not a modifier of --force)"
   - pattern: "\\|\\s*bash"
     reason: "pipe to bash is blocked — never execute piped shell input"
   - pattern: "\\|\\s*sh\\b"
@@ -38,6 +38,9 @@ bashToolPatterns:
     ask: true
   - pattern: "xattr\\s+-rd\\s+com\\.apple\\.quarantine"
     reason: "removing quarantine attribute requires confirmation"
+    ask: true
+  - pattern: "git\\s+clean\\s+-[a-z]*f[a-z]*"
+    reason: "git clean -f/fd/fdx removes untracked files permanently — use git stash or confirm intent"
     ask: true
 
 zeroAccessPaths:
@@ -71,4 +74,6 @@ noDeletePaths:
   - ".pi/settings.json"
   - ".pi/damage-control-rules.yaml"
   - "memory/MEMORY.md"
+  - "memory/last-session.md"
+  - "memory/session-log/"
   - "expertise/"
