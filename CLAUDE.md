@@ -17,6 +17,12 @@
 |skills/frontend-design:{SKILL.md}
 |skills/ux-review:{SKILL.md}
 |skills/web-research-synthesizer:{SKILL.md}
+|pi/agents:{teams.yaml,agent-chain.yaml,orchestrator.md,planner.md,plan-reviewer.md,engineering-manager.md,swift-engineer.md,code-reviewer.md,scout.md,documenter.md}
+|pi:{damage-control-rules.yaml,settings.json,package.json}
+|pi/skills:{lmnh-heartbeat/SKILL.md,lmnh-wrap-up/SKILL.md,lmnh-implement-ticket/SKILL.md,mental-model/SKILL.md}
+|pi/extensions:{agent-team.ts,memory-bridge.ts,damage-control.ts,git-status.ts,tool-counter.ts,subagent-widget.ts,themeMap.ts}
+|memory:{last-session.md,MEMORY.md}
+|expertise:{orchestrator.md,planner.md,engineering-manager.md,code-reviewer.md}
 
 ## Project Overview
 
@@ -58,6 +64,52 @@ swift test --enable-code-coverage           # Run with coverage
 ```
 
 See `docs/test-inventory.md` for the full list of test classes.
+
+## Agent Architecture (Dual Mode)
+
+LMNH uses a dual-mode agent architecture:
+
+- **`.claude/` agents** -- Claude Code agents (used in this session)
+- **`.pi/` agents** -- Pi orchestration agents (used with `pi -e extensions/agent-team.ts`)
+
+### Pi Mode Quick Start
+
+```bash
+cd /Users/qaid/Code/look-ma-no-hands
+pi -e .pi/extensions/agent-team.ts        # team orchestration dashboard
+pi -e .pi/extensions/memory-bridge.ts     # memory injection only
+```
+
+### Pi Agent Roster
+
+| Agent | Role | Model |
+|-------|------|-------|
+| `orchestrator` | Session hub, routes tasks | claude-opus-4.6 |
+| `planner` | Decomposes initiatives, DISPATCH blocks | claude-opus-4.6 |
+| `plan-reviewer` | Quality gate before implementation | claude-sonnet-4.6 |
+| `engineering-manager` | Coordinates workers, review loop | claude-sonnet-4.6 |
+| `swift-engineer` | Implements Swift code changes | claude-sonnet-4.6 |
+| `code-reviewer` | 4-tier structured code review | qwen3-235b |
+| `scout` | Read-only recon and codebase orientation | gpt-4.1-mini |
+| `documenter` | Docs, README, Swift doc comments | gpt-4.1-mini |
+
+Plus `.claude/` agents: `swiftui-expert`, `macos-app-designer`, `test-runner`, `security-review`, `build-orchestrator`, `ux-review`
+
+### Pi Skills
+
+| Skill | Purpose |
+|-------|---------|
+| `/lmnh-heartbeat` | Project status briefing |
+| `/lmnh-wrap-up` | End-of-session log and handoff |
+| `/lmnh-implement-ticket` | Single-ticket implementation chain |
+| `/mental-model` | Agent expertise accumulation protocol |
+
+### Memory and Expertise
+
+- `memory/last-session.md` -- session handoff (written by `/lmnh-wrap-up`)
+- `memory/MEMORY.md` -- session log index
+- `memory/session-log/` -- per-session archives
+- `expertise/*.md` -- per-agent accumulated YAML knowledge (max 120-150 lines each)
 
 ## Project-Specific Rules
 

@@ -1,0 +1,8 @@
+{
+  "type": "module",
+  "dependencies": {
+    "@mariozechner/pi-coding-agent": "latest",
+    "@sinclair/typebox": "latest",
+    "yaml": "latest"
+  }
+}

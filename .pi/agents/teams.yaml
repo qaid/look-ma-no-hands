@@ -1,0 +1,104 @@
+# Look Ma No Hands agent teams
+# Used by the agent-team extension to define available dispatch groups.
+# Each key is a team name; each value is an object with:
+#   agents: ordered list of agent names
+#   not_covered: capabilities this team CANNOT handle
+# The FIRST team is auto-loaded on session start.
+
+# Startup default: orchestrator + scout for orientation and light triage
+startup:
+  agents:
+    - orchestrator
+    - scout
+    - documenter
+  not_covered:
+    - code changes (no swift-engineer or swiftui-expert)
+    - PR review (no code-reviewer)
+    - planning/decomposition (no planner)
+    - security review (no security-review)
+    - UI/UX design critique (no macos-app-designer or ux-review)
+
+# Standard orchestration: orchestrator routes, planner decomposes
+orchestration:
+  agents:
+    - orchestrator
+    - planner
+    - plan-reviewer
+  not_covered:
+    - code changes (no swift-engineer)
+    - PR review (no code-reviewer)
+    - security review (no security-review)
+    - design critique (no swiftui-expert or macos-app-designer)
+
+# Feature work, bug fixes, PRs
+engineering:
+  agents:
+    - orchestrator
+    - planner
+    - plan-reviewer
+    - engineering-manager
+    - swift-engineer
+    - code-reviewer
+    - scout
+    - documenter
+  not_covered:
+    - specialized SwiftUI design critique (no swiftui-expert or macos-app-designer)
+    - security audit (no security-review)
+    - UX review (no ux-review)
+
+# Design and UI work
+design:
+  agents:
+    - orchestrator
+    - swiftui-expert
+    - macos-app-designer
+    - ux-review
+    - swift-engineer
+  not_covered:
+    - planning/decomposition (no planner)
+    - security review (no security-review)
+    - PR review via code-reviewer
+
+# Testing pass
+testing:
+  agents:
+    - orchestrator
+    - test-runner
+    - swift-engineer
+    - code-reviewer
+    - security-review
+  not_covered:
+    - strategic planning (no planner)
+    - design critique (no swiftui-expert or macos-app-designer)
+    - documentation (no documenter)
+
+# Security audit
+security:
+  agents:
+    - orchestrator
+    - security-review
+    - code-reviewer
+  not_covered:
+    - feature implementation (no swift-engineer)
+    - planning (no planner)
+    - design (no swiftui-expert or macos-app-designer)
+    - documentation (no documenter)
+
+# All agents
+full:
+  agents:
+    - orchestrator
+    - planner
+    - plan-reviewer
+    - engineering-manager
+    - swift-engineer
+    - code-reviewer
+    - scout
+    - documenter
+    - swiftui-expert
+    - macos-app-designer
+    - ux-review
+    - security-review
+    - test-runner
+    - build-orchestrator
+  not_covered: []
