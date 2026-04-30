@@ -298,6 +298,7 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let autoSaveNotes = "autoSaveNotes"
         static let autoSaveFolder = "autoSaveFolder"
         static let speakerDiarizationEnabled = "speakerDiarizationEnabled"
+        static let meetingAppDetectionEnabled = "meetingAppDetectionEnabled"
     }
 
     // MARK: - File Paths
@@ -507,6 +508,13 @@ Now produce the complete meeting notes following the format above. Ensure every 
         }
     }
 
+    /// Whether to detect active meeting apps (Zoom, Teams, Meet) and extract participant names
+    @Published var meetingAppDetectionEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(meetingAppDetectionEnabled, forKey: Keys.meetingAppDetectionEnabled)
+        }
+    }
+
     /// SHA of an update the user chose to skip (suppresses auto-check notifications)
     var skippedUpdateSHA: String? {
         get { UserDefaults.standard.string(forKey: Keys.skippedUpdateSHA) }
@@ -645,6 +653,9 @@ Now produce the complete meeting notes following the format above. Ensure every 
         } else {
             self.speakerDiarizationEnabled = true
         }
+
+        // Meeting app detection defaults to false (opt-in)
+        self.meetingAppDetectionEnabled = UserDefaults.standard.bool(forKey: Keys.meetingAppDetectionEnabled)
 
         // Auto-save notes defaults to false (opt-in)
         self.autoSaveNotes = UserDefaults.standard.bool(forKey: Keys.autoSaveNotes)
@@ -833,5 +844,6 @@ Now produce the complete meeting notes following the format above. Ensure every 
         autoSaveNotes = false
         autoSaveFolder = Settings.defaultAutoSaveFolder
         speakerDiarizationEnabled = true
+        meetingAppDetectionEnabled = false
     }
 }
