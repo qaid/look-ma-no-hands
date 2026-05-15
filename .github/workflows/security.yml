@@ -51,7 +51,7 @@ jobs:
 
       - name: Verify WhisperKit revision
         run: |
-          EXPECTED_REV="26577ce3017aae8c9edfd9a0dd17851bd248c731"
+          EXPECTED_REV="25c62997041c134b03ca82731ce2f6fd2cae1eb9"
           ACTUAL_REV=$(grep -A 5 '"identity" : "whisperkit"' Package.resolved | grep '"revision"' | cut -d'"' -f4)
 
           if [ "$ACTUAL_REV" != "$EXPECTED_REV" ]; then
