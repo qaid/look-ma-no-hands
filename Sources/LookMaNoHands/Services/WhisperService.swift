@@ -350,7 +350,10 @@ class WhisperService: @unchecked Sendable {
         }
 
         let support = await WhisperKit.recommendedRemoteModels()
-        if let match = support.supported.first(where: { name in
+        // Search supported first, then disabled (models known to WhisperKit but not recommended
+        // for this device class — e.g. turbo models on M1 Macs are in disabled, not supported).
+        let allKnown = support.supported + support.disabled
+        if let match = allKnown.first(where: { name in
             let lower = name.lowercased()
             return lower.contains("large-v3") && lower.contains("turbo")
         }) {
