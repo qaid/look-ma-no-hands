@@ -57,13 +57,16 @@ class WhisperService: @unchecked Sendable {
             textDecoderCompute: .cpuAndNeuralEngine
         )
 
+        // Resolve the canonical HF directory name for this model (handles large-v3-turbo naming mismatch).
+        let resolvedName = await Self.resolveCanonicalModelName(modelName, in: cacheDir)
+
         // When the model is already downloaded, load from the local folder directly.
         // This avoids a HuggingFace Hub network call (hubApi.snapshot) that can hang
         // during macOS-initiated relaunches (e.g., after granting screen recording permission).
-        let localModelFolder: String? = Self.localModelPath(named: modelName, in: cacheDir)
+        let localModelFolder: String? = Self.localModelPath(named: resolvedName, in: cacheDir)
 
         let config = WhisperKitConfig(
-            model: modelName,
+            model: resolvedName,
             downloadBase: cacheDir,
             modelFolder: localModelFolder,
             computeOptions: computeOptions,
@@ -86,7 +89,7 @@ class WhisperService: @unchecked Sendable {
                 // Local load failed — retry with Hub download in case files are corrupted
                 Logger.shared.info("Retrying with Hub download...", category: .whisper)
                 let retryConfig = WhisperKitConfig(
-                    model: modelName,
+                    model: resolvedName,
                     downloadBase: cacheDir,
                     computeOptions: computeOptions,
                     verbose: false,
@@ -296,7 +299,7 @@ class WhisperService: @unchecked Sendable {
     // MARK: - Model Management
 
     /// Returns the local model folder path if the model is already downloaded, or nil.
-    /// Used by `loadModel` to bypass HuggingFace Hub network calls when loading cached models.
+    /// Callers must pass the canonical (resolved) model name, not the user-facing raw value.
     private static func localModelPath(named modelName: String, in cacheDir: URL) -> String? {
         let modelDir = cacheDir
             .appendingPathComponent("models")
@@ -308,6 +311,58 @@ class WhisperService: @unchecked Sendable {
         return modelDir.path
     }
 
+    /// Scan the cache for a downloaded turbo model directory, returning the variant name
+    /// (without the `openai_whisper-` prefix) or nil.  Local-only — no network call.
+    private static func scanCacheForTurboVariant(in cacheDir: URL) -> String? {
+        let parent = cacheDir
+            .appendingPathComponent("models")
+            .appendingPathComponent("argmaxinc")
+            .appendingPathComponent("whisperkit-coreml")
+
+        guard let entries = try? FileManager.default.contentsOfDirectory(atPath: parent.path) else {
+            return nil
+        }
+
+        if let dir = entries.first(where: { name in
+            let lower = name.lowercased()
+            return lower.hasPrefix("openai_whisper-") && lower.contains("large-v3") && lower.contains("turbo")
+        }) {
+            return dir.replacingOccurrences(of: "openai_whisper-", with: "")
+        }
+        return nil
+    }
+
+    /// Maps a user-facing model name to the canonical HuggingFace directory name (minus the
+    /// `openai_whisper-` prefix).  The `large-v3-turbo` short name does not appear verbatim
+    /// in `argmaxinc/whisperkit-coreml` — actual directories use device-quantized names like
+    /// `large-v3-v20240930_turbo_632MB`.  Resolution order:
+    ///
+    /// 1. Fast path — non-turbo names match HF dirs directly; return as-is.
+    /// 2. Local cache scan — offline-safe, picks up the actual downloaded dir name.
+    /// 3. WhisperKit remote config — `recommendedRemoteModels()` returns per-device canonical names.
+    /// 4. Fallback — return the raw name (preserves prior behaviour for unknown models).
+    static func resolveCanonicalModelName(_ modelName: String, in cacheDir: URL) async -> String {
+        guard modelName.contains("turbo") else { return modelName }
+
+        if let cached = scanCacheForTurboVariant(in: cacheDir) {
+            Logger.shared.info("Resolved '\(modelName)' from local cache: \(cached)", category: .whisper)
+            return cached
+        }
+
+        let support = await WhisperKit.recommendedRemoteModels()
+        if let match = support.supported.first(where: { name in
+            let lower = name.lowercased()
+            return lower.contains("large-v3") && lower.contains("turbo")
+        }) {
+            let variant = match.replacingOccurrences(of: "openai_whisper-", with: "")
+            Logger.shared.info("Resolved '\(modelName)' from remote config: \(variant)", category: .whisper)
+            return variant
+        }
+
+        Logger.shared.warning("Could not resolve canonical name for '\(modelName)' — using raw value", category: .whisper)
+        return modelName
+    }
+
     /// Check if a WhisperKit model is available in the cache.
     /// Models are downloaded to ~/Library/Caches/models/argmaxinc/whisperkit-coreml/
     ///
@@ -317,7 +372,15 @@ class WhisperService: @unchecked Sendable {
         guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             return false
         }
-        return localModelPath(named: modelName, in: cacheDir) != nil
+        // Direct path check covers tiny/base/small/medium.
+        if localModelPath(named: modelName, in: cacheDir) != nil { return true }
+        // For turbo models, the cached dir name differs from the user-facing rawValue.
+        if modelName.contains("turbo"),
+           let variant = scanCacheForTurboVariant(in: cacheDir),
+           localModelPath(named: variant, in: cacheDir) != nil {
+            return true
+        }
+        return false
     }
 
     /// Get available WhisperKit models to download
@@ -330,7 +393,6 @@ class WhisperService: @unchecked Sendable {
             ("large-v3-turbo", "~600 MB", "Best accuracy (recommended for meetings)")
         ]
     }
-
 
     /// Download a model from Hugging Face.
     ///
@@ -354,8 +416,13 @@ class WhisperService: @unchecked Sendable {
             throw WhisperError.downloadFailed("Could not access caches directory")
         }
 
+        // Resolve canonical HF directory name before handing to WhisperKit.
+        // "large-v3-turbo" does not appear in any argmaxinc/whisperkit-coreml directory name;
+        // the actual dirs use versioned names like `large-v3-v20240930_turbo`.
+        let resolvedName = await resolveCanonicalModelName(modelName, in: cacheDir)
+
         let config = WhisperKitConfig(
-            model: modelName,
+            model: resolvedName,
             downloadBase: cacheDir,
             verbose: true,
             logLevel: .info
