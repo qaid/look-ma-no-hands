@@ -311,9 +311,26 @@ class WhisperService: @unchecked Sendable {
         return modelDir.path
     }
 
-    /// Scan the cache for a downloaded turbo model directory, returning the variant name
+    /// User-facing model names that do not match HuggingFace directory names verbatim
+    /// and require canonical-name resolution.  Currently only `large-v3-turbo`: HF dirs
+    /// use device-quantized names like `large-v3-v20240930_turbo_632MB`.
+    static let aliasedModelNames: Set<String> = ["large-v3-turbo"]
+
+    /// Substrings used to match a user-facing aliased name against an HF directory name.
+    /// Returns the substrings that must all be present (lowercased) in a candidate dir name.
+    private static func cacheMatchTokens(for modelName: String) -> [String] {
+        // `large-v3-turbo` → ["large-v3", "turbo"]
+        // Splits on "-turbo" suffix to allow versioned dirs like `large-v3-v20240930_turbo`.
+        let lower = modelName.lowercased()
+        if lower.hasSuffix("-turbo") {
+            return [String(lower.dropLast("-turbo".count)), "turbo"]
+        }
+        return [lower]
+    }
+
+    /// Scan the cache for a downloaded aliased model directory, returning the variant name
     /// (without the `openai_whisper-` prefix) or nil.  Local-only — no network call.
-    private static func scanCacheForTurboVariant(in cacheDir: URL) -> String? {
+    static func scanCacheForAliasedVariant(_ modelName: String, in cacheDir: URL) -> String? {
         let parent = cacheDir
             .appendingPathComponent("models")
             .appendingPathComponent("argmaxinc")
@@ -323,9 +340,11 @@ class WhisperService: @unchecked Sendable {
             return nil
         }
 
+        let tokens = cacheMatchTokens(for: modelName)
         if let dir = entries.first(where: { name in
             let lower = name.lowercased()
-            return lower.hasPrefix("openai_whisper-") && lower.contains("large-v3") && lower.contains("turbo")
+            guard lower.hasPrefix("openai_whisper-") else { return false }
+            return tokens.allSatisfy { lower.contains($0) }
         }) {
             return dir.replacingOccurrences(of: "openai_whisper-", with: "")
         }
@@ -333,19 +352,17 @@ class WhisperService: @unchecked Sendable {
     }
 
     /// Maps a user-facing model name to the canonical HuggingFace directory name (minus the
-    /// `openai_whisper-` prefix).  The `large-v3-turbo` short name does not appear verbatim
-    /// in `argmaxinc/whisperkit-coreml` — actual directories use device-quantized names like
-    /// `large-v3-v20240930_turbo_632MB`.  Resolution order:
+    /// `openai_whisper-` prefix).  Only names in `aliasedModelNames` require resolution; all
+    /// others are returned as-is.  Resolution order for aliased names:
     ///
-    /// 1. Fast path — non-turbo names match HF dirs directly; return as-is.
-    /// 2. Local cache scan — offline-safe, picks up the actual downloaded dir name.
-    /// 3. WhisperKit remote config — `recommendedRemoteModels()` returns per-device canonical names.
-    /// 4. Fallback — return the raw name (preserves prior behaviour for unknown models).
+    /// 1. Local cache scan — offline-safe, picks up the actual downloaded dir name.
+    /// 2. WhisperKit remote config — `recommendedRemoteModels()` returns per-device canonical names.
+    /// 3. Fallback — return the raw name (preserves prior behaviour if both lookups fail).
     static func resolveCanonicalModelName(_ modelName: String, in cacheDir: URL) async -> String {
-        guard modelName.contains("turbo") else { return modelName }
+        guard aliasedModelNames.contains(modelName) else { return modelName }
 
-        if let cached = scanCacheForTurboVariant(in: cacheDir) {
-            Logger.shared.info("Resolved '\(modelName)' from local cache: \(cached)", category: .whisper)
+        if let cached = scanCacheForAliasedVariant(modelName, in: cacheDir) {
+            Logger.shared.debug("Resolved '\(modelName)' from local cache: \(cached)", category: .whisper)
             return cached
         }
 
@@ -353,12 +370,13 @@ class WhisperService: @unchecked Sendable {
         // Search supported first, then disabled (models known to WhisperKit but not recommended
         // for this device class — e.g. turbo models on M1 Macs are in disabled, not supported).
         let allKnown = support.supported + support.disabled
+        let tokens = cacheMatchTokens(for: modelName)
         if let match = allKnown.first(where: { name in
             let lower = name.lowercased()
-            return lower.contains("large-v3") && lower.contains("turbo")
+            return tokens.allSatisfy { lower.contains($0) }
         }) {
             let variant = match.replacingOccurrences(of: "openai_whisper-", with: "")
-            Logger.shared.info("Resolved '\(modelName)' from remote config: \(variant)", category: .whisper)
+            Logger.shared.debug("Resolved '\(modelName)' from remote config: \(variant)", category: .whisper)
             return variant
         }
 
@@ -375,11 +393,11 @@ class WhisperService: @unchecked Sendable {
         guard let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             return false
         }
-        // Direct path check covers tiny/base/small/medium.
+        // Direct path check covers names that match HF dirs verbatim (tiny/base/small/medium).
         if localModelPath(named: modelName, in: cacheDir) != nil { return true }
-        // For turbo models, the cached dir name differs from the user-facing rawValue.
-        if modelName.contains("turbo"),
-           let variant = scanCacheForTurboVariant(in: cacheDir),
+        // Aliased names (e.g. large-v3-turbo) cache under a versioned dir name.
+        if aliasedModelNames.contains(modelName),
+           let variant = scanCacheForAliasedVariant(modelName, in: cacheDir),
            localModelPath(named: variant, in: cacheDir) != nil {
             return true
         }
