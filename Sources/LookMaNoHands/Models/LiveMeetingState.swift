@@ -65,6 +65,10 @@ class LiveMeetingState: @unchecked Sendable {
     var frequencyBands: [Float] = Array(repeating: 0.0, count: 40)
     var isActive = true
 
+    // Meeting app detection
+    var detectedMeetingApp: MeetingApp? = nil
+    var detectedParticipants: [String] = []
+
     // User notes (inline note-taking during recording)
     var userNotes: [UserNote] = [] {
         didSet { isTimelineDirty = true }

@@ -24,6 +24,7 @@ struct MeetingRecordTab: View {
     @State private var selectedType: MeetingType = .general
     @State private var timer: Timer?
     @State private var audioUpdateTimer: Timer?
+    private let meetingAppDetector = MeetingAppDetector()
     @State private var showClearConfirmation = false
     @State private var showTranscript = true
     @State private var scrollProxy: ScrollViewProxy?
@@ -69,6 +70,13 @@ struct MeetingRecordTab: View {
             typePicker
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
+
+            if let app = liveState.detectedMeetingApp {
+                Divider()
+                meetingAppIndicator(app: app)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
+            }
 
             Divider()
 
@@ -194,6 +202,25 @@ struct MeetingRecordTab: View {
             .fixedSize()
             .disabled(liveState.isRecording)
 
+            Spacer()
+        }
+    }
+
+    // MARK: - Meeting App Indicator
+
+    private func meetingAppIndicator(app: MeetingApp) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: app.icon)
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            Text(app.displayName)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !liveState.detectedParticipants.isEmpty {
+                Text("\(liveState.detectedParticipants.count) participant\(liveState.detectedParticipants.count == 1 ? "" : "s")")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
             Spacer()
         }
     }
@@ -826,6 +853,21 @@ struct MeetingRecordTab: View {
 
             startTimer()
             startAudioLevelUpdates()
+
+            // Detect active meeting app and extract participants
+            if Settings.shared.meetingAppDetectionEnabled {
+                if let result = MeetingAppDetector.detectActiveMeetingApp() {
+                    liveState.detectedMeetingApp = result.app
+                    let participants = meetingAppDetector.extractParticipants(for: result.app, pid: result.pid)
+                    liveState.detectedParticipants = participants
+                    Logger.shared.info("Meeting app detected: \(result.app.displayName) with \(participants.count) participant(s)", category: .transcription)
+
+                    // Poll for participant updates during recording
+                    meetingAppDetector.startPolling(interval: 15) { [liveState] updated in
+                        liveState.detectedParticipants = updated.participants
+                    }
+                }
+            }
         } catch {
             liveState.statusMessage = "Failed to start: \(error.localizedDescription)"
             liveState.status = .ready
@@ -836,6 +878,7 @@ struct MeetingRecordTab: View {
         liveState.status = .processing
         liveState.statusMessage = "Finalizing transcription..."
 
+        meetingAppDetector.stopPolling()
         stopTimer()
         stopAudioLevelUpdates()
 
