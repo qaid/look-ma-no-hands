@@ -845,6 +845,12 @@ struct SettingsView: View {
                             Text(error)
                                 .font(.caption)
                                 .foregroundColor(.red)
+                            Button("Retry") {
+                                modelDownloadError = nil
+                                handleModelChange(to: settings.whisperModel)
+                            }
+                            .font(.caption)
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
