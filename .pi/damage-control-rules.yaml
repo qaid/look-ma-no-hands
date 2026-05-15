@@ -1,0 +1,79 @@
+# Look Ma No Hands — Pi Damage-Control Rules
+# Hard blocks, ask-first patterns, zero-access paths, read-only paths, no-delete paths.
+
+bashToolPatterns:
+  # Hard blocks — no confirmation, always rejected
+  - pattern: "rm\\s+-rf\\s+/"
+    reason: "rm -rf / is always blocked"
+  - pattern: "git\\s+reset\\s+--hard"
+    reason: "git reset --hard discards uncommitted work — use git stash or revert instead"
+  - pattern: "git\\s+push\\s+(--force|-f)\\b"
+    reason: "force push is blocked — use --force-with-lease instead (it is a distinct flag, not a modifier of --force)"
+  - pattern: "\\|\\s*bash"
+    reason: "pipe to bash is blocked — never execute piped shell input"
+  - pattern: "\\|\\s*sh\\b"
+    reason: "pipe to sh is blocked — never execute piped shell input"
+
+  # Ask-first — requires explicit confirmation
+  - pattern: "rm\\s+-rf\\s+"
+    reason: "recursive delete requires confirmation"
+    ask: true
+  - pattern: "git\\s+push\\s+origin\\s+main"
+    reason: "push to main requires explicit user confirmation"
+    ask: true
+  - pattern: "git\\s+push\\s+origin\\s+master"
+    reason: "push to master requires explicit user confirmation"
+    ask: true
+  - pattern: "swift\\s+package\\s+reset"
+    reason: "swift package reset wipes the build cache and resolved dependencies — confirm first"
+    ask: true
+  - pattern: "killall\\s+"
+    reason: "killing system processes requires confirmation"
+    ask: true
+  - pattern: "defaults\\s+write\\s+"
+    reason: "writing macOS defaults modifies system/app configuration — confirm first"
+    ask: true
+  - pattern: "codesign\\s+--force"
+    reason: "force code signing overwrites existing signatures — confirm first"
+    ask: true
+  - pattern: "xattr\\s+-rd\\s+com\\.apple\\.quarantine"
+    reason: "removing quarantine attribute requires confirmation"
+    ask: true
+  - pattern: "git\\s+clean\\s+-[a-z]*f[a-z]*"
+    reason: "git clean -f/fd/fdx removes untracked files permanently — use git stash or confirm intent"
+    ask: true
+
+zeroAccessPaths:
+  - ".env"
+  - "~/.ssh/"
+  - "~/.aws/"
+  - "*.pem"
+  - "*.key"
+  - "*.p12"
+  - "*.provisionprofile"
+  - "*.mobileprovision"
+  - "*.cer"
+  - "Certificates.p12"
+
+readOnlyPaths:
+  - "/etc/"
+  - "/usr/"
+  - "Package.resolved"
+  - ".build/"
+  - "*.app/"
+  - ".swiftpm/"
+
+noDeletePaths:
+  - ".git/"
+  - "CLAUDE.md"
+  - "Package.swift"
+  - "Sources/"
+  - "Tests/"
+  - "Resources/"
+  - "scripts/deploy.sh"
+  - ".pi/settings.json"
+  - ".pi/damage-control-rules.yaml"
+  - "memory/MEMORY.md"
+  - "memory/last-session.md"
+  - "memory/session-log/"
+  - "expertise/"

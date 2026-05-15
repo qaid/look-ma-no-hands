@@ -1,0 +1,53 @@
+# Look Ma No Hands agent chain definitions
+# Sequential pipelines used by the agent-chain extension.
+# $INPUT = user's initial prompt. $ORIGINAL = always the initial prompt.
+
+# Open a session with a status briefing
+session-open:
+  description: "Read last-session handoff and surface current priorities"
+  steps:
+    - agent: orchestrator
+      prompt: |
+        Run /lmnh-heartbeat to produce a project status briefing.
+        Context: $INPUT
+
+# Decompose an initiative then coordinate the first implementation step
+plan-and-dispatch:
+  description: "Planner decomposes, orchestrator reads DISPATCH and coordinates"
+  steps:
+    - agent: planner
+      prompt: |
+        Decompose this initiative into a phased plan and return a DISPATCH block
+        for the first implementation phase: $INPUT
+    - agent: orchestrator
+      prompt: |
+        Planner output: $INPUT
+        Original request: $ORIGINAL
+        Read the DISPATCH block. Assess fast-path vs standard-path.
+        Coordinate the appropriate next step.
+
+# Given an issue number, run the full planning and dispatch chain
+issue-to-pr:
+  description: "Issue number in -> PR ready to merge out"
+  steps:
+    - agent: planner
+      prompt: |
+        The orchestrator will run this command to give you the issue details:
+        gh issue view $INPUT --repo qaid/look-ma-no-hands --json number,title,body
+        Read the issue. Assess scope. Check for an open PR already.
+        Return a DISPATCH block.
+    - agent: orchestrator
+      prompt: |
+        Planner DISPATCH block: $INPUT
+        Original issue: $ORIGINAL
+        Coordinate implementation via engineering-manager using the DISPATCH fields.
+        Report the OUTCOME to Q. when done.
+
+# Wrap up session, write handoff
+session-close:
+  description: "End-of-session: log, handoff file"
+  steps:
+    - agent: orchestrator
+      prompt: |
+        Run /lmnh-wrap-up to write the session handoff file and session log.
+        Session context to include: $INPUT
