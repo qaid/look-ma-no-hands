@@ -54,8 +54,7 @@ class WhisperService: @unchecked Sendable {
         let computeOptions = ModelComputeOptions(
             melCompute: .cpuAndGPU,
             audioEncoderCompute: .cpuAndNeuralEngine,
-            textDecoderCompute: .cpuAndNeuralEngine,
-            prefillCompute: .cpuAndNeuralEngine
+            textDecoderCompute: .cpuAndNeuralEngine
         )
 
         // When the model is already downloaded, load from the local folder directly.
@@ -170,7 +169,7 @@ class WhisperService: @unchecked Sendable {
         // Log granular timing breakdown from WhisperKit
         if let timings = results.first?.timings {
             let ttft = timings.firstTokenTime - timings.pipelineStart
-            Logger.shared.info("📊 WhisperKit timings: encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, prefill=\(String(format: "%.3f", timings.prefill))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond)), RTF=\(String(format: "%.3f", timings.realTimeFactor))", category: .transcription)
+            Logger.shared.info("📊 WhisperKit timings: encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond)), RTF=\(String(format: "%.3f", timings.realTimeFactor))", category: .transcription)
         }
 
         let text = results.map { $0.text }.joined(separator: " ")
@@ -186,7 +185,7 @@ class WhisperService: @unchecked Sendable {
             // Log fallback timings
             if let timings = fallbackResults.first?.timings {
                 let ttft = timings.firstTokenTime - timings.pipelineStart
-                Logger.shared.info("📊 WhisperKit timings (fallback): encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, prefill=\(String(format: "%.3f", timings.prefill))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond))", category: .transcription)
+                Logger.shared.info("📊 WhisperKit timings (fallback): encoding=\(String(format: "%.3f", timings.encoding))s, decoding=\(String(format: "%.3f", timings.decodingPredictions))s, logmels=\(String(format: "%.3f", timings.logmels))s, TTFT=\(String(format: "%.3f", ttft))s, tok/s=\(String(format: "%.1f", timings.tokensPerSecond))", category: .transcription)
             }
 
             let fallbackText = fallbackResults.map { $0.text }.joined(separator: " ")
