@@ -3,7 +3,7 @@
 Fast, local voice dictation and meeting transcription for macOS. Use custom keyboard shortcuts for instant dictation, or record video calls with AI-powered meeting notes.
 
 <p align="center">
-  <img width="2976" height="1550" alt="image" src="https://github.com/user-attachments/assets/6397ab5a-ea21-43cd-9128-e118d572e089]" />
+  <img width="800" height="394" alt="scopematch-repo-banner" src="https://github.com/user-attachments/assets/5f69fed6-8b2f-4cc9-86cd-32d49b7178a5" />
 </p>
 
 | |  | |
