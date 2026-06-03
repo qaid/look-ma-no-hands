@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import AVFoundation
+import CoreAudio
 
 /// AppDelegate handles menu bar setup and application lifecycle
 /// This is where we configure the app to run as a menu bar app without a dock icon
@@ -28,6 +29,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     // Focused element before recording started (for restoring focus on cancel)
     private var focusedElementBeforeRecording: AXUIElement?
     private var cursorSnapshotBeforeRecording: CursorSnapshot?
+
+    // System audio mute state — saved/restored around recording when muteWhileRecording is on
+    private var savedMuteState: UInt32 = 0
+    private var didMute = false
 
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
@@ -1138,6 +1143,74 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         startOrStopRecording()
     }
 
+    // MARK: - Sound cues
+
+    /// Play a named system sound if sound effects are enabled.
+    private func playSoundCue(_ name: NSSound.Name) {
+        guard Settings.shared.soundEffectsEnabled else { return }
+        NSSound(named: name)?.play()
+    }
+
+    // MARK: - System audio mute helpers
+
+    /// Returns the AudioDeviceID of the current default output device, or nil on error.
+    private func defaultOutputDeviceID() -> AudioDeviceID? {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var devID = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let status = AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &size, &devID)
+        return status == noErr ? devID : nil
+    }
+
+    /// The CoreAudio property address for the output mute control.
+    private func mutePropertyAddress() -> AudioObjectPropertyAddress {
+        AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioDevicePropertyScopeOutput,
+            mElement: kAudioObjectPropertyElementMain)
+    }
+
+    /// Mutes the default output device and saves its prior mute state.
+    /// Skips silently if the device does not support the mute property or muting fails.
+    private func muteSystemOutput() {
+        guard Settings.shared.muteWhileRecording,
+              let dev = defaultOutputDeviceID() else { return }
+        var addr = mutePropertyAddress()
+
+        // Only proceed if the property is settable on this device
+        var settable: DarwinBoolean = false
+        guard AudioObjectIsPropertySettable(dev, &addr, &settable) == noErr,
+              settable.boolValue else { return }
+
+        // Save the current mute state so we can restore it precisely
+        var prior: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(dev, &addr, 0, nil, &size, &prior) == noErr else { return }
+        savedMuteState = prior
+
+        var muted: UInt32 = 1
+        let status = AudioObjectSetPropertyData(
+            dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &muted)
+        if status == noErr {
+            didMute = true
+        }
+    }
+
+    /// Restores the saved mute state on the default output device.
+    /// Safe to call even when muting was skipped (idempotent via didMute guard).
+    private func restoreSystemOutputMute() {
+        guard didMute, let dev = defaultOutputDeviceID() else { return }
+        var addr = mutePropertyAddress()
+        var val = savedMuteState
+        _ = AudioObjectSetPropertyData(
+            dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &val)
+        didMute = false
+    }
+
     /// Start or stop recording (used by menu bar, URL scheme, and hotkey)
     /// This method bypasses the hotkeyEnabled check - it's for manual user actions
     private func startOrStopRecording() {
@@ -1196,6 +1269,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
             mediaControlService.resumeMedia()
         }
+
+        // Restore system audio mute state if we muted it
+        restoreSystemOutputMute()
 
         NSLog("✅ Recording canceled - no text will be inserted")
     }
@@ -1295,6 +1371,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             try audioRecorder.startRecording()
             print("Recording started")
 
+            // Play start cue synchronously (guard is inside helper)
+            playSoundCue("Tink")
+
+            // Mute system output synchronously — must NOT be inside the delayed Task below,
+            // because a short recording (quick double-tap / instant ESC) could restore the volume
+            // before the delayed mute fires, leaving output stuck muted.
+            muteSystemOutput()
+
             // CRITICAL: Pause media AFTER starting AVAudioEngine (not before)
             // This ensures we re-pause even if AVAudioEngine.start() triggers a system event that resumes media
             if Settings.shared.pauseMediaDuringDictation {
@@ -1329,6 +1413,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
                 mediaControlService.resumeMedia()
             }
+
+            // Restore system audio mute state if we muted it
+            restoreSystemOutputMute()
 
             // Hide indicator with slight delay to ensure proper cleanup
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
@@ -1446,6 +1533,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             MusicPlayerController.shared.resumePreviouslyPlayingPlayers()
             mediaControlService.resumeMedia()
         }
+
+        // Restore system audio mute state if we muted it
+        restoreSystemOutputMute()
+
+        // Play stop cue
+        playSoundCue("Pop")
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
 

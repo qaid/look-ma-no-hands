@@ -443,6 +443,32 @@ struct SettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            // Sound Effects Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sound Effects")
+                    .font(.headline)
+
+                Toggle("Play sound effects", isOn: $settings.soundEffectsEnabled)
+                    .toggleStyle(.checkbox)
+
+                Text("Plays a sound when dictation starts and stops")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Mute While Recording Section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mute While Recording")
+                    .font(.headline)
+
+                Toggle("Mute system audio while recording", isOn: $settings.muteWhileRecording)
+                    .toggleStyle(.checkbox)
+
+                Text("Silences speaker output during dictation to prevent audio bleed into the transcription")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             Divider()
                 .padding(.vertical, 12)
 
