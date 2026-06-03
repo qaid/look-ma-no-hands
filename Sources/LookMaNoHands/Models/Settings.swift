@@ -288,6 +288,10 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let lastUpdateCheckDate = "lastUpdateCheckDate"
         static let skippedUpdateSHA = "skippedUpdateSHA"
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
+        static let soundEffectsEnabled = "soundEffectsEnabled"
+        static let dictationStartSound = "dictationStartSound"
+        static let dictationStopSound = "dictationStopSound"
+        static let muteWhileRecording = "muteWhileRecording"
         static let hotkeyEnabled = "hotkeyEnabled"
         static let toggleHotkeyShortcut = "toggleHotkeyShortcut"
         static let meetingRetentionDays = "meetingRetentionDays"
@@ -430,6 +434,34 @@ Now produce the complete meeting notes following the format above. Ensure every 
     @Published var pauseMediaDuringDictation: Bool {
         didSet {
             UserDefaults.standard.set(pauseMediaDuringDictation, forKey: Keys.pauseMediaDuringDictation)
+        }
+    }
+
+    /// Whether to play a sound cue at dictation start and stop
+    @Published var soundEffectsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(soundEffectsEnabled, forKey: Keys.soundEffectsEnabled)
+        }
+    }
+
+    /// Name of the NSSound to play when dictation starts
+    @Published var dictationStartSound: String {
+        didSet {
+            UserDefaults.standard.set(dictationStartSound, forKey: Keys.dictationStartSound)
+        }
+    }
+
+    /// Name of the NSSound to play when dictation stops
+    @Published var dictationStopSound: String {
+        didSet {
+            UserDefaults.standard.set(dictationStopSound, forKey: Keys.dictationStopSound)
+        }
+    }
+
+    /// Whether to mute system audio output during dictation to prevent speaker bleed
+    @Published var muteWhileRecording: Bool {
+        didSet {
+            UserDefaults.standard.set(muteWhileRecording, forKey: Keys.muteWhileRecording)
         }
     }
 
@@ -610,6 +642,24 @@ Now produce the complete meeting notes following the format above. Ensure every 
             self.pauseMediaDuringDictation = UserDefaults.standard.bool(forKey: Keys.pauseMediaDuringDictation)
         } else {
             self.pauseMediaDuringDictation = true
+        }
+
+        // Sound effects defaults to true (enabled by default)
+        if UserDefaults.standard.object(forKey: Keys.soundEffectsEnabled) != nil {
+            self.soundEffectsEnabled = UserDefaults.standard.bool(forKey: Keys.soundEffectsEnabled)
+        } else {
+            self.soundEffectsEnabled = true
+        }
+
+        // Sound names default to Tink (start) and Pop (stop)
+        self.dictationStartSound = UserDefaults.standard.string(forKey: Keys.dictationStartSound) ?? "Tink"
+        self.dictationStopSound = UserDefaults.standard.string(forKey: Keys.dictationStopSound) ?? "Pop"
+
+        // Mute while recording defaults to false (opt-in)
+        if UserDefaults.standard.object(forKey: Keys.muteWhileRecording) != nil {
+            self.muteWhileRecording = UserDefaults.standard.bool(forKey: Keys.muteWhileRecording)
+        } else {
+            self.muteWhileRecording = false
         }
 
         // Hotkey enabled defaults to true (enabled by default)
@@ -824,6 +874,10 @@ Now produce the complete meeting notes following the format above. Ensure every 
         lastUpdateCheckDate = nil
         skippedUpdateSHA = nil
         pauseMediaDuringDictation = true
+        soundEffectsEnabled = true
+        dictationStartSound = "Tink"
+        dictationStopSound = "Pop"
+        muteWhileRecording = false
         hotkeyEnabled = true
         toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
         meetingRetentionDays = 90
