@@ -1372,7 +1372,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             print("Recording started")
 
             // Play start cue synchronously (guard is inside helper)
-            playSoundCue("Tink")
+            playSoundCue(NSSound.Name(Settings.shared.dictationStartSound))
 
             // Mute system output synchronously — must NOT be inside the delayed Task below,
             // because a short recording (quick double-tap / instant ESC) could restore the volume
@@ -1538,7 +1538,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         restoreSystemOutputMute()
 
         // Play stop cue
-        playSoundCue("Pop")
+        playSoundCue(NSSound.Name(Settings.shared.dictationStopSound))
 
         Logger.shared.info("📊 Pipeline started: \(audioSamples.count) samples (\(String(format: "%.1f", Double(audioSamples.count) / 16000.0))s audio)", category: .transcription)
 

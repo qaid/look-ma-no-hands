@@ -451,6 +451,42 @@ struct SettingsView: View {
                 Toggle("Play sound effects", isOn: $settings.soundEffectsEnabled)
                     .toggleStyle(.checkbox)
 
+                if settings.soundEffectsEnabled {
+                    let soundNames = ["Tink", "Pop", "Ping", "Glass", "Blow", "Bottle", "Frog", "Funk", "Hero", "Morse", "Purr", "Basso", "Sosumi", "Submarine"]
+
+                    HStack(spacing: 12) {
+                        Text("Start sound")
+                            .frame(width: 80, alignment: .leading)
+                        Picker("", selection: $settings.dictationStartSound) {
+                            ForEach(soundNames, id: \.self) { name in
+                                Text(name).tag(name)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 130)
+                        Button("▶") {
+                            NSSound(named: NSSound.Name(settings.dictationStartSound))?.play()
+                        }
+                        .buttonStyle(.borderless)
+                    }
+
+                    HStack(spacing: 12) {
+                        Text("Stop sound")
+                            .frame(width: 80, alignment: .leading)
+                        Picker("", selection: $settings.dictationStopSound) {
+                            ForEach(soundNames, id: \.self) { name in
+                                Text(name).tag(name)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .frame(width: 130)
+                        Button("▶") {
+                            NSSound(named: NSSound.Name(settings.dictationStopSound))?.play()
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+
                 Text("Plays a sound when dictation starts and stops")
                     .font(.caption)
                     .foregroundColor(.secondary)

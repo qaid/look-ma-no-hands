@@ -289,6 +289,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         static let skippedUpdateSHA = "skippedUpdateSHA"
         static let pauseMediaDuringDictation = "pauseMediaDuringDictation"
         static let soundEffectsEnabled = "soundEffectsEnabled"
+        static let dictationStartSound = "dictationStartSound"
+        static let dictationStopSound = "dictationStopSound"
         static let muteWhileRecording = "muteWhileRecording"
         static let hotkeyEnabled = "hotkeyEnabled"
         static let toggleHotkeyShortcut = "toggleHotkeyShortcut"
@@ -439,6 +441,20 @@ Now produce the complete meeting notes following the format above. Ensure every 
     @Published var soundEffectsEnabled: Bool {
         didSet {
             UserDefaults.standard.set(soundEffectsEnabled, forKey: Keys.soundEffectsEnabled)
+        }
+    }
+
+    /// Name of the NSSound to play when dictation starts
+    @Published var dictationStartSound: String {
+        didSet {
+            UserDefaults.standard.set(dictationStartSound, forKey: Keys.dictationStartSound)
+        }
+    }
+
+    /// Name of the NSSound to play when dictation stops
+    @Published var dictationStopSound: String {
+        didSet {
+            UserDefaults.standard.set(dictationStopSound, forKey: Keys.dictationStopSound)
         }
     }
 
@@ -634,6 +650,10 @@ Now produce the complete meeting notes following the format above. Ensure every 
         } else {
             self.soundEffectsEnabled = true
         }
+
+        // Sound names default to Tink (start) and Pop (stop)
+        self.dictationStartSound = UserDefaults.standard.string(forKey: Keys.dictationStartSound) ?? "Tink"
+        self.dictationStopSound = UserDefaults.standard.string(forKey: Keys.dictationStopSound) ?? "Pop"
 
         // Mute while recording defaults to false (opt-in)
         if UserDefaults.standard.object(forKey: Keys.muteWhileRecording) != nil {
@@ -855,6 +875,8 @@ Now produce the complete meeting notes following the format above. Ensure every 
         skippedUpdateSHA = nil
         pauseMediaDuringDictation = true
         soundEffectsEnabled = true
+        dictationStartSound = "Tink"
+        dictationStopSound = "Pop"
         muteWhileRecording = false
         hotkeyEnabled = true
         toggleHotkeyShortcut = Hotkey(keyCode: 2, modifiers: .init(command: true, shift: true))
