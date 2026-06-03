@@ -33,6 +33,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     // System audio mute state — saved/restored around recording when muteWhileRecording is on
     private var savedMuteState: UInt32 = 0
     private var didMute = false
+    // The specific device that was muted; captured at mute time so restore targets the same device
+    // even if the user switches the default output device mid-recording.
+    private var mutedDeviceID: AudioDeviceID?
 
     // Popover for menu bar content (alternative to dropdown menu)
     private var popover: NSPopover?
@@ -1197,18 +1200,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &muted)
         if status == noErr {
             didMute = true
+            mutedDeviceID = dev  // Remember which device was muted for accurate restore
         }
     }
 
-    /// Restores the saved mute state on the default output device.
+    /// Restores the saved mute state on the device that was muted.
+    /// Uses the stored mutedDeviceID rather than re-querying the default output device, so a
+    /// mid-recording device switch doesn't leave the original device stuck muted.
     /// Safe to call even when muting was skipped (idempotent via didMute guard).
     private func restoreSystemOutputMute() {
-        guard didMute, let dev = defaultOutputDeviceID() else { return }
+        guard didMute, let dev = mutedDeviceID else { return }
         var addr = mutePropertyAddress()
         var val = savedMuteState
         _ = AudioObjectSetPropertyData(
             dev, &addr, 0, nil, UInt32(MemoryLayout<UInt32>.size), &val)
         didMute = false
+        mutedDeviceID = nil
     }
 
     /// Start or stop recording (used by menu bar, URL scheme, and hotkey)
@@ -1366,8 +1373,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Show recording indicator
         recordingIndicator.show()
 
-        // Play start cue BEFORE AVAudioEngine starts — NSSound is silenced by the engine once active
-        playSoundCue(NSSound.Name(Settings.shared.dictationStartSound))
+        // Play start cue BEFORE AVAudioEngine starts — NSSound is silenced by the engine once active.
+        // Skip the start cue when mute-while-recording is on: muteSystemOutput() fires a few ms after
+        // NSSound.play() and would cut the cue off mid-play anyway, so playing it is pointless noise.
+        if !Settings.shared.muteWhileRecording {
+            playSoundCue(NSSound.Name(Settings.shared.dictationStartSound))
+        }
 
         // Start audio recording FIRST
         do {
