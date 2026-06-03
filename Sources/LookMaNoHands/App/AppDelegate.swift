@@ -1366,13 +1366,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         // Show recording indicator
         recordingIndicator.show()
 
+        // Play start cue BEFORE AVAudioEngine starts — NSSound is silenced by the engine once active
+        playSoundCue(NSSound.Name(Settings.shared.dictationStartSound))
+
         // Start audio recording FIRST
         do {
             try audioRecorder.startRecording()
             print("Recording started")
-
-            // Play start cue synchronously (guard is inside helper)
-            playSoundCue(NSSound.Name(Settings.shared.dictationStartSound))
 
             // Mute system output synchronously — must NOT be inside the delayed Task below,
             // because a short recording (quick double-tap / instant ESC) could restore the volume
