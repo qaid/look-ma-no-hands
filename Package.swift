@@ -15,7 +15,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.0.0"),
+        .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.1.1"),
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1")
     ],
     targets: [
